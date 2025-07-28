@@ -17,6 +17,8 @@ DisplayModules display;
 EvilPortalAddtional eportal;
 NRF24Modules nrf;
 
+
+// https://github.com/pr3y/Bruce/blob/main/src/main.cpp
 void __attribute__((weak)) taskHandleInput(void *parameter) {
 	auto timer = millis();
 	while (true) {
@@ -56,31 +58,25 @@ void menuinit() {
 void displayWelcome() {
 	display.clearScreen();
 	String title = "ESP32 Attack Tool";
-	String version_num = "v2.2.1";
-	int xTitle = (SCR_WIDTH - (title.length() * 6)) / 2;
-	int xVersion = (SCR_WIDTH - (version_num.length() * 6)) / 2;
+	String version_num = ATTACK_TOOL_VERSION;
 	int yTitle = SCR_HEIGHT / 2 - 5;
 	int yVersion = SCR_HEIGHT / 2 + 5;
-	display.displayStringwithCoordinates(title, xTitle, yTitle);
-	display.displayStringwithCoordinates(version_num, xVersion, yVersion, true);
+	display.drawingCenterString(title, yTitle);
+	display.drawingCenterString(version_num, yVersion, true);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
 	display.clearScreen();
 	String footer1 = "Code By";
 	String footer2 = "@Ohminecraft";
-	int xFooter1 = (SCR_WIDTH - (footer1.length() * 6)) / 2;
-	int xFooter2 = (SCR_WIDTH - (footer2.length() * 6)) / 2;
-	display.displayStringwithCoordinates(footer1, xFooter1, yTitle);
-	display.displayStringwithCoordinates(footer2, xFooter2, yVersion, true);
+	display.drawingCenterString(footer1, yTitle);
+	display.drawingCenterString(footer2, yVersion, true);
 	display.displayInvert(true);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
 	display.displayInvert(false);
 	display.clearScreen();
 	String readyText1 = "Welcome Hacker";
 	String readyText2 = "Home!";
-	int xReady1 = (SCR_WIDTH - (readyText1.length() * 6)) / 2;
-	int xReady2 = (SCR_WIDTH - (readyText2.length() * 6)) / 2;
-	display.displayStringwithCoordinates(readyText1, xReady1, yTitle);
-	display.displayStringwithCoordinates(readyText2, xReady2, yVersion, true);
+	display.drawingCenterString(readyText1, yTitle);
+	display.drawingCenterString(readyText2, yVersion, true);
 }
 
 void displayMainMenu() {
@@ -1224,13 +1220,11 @@ void selectCurrentItem() {
 				if (currentSelection == NRF24_ANALYZER) {
 					currentState = NRF24_ANALYZER_RUNNING;
 					display.clearScreen();
-					nrfAnalyzerRunning = true;
 					nrfAnalyzerSetupOneShot = false;
 				}
 				else if (currentSelection == NRF24_SCANNER) {
 					currentState = NRF24_SCANNER_RUNNING;
 					display.clearScreen();
-					nrfScannerRunning = true;
 					nrfScannerSetupOneShot = false;
 				}
 				else if (currentSelection == NRF24_JAMMER) {
@@ -1411,7 +1405,6 @@ void goBack() {
 			currentState = NRF24_MENU;
 			currentSelection = 0;
 			maxSelections = NRF24_MENU_COUNT;
-			nrfAnalyzerRunning = false;
 			nrfAnalyzerSetupOneShot = false;
 			nrf.shutdownNRF();
 			displayNRF24Menu();
@@ -1426,7 +1419,6 @@ void goBack() {
 			currentState = NRF24_JAMMER_MENU;
 			currentSelection = 0;
 			maxSelections = NRF24_JAM_MENU_COUNT;
-			nrfJammerRunning = false;
 			nrfJammerSetupOneShot = false;
 			digitalWrite(STA_LED, LOW);
 			nrf.shutdownNRFJammer();
@@ -1436,7 +1428,6 @@ void goBack() {
 			currentState = NRF24_MENU;
 			currentSelection = 0;
 			maxSelections = NRF24_MENU_COUNT;
-			nrfScannerRunning = false;
 			nrfScannerSetupOneShot = false;
 			display.setCursor(0, 0);
 			displayNRF24Menu();
@@ -1641,7 +1632,6 @@ void startNRFJammer(NRFJammerMode jammer_mode) {
 
 	Serial.println("[INFO] Starting Jamming | Mode: " + strmode);
 
-	nrfJammerRunning = true;
 	nrfJammerSetupOneShot = false;
 	currentState = NRF24_JAMMER_RUNNING;
 
@@ -1837,7 +1827,7 @@ void menuloop() {
 
 	}
 
-	else if (nrfAnalyzerRunning) {
+	else if (currentState == NRF24_ANALYZER_RUNNING) {
 		if (!nrfAnalyzerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Analyzer");
 			nrf.analyzerSetup();
@@ -1846,7 +1836,7 @@ void menuloop() {
 		nrfAnalyzer();
 	}
 
-	else if (nrfJammerRunning) {
+	else if (currentState == NRF24_JAMMER_RUNNING) {
 		if (!nrfJammerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Jammer");
 			nrf.jammerNRFRadioSetup();
@@ -1855,11 +1845,11 @@ void menuloop() {
 		nrf.jammerNRFRadioMain(currentNRFJammerMode);
 	}
 
-	else if (nrfScannerRunning) {
+	else if (currentState == NRF24_SCANNER_RUNNING) {
 		if (!nrfScannerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Scanner");
-			nrfScannerSetupOneShot = true;
 			nrf.scannerSetup();
+			nrfScannerSetupOneShot = true;
 		}
 		nrfScanner();
 	}

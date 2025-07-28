@@ -20,6 +20,8 @@
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
 
+#define ATTACK_TOOL_VERSION "2.2.1"
+
 #define MAX_SHOW_SECLECTION 4
 
 #ifdef WIFI_SCAN_RUNNING
@@ -315,11 +317,8 @@ bool fixDeauthFloodDisplayLoop = false;
 bool evilPortalOneShot = false;
 
 // NRF24
-bool nrfAnalyzerRunning = false;
 bool nrfAnalyzerSetupOneShot = false;
-bool nrfJammerRunning = false;
 bool nrfJammerSetupOneShot = false;
-bool nrfScannerRunning = false;
 bool nrfScannerSetupOneShot = false;
 
 void menuinit();

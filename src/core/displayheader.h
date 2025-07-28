@@ -58,17 +58,18 @@ class DisplayModules
         void drawingRect(int x, int y, int w, int h, bool fill_rect = true, int color = WHITE);
         void printString(String msg);
         void displayString(String msg, bool ln = false, bool senddisplay = false, int color = WHITE);
+        void drawingCenterString(String msg, int y, bool senddisplay = false, int color = WHITE);
         void displayInvert(bool invert);
         void displayStringwithCoordinates(String msg, int x, int y, bool senddisplay = false, int color = WHITE);
         String wrapText(String input, int lineWidth = 21);
-        void displayBuffer();
+        //void displayBuffer();
         void simpleStrikethrough(String text, int x, int y);
         void displayEvilPortalText(String username, String password);
         void drawingVLine(int x, int y, int h, int color = WHITE);
         void drawingLine(int x1, int y1, int x2, int y2, bool sendDisplay = false);
         void drawingPixel(int x, int y, bool sendDisplay = false);
         void sendDisplay();
-        void addToBuffer(String msg);
+        //void addToBuffer(String msg);
         
         // Additional U8g2 specific methods you might want to add
         void setCursor(int x, int y);

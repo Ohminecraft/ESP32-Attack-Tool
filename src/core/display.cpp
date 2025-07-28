@@ -12,17 +12,17 @@
 
 DisplayModules::DisplayModules() :
     u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE),
-    display_buffer(nullptr),
+    //display_buffer(nullptr),
     screenInitialized(false)
 {
 }
 
 DisplayModules::~DisplayModules()
 {
-    if (display_buffer != nullptr) {
-        delete display_buffer;
-        display_buffer = nullptr;
-    }
+    //if (display_buffer != nullptr) {
+    //    delete display_buffer;
+    //    display_buffer = nullptr;
+    //}
 }
 
 bool DisplayModules::main()
@@ -31,7 +31,7 @@ bool DisplayModules::main()
         Serial.println("[INFO] Display already initialized, skipping...");
         return true;
     }
-    display_buffer = new LinkedList<String>();
+    //display_buffer = new LinkedList<String>();
 
     Serial.println("[INFO] Initializing Display...");
     
@@ -116,6 +116,23 @@ void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int co
     }
 }
 
+void DisplayModules::drawingCenterString(String msg, int y, bool senddisplay, int color)
+{
+    if (!screenInitialized) {
+        Serial.println("[ERROR] Display not initialized, cannot draw centered text.");
+        return;
+    }
+    
+    // Calculate X position to center the text
+    int x = (SCR_WIDTH - msg.length()) / 2;
+    
+    u8g2.drawStr(x, y, msg.c_str());
+    
+    if (senddisplay) {
+        u8g2.sendBuffer();
+    }
+}
+
 void DisplayModules::drawingRect(int x, int y, int w, int h, bool fill_rect, int color)
 {
     if (!screenInitialized) {
@@ -164,6 +181,7 @@ void DisplayModules::displayStringwithCoordinates(String msg, int x, int y, bool
     }
 }
 
+/*
 void DisplayModules::displayBuffer()
 {
     if (!screenInitialized) {
@@ -200,6 +218,7 @@ void DisplayModules::displayBuffer()
     }
     u8g2.sendBuffer();
 }
+    */
 
 void DisplayModules::displayEvilPortalText(String username, String password) 
 {
@@ -255,6 +274,7 @@ void DisplayModules::sendDisplay()
     u8g2.sendBuffer();
 }
 
+/*
 // Method to add text to display buffer
 void DisplayModules::addToBuffer(String msg)
 {
@@ -262,6 +282,7 @@ void DisplayModules::addToBuffer(String msg)
         display_buffer->add(msg);
     }
 }
+*/
 
 // New method for proper text wrapping without spaces
 int DisplayModules::drawWrappedText(String text, int x, int y, int charsPerLine)
