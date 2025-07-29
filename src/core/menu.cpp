@@ -831,7 +831,7 @@ void displayAttackStatus() {
 	
 	if (currentState == WIFI_ATTACK_RUNNING) {
 		String packetStr = "packet/sec: ";
-		packetStr.concat(wifi.packet_sent);
+		packetStr.concat(String(wifi.packet_sent).toInt());
 		display.displayStringwithCoordinates(packetStr, 0, 36, true);
 	} else if (currentState == BLE_ATTACK_RUNNING) {
 		display.displayStringwithCoordinates("Advertising...", 0, 36, true);
@@ -2008,9 +2008,9 @@ void handleTasks(MenuState handle_state) {
 			// i can't using != for wtf reason, idk to fix this
 			// Deauth Flood using different redraw
 		} else {
-			if (millis() - lastDisplayUpdate > 1000) {
-				wifi.packet_sent = 0;
+			if (millis() - lastDisplayUpdate > 2000) {
 				displayAttackStatus();
+				wifi.packet_sent = 0;
 				lastDisplayUpdate = millis();
 			}
 		}

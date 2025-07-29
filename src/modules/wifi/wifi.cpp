@@ -356,7 +356,7 @@ void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
 	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
 
-	packet_sent += 3;
+	packet_sent = packet_sent + 3;
 	
 	static unsigned long lastTime = 0;
     unsigned long currentMillis = millis();
@@ -411,7 +411,7 @@ void WiFiModules::sendBeaconRandomSSID() {
 
 	esp_err_t res = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
 	
-	packet_sent += 1;
+	packet_sent = packet_sent + 1;
 
 	static unsigned long lastTime = 0;
     unsigned long currentMillis = millis();
@@ -456,7 +456,7 @@ void WiFiModules::sendDeauthAttack() {
 			esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 			esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 
-			packet_sent += 3;
+			packet_sent = packet_sent + 3;
 
 			static unsigned long lastTime = 0;
 			unsigned long currentMillis = millis();
@@ -521,7 +521,7 @@ void WiFiModules::sendProbeAttack() {
 			esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, good_probe_req_packet, sizeof(good_probe_req_packet), false);
 			esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, good_probe_req_packet, sizeof(good_probe_req_packet), false);
 
-			packet_sent += 3;
+			packet_sent = packet_sent + 3;
 
 			static unsigned long lastTime = 0;
 			unsigned long currentMillis = millis();
