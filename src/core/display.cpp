@@ -12,7 +12,7 @@
 
 DisplayModules::DisplayModules() :
     u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE),
-    //display_buffer(nullptr),
+    display_buffer(nullptr),
     screenInitialized(false)
 {
 }
@@ -34,7 +34,14 @@ bool DisplayModules::main()
     //display_buffer = new LinkedList<String>();
 
     Serial.println("[INFO] Initializing Display...");
-    
+
+    #if defined(_SPI_SCREEN)
+        // Initialize SPI display
+        // Initialize U8g2 with SPI for SSD1306 display
+        digitalWrite(CS_PIN, LOW);
+        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, CS_PIN);
+        u8g2.setBusClock(16000000); // Set SPI clock speed
+    #endif
     // Initialize U8g2 display
     u8g2.begin();
     u8g2.enableUTF8Print();  // Enable UTF8 support if needed
@@ -110,23 +117,6 @@ void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int co
             }
         }
     }
-    
-    if (senddisplay) {
-        u8g2.sendBuffer();
-    }
-}
-
-void DisplayModules::drawingCenterString(String msg, int y, bool senddisplay, int color)
-{
-    if (!screenInitialized) {
-        Serial.println("[ERROR] Display not initialized, cannot draw centered text.");
-        return;
-    }
-    
-    // Calculate X position to center the text
-    int x = (SCR_WIDTH - msg.length()) / 2;
-    
-    u8g2.drawStr(x, y, msg.c_str());
     
     if (senddisplay) {
         u8g2.sendBuffer();

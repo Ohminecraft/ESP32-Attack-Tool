@@ -1,4 +1,5 @@
 #include "utilsheader.h"
+#include "configs.h"
 
 /*
 	* utils.cpp Version 2.0 (with Claude Help)
@@ -12,15 +13,16 @@
 	* It is used to ensure the system has enough resources before starting attacks.
 */
 
-const char* generateRandomName() {
-		const char* charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-		int len = rand() % 10 + 1; // Generate a random length between 1 and 10
-		char* randomName = (char*)malloc((len + 1) * sizeof(char)); // Allocate memory for the random name
-		for (int i = 0; i < len; ++i) {
-			randomName[i] = charset[rand() % strlen(charset)]; // Select random characters from the charset
-		}
-		randomName[len] = '\0'; // Null-terminate the string
-		return randomName;
+String generateRandomName() {  // Đổi return type từ const char* thành String
+    const char* charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    int len = rand() % 10 + 1;
+    String randomName = "";
+    randomName.reserve(len + 1);  // Reserve memory trước
+    
+    for (int i = 0; i < len; i++) {
+        randomName += charset[rand() % strlen(charset)];
+    }
+    return randomName;  // String tự động manage memory
 }
 
 bool checkLeftMemory() {
@@ -66,40 +68,36 @@ void setBaseMacAddress(uint8_t macAddr[6]) {
 		Serial.printf("[ERROR] Error: Failed to set MAC address. Code: %d\n", err);
 	}
 }
+// Encoder Object
+RotaryEncoder *encoder = nullptr;
 
-int getEncoderDirection() {
-    long currentPos = encoder.getCount();
-    int direction = 0;
-    
-    if (abs(currentPos) >= ENCODER_THRESHOLD) {
-        if (currentPos > 0) {
-            direction = 1;
-        } else {
-            direction = -1;
-        }
-        encoder.clearCount();
-    }
-    
-    return direction;
+IRAM_ATTR void checkPosition() {
+    encoder->tick(); // just call tick() to check the state.
 }
+
+volatile bool nextPress = false;
+volatile bool prevPress = false;
+volatile bool selPress = false;
 
 void handleInputs() {
 	static unsigned long tm = millis();  // debauce for buttons
     static unsigned long tm2 = millis(); // delay between Select and encoder (avoid missclick)
-    static int encoderDir = 0;
+	static int encoderDir = 0; // Encoder direction
+	encoderDir = (int)encoder->getDirection();
 	bool sel = HIGH;
-	encoderDir = getEncoderDirection();
 
 	if (millis() - tm > 300) {
 		sel = digitalRead(ENC_BTN);
 	}
 
-	if (encoderDir > 0) {
+	if (encoderDir < 0) {
+		encoderDir = 0;
 		nextPress = true;
 		tm2 = millis();
 	}
 
-	if (encoderDir < 0) {
+	if (encoderDir > 0) {
+		encoderDir = 0;
 		prevPress = true;
 		tm2 = millis();
 	}

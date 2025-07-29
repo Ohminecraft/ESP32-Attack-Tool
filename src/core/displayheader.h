@@ -20,22 +20,8 @@
 #include <Wire.h>
 
 #include "core/utilsheader.h"
+#include "configs.h"
 
-//#define IS_SPI
-#define IS_I2C
-
-#ifdef IS_SPI
-    #define CS_PIN      5
-    #define DC_PIN      4
-    #define RST_PIN     16
-#endif
-
-#ifdef IS_I2C
-    #define RST_PIN      -1
-#endif
-
-#define SCR_WIDTH   128
-#define SCR_HEIGHT  64
 
 // Define color constants for U8g2 compatibility
 #define WHITE 1
@@ -44,8 +30,12 @@
 class DisplayModules
 {
     private:
+    #ifdef _SPI_SCREEN
+        U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2;
+    #elif defined(_I2C_SCREEN)
         U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
-        LinkedList<String>* display_buffer;
+    #endif
+        //LinkedList<String>* display_buffer;
         bool screenInitialized = false;
         
     public:

@@ -321,6 +321,63 @@ bool nrfAnalyzerSetupOneShot = false;
 bool nrfJammerSetupOneShot = false;
 bool nrfScannerSetupOneShot = false;
 
+// Menu display functions
+void displayWelcome();
+void displayMainMenu();
+void displayBLEMenu();
+void displayBLEScanMenu();
+void displayBLEInfoListMenu();
+void displayBLEInfoDetail();
+void displayMainSpooferMenu();
+void displayAppleSpooferMenu();
+void displaySamsungSpooferMenu();
+void displayGoogleSpooferMenu();
+void displayAdTypeSpooferMenu();
+void displaySpooferRunning();
+void displayExploitAttackBLEMenu();
+void displayWiFiMenu();
+void displayWiFiScanMenu();
+//void displayWiFiReScanMenu(uint32_t elapsedTime);
+void displayWiFiSelectMenu();
+void displayWiFiAttackMenu();
+void displayAttackStatus();
+void displayDeauthFloodInfo();
+void displayNRF24Menu();
+void displayNRF24JammerMenu();
+void displayNRFJammerStatus();
+void displayEvilPortalInfo();
+void displayRebootConfirm();
+        
+// Menu navigation
+void navigateUp();
+void navigateDown();
+void selectCurrentItem();
+void goBack();
+    
+// Attack functions
+void startBLEAttack(BLEScanState attackType);
+void startWiFiAttack(WiFiScanState attackType);
+void startNRFJammer(NRFJammerMode jammerMode);
+void stopCurrentAttack();
+        
+// WiFi scan functions
+void startWiFiScan();
+//void stopWiFiScan();
+
+// BLE scan functions
+void startBLEScan();
+
+// NRF24 functions
+void nrfAnalyzer();
+void nrfOutputScanChannel();
+void nrfScanner();
+        
+// Helper functions
+bool hasSelectedAPs();
+        
+// System functions
+void performReboot();
+
 void menuinit();
 void menuloop();
 

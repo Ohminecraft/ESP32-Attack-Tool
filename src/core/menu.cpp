@@ -22,11 +22,14 @@ NRF24Modules nrf;
 void __attribute__((weak)) taskHandleInput(void *parameter) {
 	auto timer = millis();
 	while (true) {
-		if (millis() - timer > 50) {
-			nextPress = false;
-			prevPress = false;
-			selPress = false;
+		if (millis() - timer > 20) {
 			handleInputs();
+			//nextPress = false;
+			//prevPress = false;
+			//selPress = false;
+			//Serial.print("[INFO] Sel Press: " +  String(selPress));
+			//Serial.print("[INFO] digitalRead SelPress: " + String(digitalRead(ENC_BTN)));
+			//Serial.println("[INFO] Input handled");
 			timer = millis();
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));
@@ -34,11 +37,19 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 }
 
 void menuinit() {
-	ESP32Encoder::useInternalWeakPullResistors = puType::up;
-	encoder.attachHalfQuad(ENC_PIN_A, ENC_PIN_B);
-	encoder.setCount(0);
+	encoder = new RotaryEncoder(ENC_PIN_A, ENC_PIN_B, RotaryEncoder::LatchMode::FOUR3);
+
+    // register interrupt routine
+    attachInterrupt(digitalPinToInterrupt(ENC_PIN_A), checkPosition, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENC_PIN_B), checkPosition, CHANGE);
    // Setup encoder button pin
 	pinMode(ENC_BTN, INPUT_PULLUP);
+	#if defined(_SPI_SCREEN)
+		pinMode(CS_PIN, OUTPUT);
+		pinMode(NRF24_CSN_PIN, OUTPUT);
+		digitalWrite(CS_PIN, HIGH);
+		digitalWrite(NRF24_CSN_PIN, HIGH);
+	#endif
 
 	if (!display.main()) {
 		Serial.println("[ERROR] Failed to initialize display!");
@@ -1263,6 +1274,7 @@ void selectCurrentItem() {
 
 void goBack() {
 	switch(currentState) {
+		case BLE_MENU:
 		case WIFI_MENU:
 			currentState = MAIN_MENU;
 			currentSelection = 0;
@@ -1281,6 +1293,7 @@ void goBack() {
 			maxSelections = WIFI_MENU_COUNT;
 			displayWiFiMenu();
 			break;
+		case WIFI_SELECT_MENU:
 		case WIFI_ATTACK_MENU:
 			currentState = WIFI_MENU;
 			currentSelection = 0;
@@ -1752,7 +1765,8 @@ void performReboot() {
 	ESP.restart();
 }
 
-void handleInput() {
+void menuloop() {
+	// Handle Input
 	if (check(selPress)) {
 		if ((wifiScanRunning && currentState == WIFI_SCAN_RUNNING) ||
 			(bleScanRunning && currentState == BLE_SCAN_RUNNING) ||
@@ -1784,11 +1798,6 @@ void handleInput() {
 	if (check(nextPress)) {
 		navigateDown();
 	}
-}
-
-void menuloop() {
-	// Handle Input
-	handleInput();
 
 	// Check for critical low memory and auto-reboot
 	static unsigned long lastMemoryCheck = 0;

@@ -12,6 +12,7 @@
 #include <EEPROM.h>
 
 #include "core/utilsheader.h"
+#include "configs.h"
 
 #define NRF24_CONFIG      0x00
 #define NRF24_EN_AA       0x01
@@ -21,9 +22,6 @@
 
 #define N 128
 uint8_t values[N];
-
-#define CE  5
-#define CS 17
 
 #define ANA_CHANNELS  64
 int ana_channel[ANA_CHANNELS];

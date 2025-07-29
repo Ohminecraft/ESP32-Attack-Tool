@@ -73,8 +73,8 @@ NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             //    "Surface Mouse", "Surface Keyboard", "Windows Phone", "HoloLens"
             //};
             //const char* Name = names[rand() % 8];
-            const char *Name = generateRandomName();
-            uint8_t name_len = strlen(Name);
+            String Name = generateRandomName();
+            uint8_t name_len = strlen(Name.c_str());
             AdvData_Raw = new uint8_t[7 + name_len];
             AdvData_Raw[i++] = 6 + name_len;
             AdvData_Raw[i++] = 0xFF;
@@ -83,7 +83,7 @@ NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData_Raw[i++] = 0x03;
             AdvData_Raw[i++] = 0x00;
             AdvData_Raw[i++] = 0x80;
-            memcpy(&AdvData_Raw[i], Name, name_len);
+            memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
             i += name_len;
 
             AdvData.addData(std::string((char *)AdvData_Raw, 7 + name_len));
@@ -293,7 +293,7 @@ void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     esp_base_mac_addr_set(macAddr);
-    NimBLEDevice::init("ESP32 Attack Tool - BLE Apple Spam");
+    NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
     vTaskDelay(40 / portTICK_PERIOD_MS);
@@ -313,7 +313,7 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     esp_base_mac_addr_set(macAddr);
-    NimBLEDevice::init("ESP32 Attack Tool - BLE Swiftpair");
+    NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
