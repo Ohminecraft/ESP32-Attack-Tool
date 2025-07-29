@@ -68,15 +68,13 @@ NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
         }
         
         case Microsoft: {
-            //const char* names[] = {
-            //    "Surface Pro", "Surface Book", "Surface Laptop", "Xbox Controller",
-            //    "Surface Mouse", "Surface Keyboard", "Windows Phone", "HoloLens"
-            //};
-            //const char* Name = names[rand() % 8];
             String Name = generateRandomName();
-            uint8_t name_len = strlen(Name.c_str());
+
+            uint8_t name_len = Name.length();
+
             AdvData_Raw = new uint8_t[7 + name_len];
-            AdvData_Raw[i++] = 6 + name_len;
+
+            AdvData_Raw[i++] = 7 + name_len - 1;
             AdvData_Raw[i++] = 0xFF;
             AdvData_Raw[i++] = 0x06;
             AdvData_Raw[i++] = 0x00;
