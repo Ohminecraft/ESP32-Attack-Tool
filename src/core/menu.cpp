@@ -61,6 +61,10 @@ void menuinit() {
 	eportal.setup();
 	wifi.StartMode(WIFI_SCAN_OFF);
 	Serial.println("[INFO] Menu system initialized");
+	Serial.printf("[INFO] Total heap: %d bytes\n", String(getHeap(GET_TOTAL_HEAP)).toInt());
+	Serial.printf("[INFO] Free heap: %d bytes\n", String(getHeap(GET_FREE_HEAP)).toInt());
+	Serial.printf("[INFO] Used heap: %d bytes\n", String(getHeap(GET_USED_HEAP)).toInt());
+	Serial.printf("[INFO] Used: %d%%\n", String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
 	displayWelcome();
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
 	displayMainMenu();
@@ -90,9 +94,64 @@ void displayWelcome() {
 	display.drawingCenterString(readyText2, yVersion, true);
 }
 
-void displayMainMenu() {
+void displayStatusBar(bool sendDisplay = false) {
 	display.clearScreen();
-	display.displayStringwithCoordinates("==== MAIN MENU ====", 0, 12);
+	if (currentState == MAIN_MENU)
+		display.displayStringwithCoordinates("Main Menu", 0, 12);
+	else if (currentState == BLE_MENU)
+		display.displayStringwithCoordinates("BLE Menu", 0, 12);
+	else if (currentState == BLE_INFO_MENU_LIST)
+		display.displayStringwithCoordinates("BLE Info", 0, 12);
+	else if (currentState == BLE_INFO_MENU_DETAIL)
+		display.displayStringwithCoordinates("BLE Detail", 0, 12);
+	else if (currentState == BLE_SCAN_RUNNING)
+		display.displayStringwithCoordinates("BLE Scan", 0, 12);
+	else if (currentState == BLE_SPOOFER_MAIN_MENU)
+		display.displayStringwithCoordinates("BLE Spoofer", 0, 12);
+	else if (currentState == BLE_SPOOFER_APPLE_MENU)
+		display.displayStringwithCoordinates("BLE Apple Spf", 0, 12);
+	else if (currentState == BLE_SPOOFER_SAMSUNG_MENU)
+		display.displayStringwithCoordinates("BLE Samsung Spf", 0, 12);
+	else if (currentState == BLE_SPOOFER_GOOGLE_MENU)
+		display.displayStringwithCoordinates("BLE Google Spf", 0, 12);
+	else if (currentState == BLE_SPOOFER_AD_TYPE_MENU)
+		display.displayStringwithCoordinates("BLE AdType", 0, 12);
+	else if (currentState == BLE_EXPLOIT_ATTACK_MENU)
+		display.displayStringwithCoordinates("BLE Exploit Atk", 0, 12);
+	else if (currentState == BLE_ATTACK_RUNNING)
+		display.displayStringwithCoordinates("BLE Attack", 0, 12);
+	else if (currentState == WIFI_SELECT_MENU)
+		display.displayStringwithCoordinates("WiFi Sel Menu", 0, 12);
+	else if (currentState == WIFI_ATTACK_MENU)
+		display.displayStringwithCoordinates("WiFi Atk Menu", 0, 12);
+	else if (currentState == WIFI_MENU)
+		display.displayStringwithCoordinates("WiFi Menu", 0, 12);
+	else if (currentState == NRF24_MENU)
+		display.displayStringwithCoordinates("NRF Menu", 0, 12);
+	else if (currentState == NRF24_JAMMER_MENU)
+		display.displayStringwithCoordinates("NRF Jam Menu", 0, 12);
+	else if (currentState == WIFI_SCAN_RUNNING)
+		display.displayStringwithCoordinates("WiFi Scan", 0, 12);
+	else if (currentState == NRF24_ANALYZER_RUNNING)
+		display.displayStringwithCoordinates("NRF Analyzer", 0, 12);
+	else if (currentState == NRF24_SCANNER_RUNNING)
+		display.displayStringwithCoordinates("NRF Scanner", 0, 12);
+	else if (currentState == NRF24_JAMMER_RUNNING)
+		display.displayStringwithCoordinates("NRF Jammer", 0, 12);
+	else if (currentState == WIFI_ATTACK_RUNNING)
+		display.displayStringwithCoordinates("WiFi Attack", 0, 12);
+	else
+		display.displayStringwithCoordinates("Unknown State", 0, 12);
+	
+	String heapInfo = "H: ";
+	heapInfo.concat(String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
+	heapInfo.concat("%");
+	display.displayStringwithCoordinates(heapInfo, SCR_WIDTH - 38, 12);
+	if (sendDisplay) display.sendDisplay();
+}
+
+void displayMainMenu() {
+	displayStatusBar();
 	
 	String items[MAIN_MENU_COUNT] = {
 		"BLE",
@@ -113,8 +172,7 @@ void displayMainMenu() {
 }
 
 void displayBLEScanMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== BLE SCAN =====", 0, 12, true);
+	displayStatusBar(true);
 	if (bleScanRunning) {
 		if (bleScanInProgress) {
 			display.displayStringwithCoordinates("Scanning...", 0, 24, true);
@@ -132,8 +190,7 @@ void displayBLEScanMenu() {
 }
 
 void displayBLEMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("===== BLE MENU =====", 0, 12);
+	displayStatusBar();
 
 	String items[BLE_MENU_COUNT] = {
 		"BLE Scan",
@@ -155,8 +212,7 @@ void displayBLEMenu() {
 }
 
 void displayBLEInfoListMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("===== BLE INFO =====", 0, 12, true);
+	displayStatusBar();
 
 	if (!blescanres || blescanres->size() == 0) {
 		display.displayStringwithCoordinates("No Devices found!", 0, 24);
@@ -191,8 +247,7 @@ void displayBLEInfoListMenu() {
 }
 
 void displayBLEInfoDetail() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== BLE DETAIL ====", 0, 12, true);
+	displayStatusBar();
 
 	if (!blescanres || currentSelection >= blescanres->size()) {
 		display.displayStringwithCoordinates("Invalid device", 0, 24);
@@ -211,8 +266,7 @@ void displayBLEInfoDetail() {
 
 void displayMainSpooferMenu() {
 	digitalWrite(STA_LED, LOW);
-	display.clearScreen();
-	display.displayStringwithCoordinates("== BLE SPOOFER ATK ==", 0, 12);
+	displayStatusBar();
 
 	String items[BLE_SPOOFER_COUNT] = {
 		"Apple",
@@ -234,8 +288,7 @@ void displayMainSpooferMenu() {
 
 void displayAppleSpooferMenu() {
 	digitalWrite(STA_LED, LOW);
-	display.clearScreen();
-	display.displayStringwithCoordinates("= BLE APPLE SPO ATK =", 0, 12);
+	displayStatusBar();
 
 	String items[BLE_SPO_APPLE_COUNT] = {
 		"Airpods",
@@ -270,8 +323,7 @@ void displayAppleSpooferMenu() {
 
 void displaySamsungSpooferMenu() {
 	digitalWrite(STA_LED, LOW);
-	display.clearScreen();
-	display.displayStringwithCoordinates("== BLE SAMSUNG SPO ==", 0, 12);
+	displayStatusBar();
 
 	String items[BLE_SPO_SAMSUNG_COUNT] = {
 		"Fallback Watch",
@@ -317,8 +369,7 @@ void displaySamsungSpooferMenu() {
 
 void displayGoogleSpooferMenu() {
 	digitalWrite(STA_LED, LOW);
-	display.clearScreen();
-	display.displayStringwithCoordinates("== BLE GOOGLE SPOO ==", 0, 12);
+	displayStatusBar();
 
 	String items[BLE_SPO_GOOGLE_COUNT] = {
 		"Bisto Dev Board",
@@ -405,8 +456,7 @@ void displayGoogleSpooferMenu() {
 
 void displayAdTypeSpooferMenu() {
 	digitalWrite(STA_LED, LOW);
-	display.clearScreen();
-	display.displayStringwithCoordinates("== BLE SELECT AD TYPE ==", 0, 12);
+	displayStatusBar();
 
 	String items[BLE_SPO_AD_TYPE_COUNT] = {
 		"Type NON",
@@ -433,8 +483,7 @@ void displaySpooferRunning() {
 
 void displayExploitAttackBLEMenu() {
 	digitalWrite(STA_LED, LOW);
-	display.clearScreen();
-	display.displayStringwithCoordinates("== BLE EXPLOIT ATK ==", 0, 12);
+	displayStatusBar();
 	
 	String items[BLE_ATK_MENU_COUNT] = {
 		"Sour Apple",
@@ -457,8 +506,7 @@ void displayExploitAttackBLEMenu() {
 }
 
 void displayWiFiMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== WIFI MENU =====", 0, 12);
+	displayStatusBar();
 	
 	String items[WIFI_MENU_COUNT] = {
 		"Scan WiFi",
@@ -479,8 +527,7 @@ void displayWiFiMenu() {
 }
 
 void displayWiFiScanMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== WIFI SCAN =====", 0, 12, true);
+	displayStatusBar(true);
 	if (wifiScanRunning) {
 		if (wifiScanInProgress) {
 			display.displayStringwithCoordinates("Scanning...", 0, 24, true);
@@ -508,8 +555,7 @@ void displayWiFiReScanMenu(uint32_t elapsedTime) {
 */
 
 void displayWiFiSelectMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== WIFI SELECT ====", 0, 12, true);
+	displayStatusBar();
 	
 	if (!access_points || access_points->size() == 0) {
 		display.displayStringwithCoordinates("No APs found!", 0, 24);
@@ -553,8 +599,7 @@ void displayWiFiSelectMenu() {
 }
 
 void displayWiFiAttackMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== WIFI ATTACK ====", 0, 12, true);
+	displayStatusBar();
 	
 	String items[WIFI_ATK_MENU_COUNT] = {
 		"Deauth Tar Attack",
@@ -588,8 +633,7 @@ void displayRebootConfirm() {
 }
 
 void displayNRF24Menu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== NRF24 MENU ====", 0, 12, true);
+	displayStatusBar();
 
 	String items[NRF24_MENU_COUNT] = {
 		"Analyzer",
@@ -609,8 +653,7 @@ void displayNRF24Menu() {
 }
 
 void displayNRF24JammerMenu() {
-	display.clearScreen();
-	display.displayStringwithCoordinates("=== NRF24 JAMMER ===", 0, 12, true);
+	displayStatusBar();
 
 	String items[NRF24_JAM_MENU_COUNT] = {
 		"WiFi",
@@ -685,8 +728,7 @@ void displayEvilPortalInfo() {
 		display.clearScreen();
 	}
 
-	size_t freeHeap = esp_get_free_heap_size();
-	if (freeHeap <= MEM_LOWER_LIM + 2000) {
+	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
 		display.displayStringwithCoordinates("LOW MEM!", 80, 36, true);
 	}
 	/*
@@ -699,10 +741,9 @@ void displayEvilPortalInfo() {
 }
 
 void displayNRFJammerStatus() {
-	display.clearScreen();
 	String attackName = "";
 	
-	display.displayStringwithCoordinates("NRF24 JAMMER", 0, 12);
+	displayStatusBar();
 	display.displayStringwithCoordinates("RUNNING", 0, 24);
 	
 	switch(currentNRFJammerMode) {
@@ -738,8 +779,7 @@ void displayNRFJammerStatus() {
 	display.displayStringwithCoordinates("Press SELECT to stop", 0, 48);
 	
 	// Hiển thị memory info nếu cần
-	size_t freeHeap = esp_get_free_heap_size();
-	if (freeHeap <= MEM_LOWER_LIM + 2000) {
+	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
 		display.displayStringwithCoordinates("LOW MEM!", 80, 60);
 	}
 	
@@ -747,7 +787,6 @@ void displayNRFJammerStatus() {
 }
 
 void displayAttackStatus() {
-	display.clearScreen();
 	String attackName = "";
 	if (currentState == BLE_ATTACK_RUNNING) {
 	   switch(currentBLEAttackType) {
@@ -787,7 +826,7 @@ void displayAttackStatus() {
 		}
 	}
 
-	display.displayStringwithCoordinates("ATTACK RUNNING", 0, 12);
+	displayStatusBar();
 	display.displayStringwithCoordinates(attackName, 0, 24);
 	
 	if (currentState == WIFI_ATTACK_RUNNING) {
@@ -799,8 +838,7 @@ void displayAttackStatus() {
 	}
 	
 	// Display memory info
-	size_t freeHeap = esp_get_free_heap_size();
-	if (freeHeap <= MEM_LOWER_LIM + 2000) {
+	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
 		display.displayStringwithCoordinates("LOW MEM!", 80, 48, true);
 	}
 }
@@ -812,8 +850,7 @@ void displayDeauthFloodInfo() {
 	}
 	if (wifi.deauth_flood_found_ap) {
 		if (wifi.deauth_flood_redraw) {
-			display.clearScreen();
-			display.displayStringwithCoordinates("ATTACK RUNNING", 0, 12);
+			displayStatusBar();
 			display.displayStringwithCoordinates("Deauth Flood", 0, 24);
 			display.displayStringwithCoordinates("Target:", 0, 36);
 			display.displayStringwithCoordinates(wifi.deauth_flood_target, 0, 48, true);
@@ -829,8 +866,7 @@ void displayDeauthFloodInfo() {
 		}
 	}
 
-	size_t freeHeap = esp_get_free_heap_size();
-	if (freeHeap <= MEM_LOWER_LIM + 2000) {
+	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
 		display.displayStringwithCoordinates("LOW MEM!", 80, 48, true);
 	}
 }
@@ -1263,8 +1299,8 @@ void selectCurrentItem() {
 				NRFJammerMode listjammermode[] = {Wifi, BLE, Bluetooth, Zigbee, RC, Video_Transmitter, 
 											Usb_Wireless, Full_Channel};
 				currentNRFJammerMode = listjammermode[currentSelection];
-				displayNRFJammerStatus();
 				startNRFJammer(currentNRFJammerMode);
+				displayNRFJammerStatus();
 				}
 			break;
 
@@ -1464,12 +1500,14 @@ void nrfAnalyzer() {
 	int n = 200;
 	while (n--) {
 		if (check(selPress)) {
+			Serial.println("[INFO] NRF24 Analyzer stopped by user.");
 			goBack();
 			break;
 		} 
 		int i = N;
 		while (i--) {
 			if (check(selPress)) {
+				Serial.println("[INFO] NRF24 Analyzer stopped by user.");
 				goBack();
 				return;
 			} 
@@ -1529,28 +1567,26 @@ void nrfOutputScanChannel() {
 	for (byte count = 0; count < 64; count += 10) {
 	  display.drawingLine(127, count, 122, count);
 	  display.drawingLine(0, count, 5, count);
-	  if (check(selPress)) {
-			goBack();
-			return;
+	  if (selPress) {
+		return;
 		}
 	}
 
 	for (byte count = 10; count < 127; count += 10) {
 	  display.drawingPixel(count, 0);
 	  display.drawingPixel(count, 63);
-	  if (check(selPress)) {
-			goBack();
-			return;
+	  if (selPress) {
+		return;
 		}
 	}
 
 	for (byte count = 0; count < 127; count++) {
 	  display.drawingLine(127 - count, 63, 127 - count, 63 - sensorArray[count]);
-	  if (check(selPress)) {
-			goBack();
-			return;
+	  if (selPress) {
+		return;
 		}
 	}
+
 
 	display.setCursor(12, 12);
 	display.printString("[" + String(norm) + "]");
@@ -1558,18 +1594,19 @@ void nrfOutputScanChannel() {
 }
 
 void nrfScanner() {
-	if (check(selPress)) {
-		Serial.println("[INFO] NRF24 Scanner stopped by user.");
-		goBack();
+	if (selPress) {
 		return;
 	}
 	nrf.scanChannel();
-	if (check(selPress)) {
-		Serial.println("[INFO] NRF24 Scanner stopped by user.");
-		goBack();
+
+	if (selPress) {
 		return;
 	}
 	nrfOutputScanChannel();
+
+	if (selPress) {
+		return;
+	}
 	if (millis() - lastSaveTime > saveInterval) {
 		nrf.saveGraphtoEEPROM();
 		lastSaveTime = millis();
@@ -1765,17 +1802,17 @@ void performReboot() {
 	ESP.restart();
 }
 
-void menuloop() {
+void handleInput(MenuState handle_state) {
 	// Handle Input
 	if (check(selPress)) {
-		if ((wifiScanRunning && currentState == WIFI_SCAN_RUNNING) ||
-			(bleScanRunning && currentState == BLE_SCAN_RUNNING) ||
-			currentState == NRF24_ANALYZER_RUNNING ||
-			currentState == NRF24_JAMMER_RUNNING ||
-			currentState == NRF24_SCANNER_RUNNING ||
-			currentState == WIFI_ATTACK_RUNNING ||
-			currentState == BLE_ATTACK_RUNNING ||
-			currentState == BLE_SPOOFER_RUNNING)
+		if ((wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) ||
+			(bleScanRunning && handle_state == BLE_SCAN_RUNNING) ||
+			handle_state == NRF24_ANALYZER_RUNNING ||
+			handle_state == NRF24_JAMMER_RUNNING ||
+			handle_state == NRF24_SCANNER_RUNNING ||
+			handle_state == WIFI_ATTACK_RUNNING ||
+			handle_state == BLE_ATTACK_RUNNING ||
+			handle_state == BLE_SPOOFER_RUNNING)
 		{
 			goBack();
 		}
@@ -1785,8 +1822,8 @@ void menuloop() {
 	}
 
 	if (check(prevPress)) {
-		if ((currentState == WIFI_SCAN_RUNNING && !wifiScanOneShot) ||
-			(currentState == BLE_SCAN_RUNNING && !bleScanOneShot))
+		if ((handle_state == WIFI_SCAN_RUNNING && !wifiScanOneShot) ||
+			(handle_state == BLE_SCAN_RUNNING && !bleScanOneShot))
 		{
 			goBack();
 		} 
@@ -1798,29 +1835,11 @@ void menuloop() {
 	if (check(nextPress)) {
 		navigateDown();
 	}
+}
 
-	// Check for critical low memory and auto-reboot
-	static unsigned long lastMemoryCheck = 0;
-	if (millis() - lastMemoryCheck > 3000) { // Check every 3 seconds
-		size_t freeHeap = esp_get_free_heap_size();
-		if (freeHeap < MEM_LOWER_LIM) { // Critical low memory threshold
-			Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Auto-rebooting...");
-			display.clearScreen();
-			display.displayStringwithCoordinates("CRITICAL LOW MEM!", 0, 12);
-			display.displayStringwithCoordinates("AUTO REBOOTING...", 0, 21, true);
-			vTaskDelay(2000 / portTICK_PERIOD_MS);
-			wifi.StartMode(WIFI_SCAN_OFF);
-			ble.ShutdownBLE();
-			nrf.shutdownNRFJammer();
-			nrf.shutdownNRF();
-			// Ensure all tasks are stopped before rebooting
-			ESP.restart();
-		}
-		lastMemoryCheck = millis();
-	}
-	
+void handleTasks(MenuState handle_state) {
 	// Handle WiFi scanning
-	if (wifiScanRunning && currentState == WIFI_SCAN_RUNNING) {
+	if (wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) {
 
 		if (!wifiScanOneShot) startWiFiScan();
 
@@ -1828,7 +1847,7 @@ void menuloop() {
 
 	}
 
-	else if (bleScanRunning && currentState == BLE_SCAN_RUNNING) {
+	else if (bleScanRunning && handle_state == BLE_SCAN_RUNNING) {
 
 		if (!bleScanOneShot) startBLEScan();
 
@@ -1836,7 +1855,7 @@ void menuloop() {
 
 	}
 
-	else if (currentState == NRF24_ANALYZER_RUNNING) {
+	else if (handle_state == NRF24_ANALYZER_RUNNING) {
 		if (!nrfAnalyzerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Analyzer");
 			nrf.analyzerSetup();
@@ -1845,25 +1864,37 @@ void menuloop() {
 		nrfAnalyzer();
 	}
 
-	else if (currentState == NRF24_JAMMER_RUNNING) {
+	else if (handle_state == NRF24_JAMMER_RUNNING) {
 		if (!nrfJammerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Jammer");
 			nrf.jammerNRFRadioSetup();
 			nrfJammerSetupOneShot = true;
 		}
-		nrf.jammerNRFRadioMain(currentNRFJammerMode);
+		//while(!check(selPress)) {
+			nrf.jammerNRFRadioMain(currentNRFJammerMode);
+		//}
+		if (check(selPress)) {
+			Serial.println("[INFO] NRF24 Jammer stopped by user.");
+			goBack();
+		}
 	}
 
-	else if (currentState == NRF24_SCANNER_RUNNING) {
+	else if (handle_state == NRF24_SCANNER_RUNNING) {
 		if (!nrfScannerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Scanner");
 			nrf.scannerSetup();
 			nrfScannerSetupOneShot = true;
 		}
-		nrfScanner();
+		//while(!check(selPress)) {
+			nrfScanner();
+		//}
+		if (check(selPress)) {
+			Serial.println("[INFO] NRF24 Scanner stopped by user.");
+			goBack();
+		}
 	}
 
-	else if (currentState == BLE_SPOOFER_RUNNING) {
+	else if (handle_state == BLE_SPOOFER_RUNNING) {
 		if (!bleSpooferDone) {
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE)
 				ble.startSpoofer(ble_spoofer_device, BLE_SPOOFER_DEVICE_BRAND_APPLE, ble_spoofer_ad_type);
@@ -1877,7 +1908,7 @@ void menuloop() {
 	}
 	
 	// If attack is running, execute attack periodically and update display
-	else if (currentState == BLE_ATTACK_RUNNING || currentState == WIFI_ATTACK_RUNNING) {
+	else if (handle_state == BLE_ATTACK_RUNNING || handle_state == WIFI_ATTACK_RUNNING) {
 		static unsigned long lastDisplayUpdate = 0;
 		static unsigned long lastMemoryCheck = 0;
 		
@@ -1891,7 +1922,7 @@ void menuloop() {
 			lastMemoryCheck = millis();
 		}
 		
-		if (currentState == BLE_ATTACK_RUNNING) {
+		if (handle_state == BLE_ATTACK_RUNNING) {
 			// BLE attack handling...
 			switch(currentBLEAttackType) {
 				case BLE_ATTACK_SOUR_APPLE:
@@ -1911,7 +1942,7 @@ void menuloop() {
 					break;
 			}
 		} 
-		else if (currentState == WIFI_ATTACK_RUNNING) {
+		else if (handle_state == WIFI_ATTACK_RUNNING) {
 			// SỬA: Tách biệt xử lý Evil Portal và các WiFi attack khác
 			if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL || currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
 				// Evil Portal handling
@@ -1973,19 +2004,41 @@ void menuloop() {
 		}
 
 		// Update display every 1 second (not using with evil portal)
-		if (currentState == WIFI_ATTACK_RUNNING) { // Ble Attack no need redraw display
-			if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL || currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH || currentWiFiAttackType == WIFI_ATTACK_DEAUTH_FLOOD) {
+		if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL || currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH || currentWiFiAttackType == WIFI_ATTACK_DEAUTH_FLOOD) {
 			// i can't using != for wtf reason, idk to fix this
 			// Deauth Flood using different redraw
-			} else {
-				if (millis() - lastDisplayUpdate > 1000) {
-					wifi.packet_sent = 0;
-					displayAttackStatus();
-					lastDisplayUpdate = millis();
-				}
+		} else {
+			if (millis() - lastDisplayUpdate > 1000) {
+				wifi.packet_sent = 0;
+				displayAttackStatus();
+				lastDisplayUpdate = millis();
 			}
 		}
 	}
+}
+
+void menuloop() {
+	handleInput(currentState);
+	handleTasks(currentState);
+	// Check for critical low memory and auto-reboot
+	static unsigned long lastMemoryCheck = 0;
+	if (millis() - lastMemoryCheck > 3000) { // Check every 3 seconds
+		if (getHeap(GET_FREE_HEAP) < MEM_LOWER_LIM) { // Critical low memory threshold
+			Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Auto-rebooting...");
+			display.clearScreen();
+			display.displayStringwithCoordinates("CRITICAL LOW MEM!", 0, 12);
+			display.displayStringwithCoordinates("AUTO REBOOTING...", 0, 21, true);
+			vTaskDelay(2000 / portTICK_PERIOD_MS);
+			wifi.StartMode(WIFI_SCAN_OFF);
+			ble.ShutdownBLE();
+			nrf.shutdownNRFJammer();
+			nrf.shutdownNRF();
+			// Ensure all tasks are stopped before rebooting
+			ESP.restart();
+		}
+		lastMemoryCheck = millis();
+	}
+	
 }
 
 #pragma GCC diagnostic pop

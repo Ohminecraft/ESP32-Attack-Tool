@@ -13,28 +13,44 @@
 	* It is used to ensure the system has enough resources before starting attacks.
 */
 
-String generateRandomName() {  // Đổi return type từ const char* thành String
+String generateRandomName() {
     const char* charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    int len = rand() % 10 + 1;
+    int len = rand() % 8 + 3; // Limit length to 3-10 characters
     String randomName = "";
-    randomName.reserve(len + 1);  // Reserve memory trước
+    
+    // Reserve memory upfront to prevent fragmentation
+    randomName.reserve(len + 1);
     
     for (int i = 0; i < len; i++) {
         randomName += charset[rand() % strlen(charset)];
     }
-    return randomName;  // String tự động manage memory
+    
+    return randomName;
+}
+uint32_t getHeap(uint8_t type) {
+	if (type == GET_TOTAL_HEAP) return ESP.getHeapSize();
+	else if (type == GET_FREE_HEAP) return ESP.getFreeHeap();
+	else if (type == GET_USED_HEAP) return (ESP.getHeapSize() - ESP.getFreeHeap());
+	else if (type == GET_USED_HEAP_PERCENT) {
+		size_t freeHeap = ESP.getFreeHeap();
+		size_t totalHeap = ESP.getHeapSize();
+		if (totalHeap == 0) return 0; // Avoid division by zero
+		return ((totalHeap - freeHeap) * 100) / totalHeap; // Return used heap percentage
+	}
+	else return 0; // Invalid type
 }
 
 bool checkLeftMemory() {
-	size_t freeHeap = esp_get_free_heap_size();
-	Serial.printf("[INFO] Free heap: %d bytes\n", freeHeap);
+	Serial.printf("[INFO] Free heap: %d bytes\n", String(getHeap(GET_FREE_HEAP)).toInt());
+	Serial.printf("[INFO] Used heap: %d bytes\n", String(getHeap(GET_USED_HEAP)).toInt());
+	Serial.printf("[INFO] Used: %d%%\n", String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
 	
-	if (freeHeap <= MEM_LOWER_LIM + 2000) {
+	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
 		Serial.println("[WARN] Warning: Low memory!");
 		Serial.println("[WARN] Please restart the device or free up memory.");
 		return true;
 	}
-	else if (freeHeap <= MEM_LOWER_LIM) {
+	else if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM) {
 		Serial.println("[WARN] Warning: Critical low memory!");
 		return false;
 	}

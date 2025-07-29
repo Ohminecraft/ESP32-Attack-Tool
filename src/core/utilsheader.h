@@ -27,6 +27,11 @@
 // Encoder constants
 //#define ENCODER_THRESHOLD 2  // Threshold cho encoder movement
 
+#define GET_TOTAL_HEAP 0
+#define GET_FREE_HEAP 1
+#define GET_USED_HEAP 2
+#define GET_USED_HEAP_PERCENT 3
+uint32_t getHeap(uint8_t type);
 String generateRandomName();
 bool checkLeftMemory();
 
