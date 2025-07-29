@@ -8,24 +8,24 @@
     * Licensed under the MIT License.
 */
 
-RF24 NRFRadio(CE, CS, 16000000);
+RF24 NRFRadio(NRF24_CE_PIN, NRF24_CSN_PIN, 16000000);
 
 byte NRF24Modules::getRegister(byte r) {
     byte c;
     
-    digitalWrite(CS, LOW);
+    digitalWrite(NRF24_CSN_PIN, LOW);
     SPI.transfer(r & 0x1F);
     c = SPI.transfer(0);
-    digitalWrite(CS, HIGH);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
 
     return c;
 }
 
 void NRF24Modules::setRegister(byte r, byte v) {
-    digitalWrite(CS, LOW);
+    digitalWrite(NRF24_CSN_PIN, LOW);
     SPI.transfer((r & 0x1F) | 0x20);
     SPI.transfer(v);
-    digitalWrite(CS, HIGH);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
 }
 
 void NRF24Modules::initNRF() {
@@ -38,11 +38,11 @@ void NRF24Modules::shutdownNRF() {
 }
 
 void NRF24Modules::enableCE() {
-    digitalWrite(CE, HIGH);
+    digitalWrite(NRF24_CE_PIN, HIGH);
 }
 
 void NRF24Modules::disableCE() {
-    digitalWrite(CE, LOW);
+    digitalWrite(NRF24_CE_PIN, LOW);
 }
 
 void NRF24Modules::setRX() {
@@ -63,17 +63,17 @@ void NRF24Modules::analyzerScanChannels() {
 }
 
 void NRF24Modules::writeRegister(uint8_t reg, uint8_t value) {
-    digitalWrite(CS, LOW);
+    digitalWrite(NRF24_CSN_PIN, LOW);
     SPI.transfer(reg | 0x20);
     SPI.transfer(value);
-    digitalWrite(CS, HIGH);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
 }
 
 uint8_t NRF24Modules::readRegister(uint8_t reg) {
-    digitalWrite(CS, LOW);
+    digitalWrite(NRF24_CSN_PIN, LOW);
     SPI.transfer(reg & 0x1F);
     uint8_t res = SPI.transfer(0x00);
-    digitalWrite(CS, HIGH);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
     return res;
 }
 
@@ -86,16 +86,16 @@ bool NRF24Modules::carrierDetected() {
 }
 
 void NRF24Modules::analyzerSetup() {
-    pinMode(CE, OUTPUT);
-    pinMode(CS, OUTPUT);
+    pinMode(NRF24_CE_PIN, OUTPUT);
+    pinMode(NRF24_CSN_PIN, OUTPUT);
 
-    SPI.begin(18, 19, 23, CS);
+    SPI.begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN, NRF24_CSN_PIN);
     SPI.setDataMode(SPI_MODE0);
     SPI.setFrequency(10000000);
     SPI.setBitOrder(MSBFIRST);
 
-    digitalWrite(CS, HIGH);
-    digitalWrite(CE, LOW);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
+    digitalWrite(NRF24_CE_PIN, LOW);
 
     NRFRadio.begin();
     this->disableCE();
@@ -148,6 +148,10 @@ void NRF24Modules::jammerNRFRadioMain(NRFJammerMode mode) {
         if (jammer_chan_hop >= sizeof(full_channels)) jammer_chan_hop = 0;
         NRFRadio.setChannel(full_channels[jammer_chan_hop]);
     }
+    if (selPress) {
+        Serial.println("[INFO] Jammer Stopped by user");
+        return;
+    }
 }
 
 void NRF24Modules::shutdownNRFJammer() {
@@ -165,8 +169,7 @@ void NRF24Modules::scanChannel() {
         NRFRadio.setChannel((128 * i) / SCAN_CHANNELS);
 
         for (int j = 0; j < samplesPerChannel; j++) {
-            if (check(selPress)) {
-                Serial.println("[INFO] NRF24 Scanner stopped by user.");
+            if (selPress) {
                 return;
             }
             this->setRX();
@@ -201,7 +204,7 @@ void NRF24Modules::scannerSetup() {
       sensorArray[count] = 0;
     }
 
-    SPI.begin(18, 19, 23, CS);
+    SPI.begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN, NRF24_CSN_PIN);
     SPI.setDataMode(SPI_MODE0);
     SPI.setFrequency(16000000);
     SPI.setBitOrder(MSBFIRST);

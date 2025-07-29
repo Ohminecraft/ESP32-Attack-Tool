@@ -1,4 +1,5 @@
 #include "utilsheader.h"
+#include "configs.h"
 
 /*
 	* utils.cpp Version 2.0 (with Claude Help)
@@ -12,27 +13,44 @@
 	* It is used to ensure the system has enough resources before starting attacks.
 */
 
-const char* generateRandomName() {
-		const char* charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-		int len = rand() % 10 + 1; // Generate a random length between 1 and 10
-		char* randomName = (char*)malloc((len + 1) * sizeof(char)); // Allocate memory for the random name
-		for (int i = 0; i < len; ++i) {
-			randomName[i] = charset[rand() % strlen(charset)]; // Select random characters from the charset
-		}
-		randomName[len] = '\0'; // Null-terminate the string
-		return randomName;
+String generateRandomName() {
+    const char* charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    int len = rand() % 8 + 3; // Limit length to 3-10 characters
+    String randomName = "";
+    
+    // Reserve memory upfront to prevent fragmentation
+    randomName.reserve(len + 1);
+    
+    for (int i = 0; i < len; i++) {
+        randomName += charset[rand() % strlen(charset)];
+    }
+    
+    return randomName;
+}
+uint32_t getHeap(uint8_t type) {
+	if (type == GET_TOTAL_HEAP) return ESP.getHeapSize();
+	else if (type == GET_FREE_HEAP) return ESP.getFreeHeap();
+	else if (type == GET_USED_HEAP) return (ESP.getHeapSize() - ESP.getFreeHeap());
+	else if (type == GET_USED_HEAP_PERCENT) {
+		size_t freeHeap = ESP.getFreeHeap();
+		size_t totalHeap = ESP.getHeapSize();
+		if (totalHeap == 0) return 0; // Avoid division by zero
+		return ((totalHeap - freeHeap) * 100) / totalHeap; // Return used heap percentage
+	}
+	else return 0; // Invalid type
 }
 
 bool checkLeftMemory() {
-	size_t freeHeap = esp_get_free_heap_size();
-	Serial.printf("[INFO] Free heap: %d bytes\n", freeHeap);
+	Serial.printf("[INFO] Free heap: %d bytes\n", String(getHeap(GET_FREE_HEAP)).toInt());
+	Serial.printf("[INFO] Used heap: %d bytes\n", String(getHeap(GET_USED_HEAP)).toInt());
+	Serial.printf("[INFO] Used: %d%%\n", String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
 	
-	if (freeHeap <= MEM_LOWER_LIM + 2000) {
+	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
 		Serial.println("[WARN] Warning: Low memory!");
 		Serial.println("[WARN] Please restart the device or free up memory.");
 		return true;
 	}
-	else if (freeHeap <= MEM_LOWER_LIM) {
+	else if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM) {
 		Serial.println("[WARN] Warning: Critical low memory!");
 		return false;
 	}
@@ -66,40 +84,36 @@ void setBaseMacAddress(uint8_t macAddr[6]) {
 		Serial.printf("[ERROR] Error: Failed to set MAC address. Code: %d\n", err);
 	}
 }
+// Encoder Object
+RotaryEncoder *encoder = nullptr;
 
-int getEncoderDirection() {
-    long currentPos = encoder.getCount();
-    int direction = 0;
-    
-    if (abs(currentPos) >= ENCODER_THRESHOLD) {
-        if (currentPos > 0) {
-            direction = 1;
-        } else {
-            direction = -1;
-        }
-        encoder.clearCount();
-    }
-    
-    return direction;
+IRAM_ATTR void checkPosition() {
+    encoder->tick(); // just call tick() to check the state.
 }
+
+volatile bool nextPress = false;
+volatile bool prevPress = false;
+volatile bool selPress = false;
 
 void handleInputs() {
 	static unsigned long tm = millis();  // debauce for buttons
     static unsigned long tm2 = millis(); // delay between Select and encoder (avoid missclick)
-    static int encoderDir = 0;
+	static int encoderDir = 0; // Encoder direction
+	encoderDir = (int)encoder->getDirection();
 	bool sel = HIGH;
-	encoderDir = getEncoderDirection();
 
 	if (millis() - tm > 300) {
 		sel = digitalRead(ENC_BTN);
 	}
 
-	if (encoderDir > 0) {
+	if (encoderDir < 0) {
+		encoderDir = 0;
 		nextPress = true;
 		tm2 = millis();
 	}
 
-	if (encoderDir < 0) {
+	if (encoderDir > 0) {
+		encoderDir = 0;
 		prevPress = true;
 		tm2 = millis();
 	}

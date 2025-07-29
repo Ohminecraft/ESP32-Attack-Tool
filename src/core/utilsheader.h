@@ -13,36 +13,38 @@
 */
 
 #include <Arduino.h>
-#include <ESP32Encoder.h>
+#include <RotaryEncoder.h>
 
 #define MEM_LOWER_LIM 10000
-#define STA_LED 2
 
-// Encoder pins - thay thế button pins
-#define ENC_PIN_A   14  // Thay thế BTN_LEFT
-#define ENC_PIN_B   12  // Thay thế BTN_RIGHT  
-#define ENC_BTN     13  // Thay thế BTN_SELECT
+// Encoder pins - edit in configs.h
+//#define ENC_PIN_A   14 
+//#define ENC_PIN_B   12   
+//#define ENC_BTN     13 
 
-#define MAX_BUTTON  3
+#define MAX_BUTTON 3
 
 // Encoder constants
-#define ENCODER_THRESHOLD 2  // Threshold cho encoder movement
+//#define ENCODER_THRESHOLD 2  // Threshold cho encoder movement
 
-const char* generateRandomName();
+#define GET_TOTAL_HEAP 0
+#define GET_FREE_HEAP 1
+#define GET_USED_HEAP 2
+#define GET_USED_HEAP_PERCENT 3
+uint32_t getHeap(uint8_t type);
+String generateRandomName();
 bool checkLeftMemory();
 
 void generateRandomMac(uint8_t* mac);
 String macToString(uint8_t macAddr[6]);
 void setBaseMacAddress(uint8_t macAddr[6]);
 
-// Encoder Object
-ESP32Encoder encoder;
+extern volatile bool nextPress;
+extern volatile bool prevPress; 
+extern volatile bool selPress;
 
-volatile bool nextPress = false;
-volatile bool prevPress = false;
-volatile bool selPress = false;
-
-int getEncoderDirection();
+extern RotaryEncoder *encoder;
+IRAM_ATTR void checkPosition();
 
 void handleInputs();
 
