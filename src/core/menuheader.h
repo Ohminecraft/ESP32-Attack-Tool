@@ -20,7 +20,7 @@
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
 
-#define ATTACK_TOOL_VERSION "2.2.2"
+#define ATTACK_TOOL_VERSION "2.2.3"
 
 #define MAX_SHOW_SECLECTION 4
 
@@ -60,6 +60,7 @@ enum MainMenuItem {
     MAIN_BLE,
     MAIN_WIFI,
     MAIN_NRF24,
+    MAIN_DEEP_SLEEP,
     MAIN_REBOOT,
     MAIN_MENU_COUNT
 };
@@ -321,6 +322,9 @@ bool nrfAnalyzerSetupOneShot = false;
 bool nrfJammerSetupOneShot = false;
 bool nrfScannerSetupOneShot = false;
 
+// System
+bool autoSleep = false;
+
 // Menu display functions
 void displayWelcome();
 void displayMainMenu();
@@ -377,6 +381,7 @@ bool hasSelectedAPs();
         
 // System functions
 void performReboot();
+void performDeepSleep();
 
 void menuinit();
 void menuloop();

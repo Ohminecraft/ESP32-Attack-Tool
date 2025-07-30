@@ -12,7 +12,7 @@
 LinkedList<AccessPoint>* access_points;
 LinkedList<AccessPoint>* deauth_flood_ap;
 
-extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3){
+extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3) {
     if (arg == 31337)
       return 1;
     else

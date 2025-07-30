@@ -8,7 +8,8 @@
     * Licensed under the MIT License.
 */
 
-RF24 NRFRadio(NRF24_CE_PIN, NRF24_CSN_PIN, 16000000);
+RF24 NRFRadio(NRF24_CE_PIN, NRF24_CSN_PIN);
+SPIClass NRFSPI;
 
 byte NRF24Modules::getRegister(byte r) {
     byte c;
@@ -89,15 +90,13 @@ void NRF24Modules::analyzerSetup() {
     pinMode(NRF24_CE_PIN, OUTPUT);
     pinMode(NRF24_CSN_PIN, OUTPUT);
 
-    SPI.begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN, NRF24_CSN_PIN);
-    SPI.setDataMode(SPI_MODE0);
-    SPI.setFrequency(10000000);
-    SPI.setBitOrder(MSBFIRST);
+    NRFSPI.begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
+    NRFSPI.setDataMode(SPI_MODE0);
+    NRFSPI.setFrequency(16000000);
+    NRFSPI.setBitOrder(MSBFIRST);
 
-    digitalWrite(NRF24_CSN_PIN, HIGH);
-    digitalWrite(NRF24_CE_PIN, LOW);
+    NRFRadio.begin(&NRFSPI, rf24_gpio_pin_t(NRF24_CE_PIN), rf24_gpio_pin_t(NRF24_CSN_PIN));;
 
-    NRFRadio.begin();
     this->disableCE();
 
     this->initNRF();
@@ -106,7 +105,12 @@ void NRF24Modules::analyzerSetup() {
 }
 
 void NRF24Modules::jammerNRFRadioSetup() {
-    if (!NRFRadio.begin()) {
+    pinMode(NRF24_CE_PIN, OUTPUT);
+    pinMode(NRF24_CSN_PIN, OUTPUT);
+    digitalWrite(NRF24_CE_PIN, LOW);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
+    NRFSPI.begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
+    if (!NRFRadio.begin(&NRFSPI, rf24_gpio_pin_t(NRF24_CE_PIN), rf24_gpio_pin_t(NRF24_CSN_PIN))) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
@@ -204,12 +208,14 @@ void NRF24Modules::scannerSetup() {
       sensorArray[count] = 0;
     }
 
-    SPI.begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN, NRF24_CSN_PIN);
-    SPI.setDataMode(SPI_MODE0);
-    SPI.setFrequency(16000000);
-    SPI.setBitOrder(MSBFIRST);
+    pinMode(NRF24_CE_PIN, OUTPUT);
+    pinMode(NRF24_CSN_PIN, OUTPUT);
+    NRFSPI.begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
+    NRFSPI.setDataMode(SPI_MODE0);
+    NRFSPI.setFrequency(16000000);
+    NRFSPI.setBitOrder(MSBFIRST);
 
-    NRFRadio.begin(); // Initialize RadioA
+    NRFRadio.begin(&NRFSPI, rf24_gpio_pin_t(NRF24_CE_PIN), rf24_gpio_pin_t(NRF24_CSN_PIN)); // Initialize RadioA
     this->disableCE();
 
     this->initNRF();
