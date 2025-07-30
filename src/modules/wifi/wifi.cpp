@@ -189,7 +189,7 @@ void WiFiModules::channelHop() {
 }
 
 void WiFiModules::channelRandom() {
-	this->set_channel = random(1, 14);
+	this->set_channel = (rand() % 14) + 1;
 	esp_wifi_set_channel(this->set_channel, WIFI_SECOND_CHAN_NONE);
 	//Serial.printf("Channel channel to %d using channel random\n", this->set_channel);
 	vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -273,7 +273,7 @@ void WiFiModules::StartAPWiFiScan() {
 	wifi_initialized = true;
     vTaskDelay(100 / portTICK_PERIOD_MS);
     
-    int numNetworks = WiFi.scanNetworks(false);
+    int numNetworks = WiFi.scanNetworks(false, true, false, 1000);
     
     if (numNetworks == -1) {
         Serial.println("[ERROR] WiFi scan failed or No network found!");
@@ -284,7 +284,10 @@ void WiFiModules::StartAPWiFiScan() {
     
     for (int i = 0; i < numNetworks; i++) {
         AccessPoint ap;
-        ap.essid = WiFi.SSID(i);
+		if (WiFi.SSID(i) == "")
+			ap.essid = "<Hidden SSID>";	
+		else
+			ap.essid = WiFi.SSID(i);
         ap.channel = static_cast<uint8_t>(WiFi.channel(i));
         
         uint8_t* bssid = WiFi.BSSID(i);
@@ -356,19 +359,14 @@ void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
 	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
 
-	packet_sent += 3;
-	
-	static unsigned long lastTime = 0;
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastTime >= 2000) { // Check every 2 seconds
-        if (res_1 != ESP_OK)
-            Serial.printf("[ERROR] Error sending beacon frame 1: %s\n", esp_err_to_name(res_1));
-        if (res_2 != ESP_OK)
-            Serial.printf("[ERROR] Error sending beacon frame 2: %s\n", esp_err_to_name(res_2));
-        if (res_3 != ESP_OK)
-            Serial.printf("[ERROR] Error sending beacon frame 3: %s\n", esp_err_to_name(res_3));
-        lastTime = currentMillis;
-	}
+	packet_sent = packet_sent + 3;
+
+    if (res_1 != ESP_OK)
+		packet_sent -= 1;
+    if (res_2 != ESP_OK)
+		packet_sent -= 1;
+    if (res_3 != ESP_OK)
+		packet_sent -= 1;
 }
 
 void WiFiModules::sendBeaconRandomSSID() {
@@ -411,15 +409,9 @@ void WiFiModules::sendBeaconRandomSSID() {
 
 	esp_err_t res = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
 	
-	packet_sent += 1;
-
-	static unsigned long lastTime = 0;
-    unsigned long currentMillis = millis();
-    if (currentMillis - lastTime >= 2000) { // Check every 2 seconds
-        if (res != ESP_OK)
-            Serial.printf("[ERROR] Error sending beacon frame: %s\n", esp_err_to_name(res));
-        lastTime = currentMillis;
-	}
+	packet_sent = packet_sent + 1;
+    if (res != ESP_OK)
+        packet_sent -= 1;
 }
 
 void WiFiModules::sendDeauthAttack() {
@@ -456,19 +448,14 @@ void WiFiModules::sendDeauthAttack() {
 			esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 			esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 
-			packet_sent += 3;
+			packet_sent = packet_sent + 3;
 
-			static unsigned long lastTime = 0;
-			unsigned long currentMillis = millis();
-			if (currentMillis - lastTime >= 2000) { // Check every 2 seconds
-				if (res_1 != ESP_OK)
-					Serial.printf("[ERROR] Error sending deauth frame 1: %s\n", esp_err_to_name(res_1));
-				if (res_2 != ESP_OK)
-					Serial.printf("[ERROR] Error sending deauth frame 2: %s\n", esp_err_to_name(res_2));
-				if (res_3 != ESP_OK)
-					Serial.printf("[ERROR] Error sending deauth frame 3: %s\n", esp_err_to_name(res_3));
-				lastTime = currentMillis;
-			}
+			if (res_1 != ESP_OK)
+				packet_sent -= 1;
+			if (res_2 != ESP_OK)
+				packet_sent -= 1;
+			if (res_3 != ESP_OK)
+				packet_sent -= 1;
 		}
 	}
 }
@@ -521,19 +508,14 @@ void WiFiModules::sendProbeAttack() {
 			esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, good_probe_req_packet, sizeof(good_probe_req_packet), false);
 			esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, good_probe_req_packet, sizeof(good_probe_req_packet), false);
 
-			packet_sent += 3;
+			packet_sent = packet_sent + 3;
 
-			static unsigned long lastTime = 0;
-			unsigned long currentMillis = millis();
-			if (currentMillis - lastTime >= 2000) { // Check every 2 seconds
-				if (res_1 != ESP_OK)
-					Serial.printf("[ERROR] Error sending probe frame 1: %s\n", esp_err_to_name(res_1));
-				if (res_2 != ESP_OK)
-					Serial.printf("[ERROR] Error sending probe frame 2: %s\n", esp_err_to_name(res_2));
-				if (res_3 != ESP_OK)
-					Serial.printf("[ERROR] Error sending probe frame 3: %s\n", esp_err_to_name(res_3));
-				lastTime = currentMillis;
-			}
+			if (res_1 != ESP_OK)
+				packet_sent -= 1;
+			if (res_2 != ESP_OK)
+				packet_sent -= 1;
+			if (res_3 != ESP_OK)
+				packet_sent -= 1;
 		}
 	}
 }

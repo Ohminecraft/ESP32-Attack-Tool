@@ -15,7 +15,7 @@
 #include <Arduino.h>
 #include <RotaryEncoder.h>
 
-#define MEM_LOWER_LIM 10000
+#define MEM_LOWER_LIM 40000
 
 // Encoder pins - edit in configs.h
 //#define ENC_PIN_A   14 

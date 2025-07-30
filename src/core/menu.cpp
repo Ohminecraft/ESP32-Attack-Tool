@@ -150,9 +150,61 @@ void displayStatusBar(bool sendDisplay = false) {
 	if (sendDisplay) display.sendDisplay();
 }
 
-void displayMainMenu() {
+void menuNode(String items[], int itemCount) {
 	displayStatusBar();
 	
+	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
+	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
+		
+	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < itemCount; i++) {
+		String itemText = ((startIndex + i) == currentSelection) ? 
+			"> " + items[startIndex + i] : "  " + items[startIndex + i];
+		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
+	}
+		
+	display.sendDisplay();
+}
+
+void menuNode(String items, String info, String errortext[2], int itemCount, bool showBack = true) {
+	itemCount = itemCount + 1; // Back Option
+	if(currentSelection < itemCount - 1) {
+		String itemText = "> " + items;
+		display.displayStringwithCoordinates(itemText, 0, 24);
+	}
+	
+	 else if (itemCount - 1 == 0) {
+		display.displayStringwithCoordinates(errortext[0], 0, 24);
+		display.displayStringwithCoordinates(errortext[1], 0, 36);
+		display.displayStringwithCoordinates("> Back", 0, 48, true);
+	} else {
+		display.displayStringwithCoordinates(info + String(itemCount - 1), 0, 24, true);
+		display.displayStringwithCoordinates("> Back", 0, 48, true);
+	}
+	
+	display.sendDisplay();
+}
+
+void menuNode(String items[], String info, String errortext[2], int itemCount) {
+	if(currentSelection < itemCount) {
+		String itemText;
+		for (int i = 0; i < (int)sizeof(items); i++) {
+			if (i == 0) itemText = "> " + items[i];
+			else itemText = items[i];
+			display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
+		}
+	} else if (itemCount == 0) {
+		display.displayStringwithCoordinates(errortext[0], 0, 24);
+		display.displayStringwithCoordinates(errortext[1], 0, 36);
+		display.displayStringwithCoordinates("> Back", 0, 48);
+	} else {
+		display.displayStringwithCoordinates(info + String(itemCount), 0, 24);
+		display.displayStringwithCoordinates("> Back", 0, 48);
+	}
+	
+	display.sendDisplay();
+}
+
+void displayMainMenu() {
 	String items[MAIN_MENU_COUNT] = {
 		"BLE",
 		"WiFi",
@@ -160,15 +212,7 @@ void displayMainMenu() {
 		"Reboot"
 	};
 	
-	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < MAIN_MENU_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, MAIN_MENU_COUNT);
 }
 
 void displayBLEScanMenu() {
@@ -190,8 +234,6 @@ void displayBLEScanMenu() {
 }
 
 void displayBLEMenu() {
-	displayStatusBar();
-
 	String items[BLE_MENU_COUNT] = {
 		"BLE Scan",
 		"BLE Info",
@@ -200,50 +242,25 @@ void displayBLEMenu() {
 		"< Back"
 	};
 
-	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < BLE_MENU_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, BLE_MENU_COUNT);
 }
 
 void displayBLEInfoListMenu() {
 	displayStatusBar();
-
-	if (!blescanres || blescanres->size() == 0) {
-		display.displayStringwithCoordinates("No Devices found!", 0, 24);
-		display.displayStringwithCoordinates("Scan first", 0, 36);
-		
-		// Show only back option if haven't AP exists
-		String backText = (currentSelection == 0) ? "> Back" : "  Back";
-		display.displayStringwithCoordinates(backText, 0, 48, true);
-		return;
-	}
-	
-	// show AP + option Back
-	int totalItems = blescanres->size() + 1;
-	
+	String ble_title;
 	if (currentSelection < blescanres->size()) {
-
 		BLEScanResult bledevice = blescanres->get(currentSelection);
-		String ble_title = bledevice.name;
+		ble_title = bledevice.name;
 		if (ble_title == "<no name>") ble_title = bledevice.addr.toString().c_str();
-		// Truncate if too long
-		if (ble_title.length() > 17) {
+			// Truncate if too long
+		if (ble_title.length() > 17)
 			ble_title = ble_title.substring(0, 18) + "...";
-		}
-		
-		display.displayStringwithCoordinates("> " + ble_title, 0, 24, true);
-	} else {
-		display.displayStringwithCoordinates("> Back", 0, 48, true);
-		if (blescanres->size() > 0) {
-			display.displayStringwithCoordinates("Devices: " + String(blescanres->size()), 0, 24, true);
-		}
 	}
+	String errortext[2] = {
+		"No Devices Found!",
+		"Scan First!"
+	};
+	menuNode(ble_title, "Devices: ", errortext, blescanres->size());
 }
 
 void displayBLEInfoDetail() {
@@ -275,15 +292,7 @@ void displayMainSpooferMenu() {
 		"< Back"
 	};
 
-	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < BLE_SPOOFER_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, BLE_SPOOFER_COUNT);
 }
 
 void displayAppleSpooferMenu() {
@@ -311,14 +320,7 @@ void displayAppleSpooferMenu() {
 		"< Back"
 	};
 
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < BLE_SPO_APPLE_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, BLE_SPO_APPLE_COUNT);
 }
 
 void displaySamsungSpooferMenu() {
@@ -355,15 +357,7 @@ void displaySamsungSpooferMenu() {
 		"< Back"
 	};
 
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < BLE_SPO_SAMSUNG_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ?
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-
-	display.sendDisplay();
+	menuNode(items, BLE_SPO_SAMSUNG_COUNT);
 }
 
 
@@ -442,15 +436,7 @@ void displayGoogleSpooferMenu() {
 		"Ton Upgrade Netflix",
 		"< Back"
 	};
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < BLE_SPO_GOOGLE_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ?
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-
-	display.sendDisplay();
+	menuNode(items, BLE_SPO_GOOGLE_COUNT);
 }
 
 
@@ -465,14 +451,7 @@ void displayAdTypeSpooferMenu() {
 		"< Back"
 	};
 
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < BLE_SPO_AD_TYPE_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, BLE_SPO_AD_TYPE_COUNT);
 }
 
 void displaySpooferRunning() {
@@ -494,15 +473,7 @@ void displayExploitAttackBLEMenu() {
 		"< Back"
 	};
 	
-	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < BLE_ATK_MENU_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, BLE_ATK_MENU_COUNT);
 }
 
 void displayWiFiMenu() {
@@ -515,15 +486,7 @@ void displayWiFiMenu() {
 		"< Back"
 	};
 	
-	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < WIFI_MENU_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, WIFI_MENU_COUNT);
 }
 
 void displayWiFiScanMenu() {
@@ -556,19 +519,8 @@ void displayWiFiReScanMenu(uint32_t elapsedTime) {
 
 void displayWiFiSelectMenu() {
 	displayStatusBar();
-	
-	if (!access_points || access_points->size() == 0) {
-		display.displayStringwithCoordinates("No APs found!", 0, 24);
-		display.displayStringwithCoordinates("Scan first", 0, 36);
-		
-		// Show only back option if haven't AP exists
-		String backText = (currentSelection == 0) ? "> Back" : "  Back";
-		display.displayStringwithCoordinates(backText, 0, 48, true);
-		return;
-	}
-	
-	// show AP + option Back
-	int totalItems = access_points->size() + 1;
+
+	String items[4] = {};
 	
 	if (currentSelection < access_points->size()) {
 
@@ -585,17 +537,21 @@ void displayWiFiSelectMenu() {
 		if (apInfo.length() > 14) {
 			apInfo = apInfo.substring(0, 18) + "...";
 		}
-		
-		display.displayStringwithCoordinates("> " + apInfo, 0, 24);
-		display.displayStringwithCoordinates("Ch:" + String(ap.channel) + " R:" + String(ap.rssi), 0, 36);
-		display.displayStringwithCoordinates("B:" + String(bssidStr), 0, 48);
-		display.displayStringwithCoordinates("Enc:" + ap.wpastr, 0, 60, true);
-	} else {
-		display.displayStringwithCoordinates("> Back", 0, 48, true);
-		if (access_points->size() > 0) {
-			display.displayStringwithCoordinates("APs: " + String(access_points->size()), 0, 24, true);
+
+		for (int i = 0; i < 4; i++) {
+			if (i == 0) items[i] = apInfo;
+			else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi));
+			else if (i == 2) items[i] = ("B:" + String(bssidStr));
+			else if (i == 3) items[i] = ("Enc:" + ap.wpastr);
 		}
 	}
+
+	String errorText[2] = {
+		"No APs found!",
+		"Scan First!"
+	};
+
+	menuNode(items, "APs: " ,errorText, access_points->size());
 }
 
 void displayWiFiAttackMenu() {
@@ -613,15 +569,7 @@ void displayWiFiAttackMenu() {
 		"< Back"
 	};
 	
-	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < WIFI_ATK_MENU_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, WIFI_ATK_MENU_COUNT);
 }
 
 void displayRebootConfirm() {
@@ -642,14 +590,7 @@ void displayNRF24Menu() {
 		"< Back"
 	};
 
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < NRF24_MENU_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, NRF24_MENU_COUNT);
 }
 
 void displayNRF24JammerMenu() {
@@ -667,14 +608,7 @@ void displayNRF24JammerMenu() {
 		"< Back"
 	};
 
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
-	
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < NRF24_JAM_MENU_COUNT; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-	display.sendDisplay();
+	menuNode(items, NRF24_JAM_MENU_COUNT);
 }
 
 void displayEvilPortalInfo() {
@@ -831,7 +765,7 @@ void displayAttackStatus() {
 	
 	if (currentState == WIFI_ATTACK_RUNNING) {
 		String packetStr = "packet/sec: ";
-		packetStr.concat(wifi.packet_sent);
+		packetStr.concat(String(wifi.packet_sent).toInt());
 		display.displayStringwithCoordinates(packetStr, 0, 36, true);
 	} else if (currentState == BLE_ATTACK_RUNNING) {
 		display.displayStringwithCoordinates("Advertising...", 0, 36, true);
@@ -1048,7 +982,7 @@ void selectCurrentItem() {
 					currentState = BLE_EXPLOIT_ATTACK_MENU;
 					currentSelection = 0;
 					maxSelections = BLE_ATK_MENU_COUNT;
-					ble.initSpoofer();
+					ble.initSpam();
 					displayExploitAttackBLEMenu();
 				} else if (currentSelection == BLE_INFO) {
 					currentState = BLE_INFO_MENU_LIST;
@@ -2008,18 +1942,72 @@ void handleTasks(MenuState handle_state) {
 			// i can't using != for wtf reason, idk to fix this
 			// Deauth Flood using different redraw
 		} else {
-			if (millis() - lastDisplayUpdate > 1000) {
-				wifi.packet_sent = 0;
+			if (millis() - lastDisplayUpdate > 2000) {
 				displayAttackStatus();
+				wifi.packet_sent = 0;
 				lastDisplayUpdate = millis();
 			}
 		}
 	}
 }
 
+void redrawTasks() {
+	switch (currentState) {
+		case MAIN_MENU:
+			displayMainMenu();
+			break;
+		case BLE_MENU:
+			displayBLEMenu();
+			break;
+		case BLE_INFO_MENU_LIST:
+			displayBLEInfoListMenu();
+			break;
+		case BLE_INFO_MENU_DETAIL:
+			break;
+		case BLE_SPOOFER_MAIN_MENU:
+			displayMainSpooferMenu();
+			break;
+		case BLE_SPOOFER_APPLE_MENU:
+			displayAppleSpooferMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_MENU:
+			displaySamsungSpooferMenu();
+			break;
+		case BLE_SPOOFER_GOOGLE_MENU:
+			displayGoogleSpooferMenu();
+			break;
+		case BLE_SPOOFER_AD_TYPE_MENU:
+			displayAdTypeSpooferMenu();
+			break;
+		case BLE_EXPLOIT_ATTACK_MENU:
+			displayExploitAttackBLEMenu();
+			break;
+		case WIFI_MENU:
+			displayWiFiMenu();
+			break;
+		case WIFI_ATTACK_MENU:
+			displayWiFiAttackMenu();
+			break;
+		case WIFI_SELECT_MENU:
+			displayWiFiSelectMenu();
+			break;
+		case NRF24_MENU:
+			displayNRF24Menu();
+			break;
+		case NRF24_JAMMER_MENU:
+			displayNRF24JammerMenu();
+			break;
+	}
+}
+
 void menuloop() {
 	handleInput(currentState);
 	handleTasks(currentState);
+	static unsigned long lastRedrawCheck = 0;
+	if (millis() - lastRedrawCheck > 30000) {
+		redrawTasks();
+		lastRedrawCheck = millis();
+	}
 	// Check for critical low memory and auto-reboot
 	static unsigned long lastMemoryCheck = 0;
 	if (millis() - lastMemoryCheck > 3000) { // Check every 3 seconds
