@@ -1936,10 +1936,10 @@ void handleTasks(MenuState handle_state) {
 			// BLE attack handling...
 			switch(currentBLEAttackType) {
 				case BLE_ATTACK_SOUR_APPLE:
-					ble.executeAppleSpam(SourApple);
+					ble.executeSwiftpair(SourApple);
 					break;
 				case BLE_ATTACK_APPLE_JUICE:
-					ble.executeAppleSpam(AppleJuice);
+					ble.executeSwiftpair(AppleJuice);
 					break;
 				case BLE_ATTACK_MICROSOFT:
 					ble.executeSwiftpair(Microsoft);

