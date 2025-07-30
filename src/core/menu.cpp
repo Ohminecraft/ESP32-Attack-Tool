@@ -209,6 +209,7 @@ void displayMainMenu() {
 		"BLE",
 		"WiFi",
 		"NRF24",
+		"Deep Sleep",
 		"Reboot"
 	};
 	
@@ -577,6 +578,14 @@ void displayRebootConfirm() {
 	display.displayStringwithCoordinates("====== REBOOT ======", 0, 12);
 	display.displayStringwithCoordinates("Press SELECT to", 0, 24);
 	display.displayStringwithCoordinates("confirm reboot", 0, 36);
+	display.displayStringwithCoordinates("or LEFT to cancel", 0, 48, true);
+}
+
+void displayDeepSleepConfirm() {
+	display.clearScreen();
+	display.displayStringwithCoordinates("==== DeepSleep ====", 0, 12);
+	display.displayStringwithCoordinates("Press SELECT to", 0, 24);
+	display.displayStringwithCoordinates("confirm deepsleep", 0, 36);
 	display.displayStringwithCoordinates("or LEFT to cancel", 0, 48, true);
 }
 
@@ -953,7 +962,7 @@ void selectCurrentItem() {
 				// Wait for user confirmation
 				bool confirmed = false;
 				bool cancelled = false;
-				unsigned long startTime = millis();
+				//unsigned long startTime = millis();
 				
 				while (!confirmed && !cancelled /*&& (millis() - startTime < 10000)*/) {
 
@@ -967,6 +976,29 @@ void selectCurrentItem() {
 				
 				if (confirmed) {
 					performReboot();
+				} else {
+					// Return to main menu
+					displayMainMenu();
+				}
+			} else if (currentSelection == MAIN_DEEP_SLEEP) {
+				displayDeepSleepConfirm();
+
+				bool confirmed = false;
+				bool cancelled = false;
+				//unsigned long startTime = millis();
+				
+				while (!confirmed && !cancelled /*&& (millis() - startTime < 10000)*/) {
+
+					if (check(selPress)) {
+						confirmed = true;
+					} else if (check(prevPress)) {
+						cancelled = true;
+					}
+					vTaskDelay(10 / portTICK_PERIOD_MS);
+				}
+				
+				if (confirmed) {
+					performDeepSleep();
 				} else {
 					// Return to main menu
 					displayMainMenu();
@@ -1726,6 +1758,8 @@ void performReboot() {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
 	
+	currentState = MAIN_MENU;
+
 	// Display reboot message
 	display.clearScreen();
 	display.displayStringwithCoordinates("REBOOTING...", 0, 12);
@@ -1734,6 +1768,48 @@ void performReboot() {
 	
 	// Restart ESP32
 	ESP.restart();
+}
+
+void performDeepSleep() {
+	if (autoSleep)
+	Serial.println("[SYSTEM_REBOOT] Forcing Performing Deep Sleep...");
+	else 
+	Serial.println("[SYSTEM_REBOOT] User Performing Deep Sleep...");
+	
+	// Stop any running attacks or scans
+	if (wifiScanRunning) {
+		wifiScanRunning = false;
+	}
+
+	if (bleScanRunning) {
+		bleScanRunning = false;
+	}
+	
+	// Shutdown BLE
+	if (ble.ble_initialized) {
+		ble.ShutdownBLE();
+	}
+	
+	// Shutdown WiFi
+	if (wifi.wifi_initialized) {
+		wifi.StartMode(WIFI_SCAN_OFF);
+	}
+
+	currentState = MAIN_MENU;
+	
+	// Display reboot message
+	display.clearScreen();
+	display.displayStringwithCoordinates("Deep Sleep", 0, 12);
+
+	display.displayStringwithCoordinates("Tip: Press Sel", 0, 24);
+	display.displayStringwithCoordinates("to wake up", 0, 36);
+	display.displayStringwithCoordinates("device", 0, 48, true);
+	if (autoSleep) display.displayStringwithCoordinates("Forcing by System", 0, 60, true);
+	vTaskDelay(2000 / portTICK_PERIOD_MS);
+	display.clearScreen();
+	// Restart ESP32
+	esp_deep_sleep_enable_gpio_wakeup(1 << ENC_BTN, ESP_GPIO_WAKEUP_GPIO_LOW);
+	esp_deep_sleep_start();
 }
 
 void handleInput(MenuState handle_state) {
@@ -2007,6 +2083,28 @@ void menuloop() {
 	if (millis() - lastRedrawCheck > 30000) {
 		redrawTasks();
 		lastRedrawCheck = millis();
+	}
+	static unsigned long autoSleepTimer = 0;
+	if (!(currentState == WIFI_SCAN_RUNNING) &&
+		!(currentState == BLE_SCAN_RUNNING) &&
+		!(currentState == NRF24_ANALYZER_RUNNING) &&
+		!(currentState == NRF24_JAMMER_RUNNING) &&
+		!(currentState == NRF24_SCANNER_RUNNING) &&
+		!(currentState == WIFI_ATTACK_RUNNING) &&
+		!(currentState == BLE_ATTACK_RUNNING) &&
+		!(currentState == BLE_SPOOFER_RUNNING))
+	{
+		if (!check(selPress) && !check(prevPress) && !check(nextPress)) {
+			if (autoSleepTimer == 0) { 
+				autoSleepTimer = millis();
+			}
+		} else {
+			autoSleepTimer = 0;
+		}
+		if (autoSleepTimer > 0 && (millis() - autoSleepTimer) > 300000) { // 5 mins
+			autoSleep = true;
+			performDeepSleep();
+		}
 	}
 	// Check for critical low memory and auto-reboot
 	static unsigned long lastMemoryCheck = 0;
