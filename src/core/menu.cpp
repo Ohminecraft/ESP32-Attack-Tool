@@ -73,17 +73,18 @@ void menuinit() {
 void displayWelcome() {
 	display.clearScreen();
 	String title = "ESP32 Attack Tool";
-	String version_num = ATTACK_TOOL_VERSION;
 	int yTitle = SCR_HEIGHT / 2 - 5;
 	int yVersion = SCR_HEIGHT / 2 + 5;
 	display.drawingCenterString(title, yTitle);
-	display.drawingCenterString(version_num, yVersion, true);
+	display.drawBipmap((SCR_WIDTH / 2) - 10, yVersion - 4, 22, 22, bitmapicon[0], true);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
 	display.clearScreen();
 	String footer1 = "Code By";
 	String footer2 = "@Ohminecraft";
+	String version_num = "v" + String(ATTACK_TOOL_VERSION);
 	display.drawingCenterString(footer1, yTitle);
-	display.drawingCenterString(footer2, yVersion, true);
+	display.drawingCenterString(footer2, yVersion);
+	display.drawingCenterString(version_num, yVersion + 12, true);	
 	display.displayInvert(true);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
 	display.displayInvert(false);
@@ -219,13 +220,11 @@ void displayMainMenu() {
 void displayBLEScanMenu() {
 	displayStatusBar(true);
 	if (bleScanRunning) {
-		if (bleScanInProgress) {
-			display.displayStringwithCoordinates("Scanning...", 0, 24, true);
-		} else {
-				bleScanDisplay = true;
-				display.displayStringwithCoordinates("Scan complete", 0, 24);
-				display.displayStringwithCoordinates("SELECT->back", 0, 36);
-				display.displayStringwithCoordinates("Found: " + String(blescanres ? blescanres->size() : 0), 0, 48, true);
+		if (!bleScanInProgress) {
+			bleScanDisplay = true;
+			display.displayStringwithCoordinates("Scan complete", 0, 24);
+			display.displayStringwithCoordinates("SELECT->back", 0, 36);
+			display.displayStringwithCoordinates("Found: " + String(blescanres ? blescanres->size() : 0), 0, 48, true);
 		}
 	} else {
 		display.displayStringwithCoordinates("Press SELECT to", 0, 24);
@@ -1303,15 +1302,20 @@ void goBack() {
 			displayWiFiMenu();
 			break;
 		case BLE_SCAN_RUNNING:
-			if (bleScanRunning) {
+			if (bleScanRunning && bleScanInProgress) {
+				bleScanInProgress = false;
+				ble.ShutdownBLE();
+				Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
+				displayBLEScanMenu();
+			} else if (bleScanRunning && bleScanOneShot && bleScanDisplay) {
 				bleScanRunning = false;
 				bleScanOneShot = false;
 				bleScanDisplay = false;
+				currentState = BLE_MENU;
+				currentSelection = 0;
+				maxSelections = BLE_MENU_COUNT;
+				displayBLEMenu();
 			}
-			currentState = BLE_MENU;
-			currentSelection = 0;
-			maxSelections = BLE_MENU_COUNT;
-			displayBLEMenu();
 			break;
 		case BLE_EXPLOIT_ATTACK_MENU:
 			currentState = BLE_MENU;
@@ -1660,10 +1664,11 @@ void startBLEScan() {
 
 	bleScanInProgress = true;
 	displayBLEScanMenu();
-	ble.bleScan();
 	bleScanOneShot = true;
-	ble.ShutdownBLE();
-	bleScanInProgress = false;
+	ble.bleScan();
+	//displayStatusBar(true);
+	//ble.ShutdownBLE();
+	//bleScanInProgress = false;
 
 }
 
@@ -1861,8 +1866,16 @@ void handleTasks(MenuState handle_state) {
 
 		if (!bleScanOneShot) startBLEScan();
 
-		if (!bleScanDisplay) displayBLEScanMenu();
+		if (!bleScanDisplay && !bleScanInProgress) displayBLEScanMenu();
 
+		if (bleScanInProgress) {
+			if (bleScanRedraw) {
+				bleScanRedraw = false;
+				display.clearScreen();
+				displayStatusBar();
+				display.displayBuffer();
+			}
+		}
 	}
 
 	else if (handle_state == NRF24_ANALYZER_RUNNING) {
@@ -1936,10 +1949,10 @@ void handleTasks(MenuState handle_state) {
 			// BLE attack handling...
 			switch(currentBLEAttackType) {
 				case BLE_ATTACK_SOUR_APPLE:
-					ble.executeAppleSpam(SourApple);
+					ble.executeSwiftpair(SourApple);
 					break;
 				case BLE_ATTACK_APPLE_JUICE:
-					ble.executeAppleSpam(AppleJuice);
+					ble.executeSwiftpair(AppleJuice);
 					break;
 				case BLE_ATTACK_MICROSOFT:
 					ble.executeSwiftpair(Microsoft);

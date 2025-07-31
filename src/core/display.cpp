@@ -10,23 +10,16 @@
     * The display is used to show information and messages in the ESP32 Attack Tool.
 */
 
+LinkedList<String>* display_buffer;
+
 DisplayModules::DisplayModules() :
     #if defined(_SPI_SCREEN)
         u8g2(U8G2_R0, /* reset=*/ RST_PIN, CS_PIN, DC_PIN),
     #elif defined(_I2C_SCREEN)
         u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, SCL_PIN, SDA_PIN),
     #endif
-    //display_buffer(nullptr),
     screenInitialized(false)
 {
-}
-
-DisplayModules::~DisplayModules()
-{
-    //if (display_buffer != nullptr) {
-    //    delete display_buffer;
-    //    display_buffer = nullptr;
-    //}
 }
 
 bool DisplayModules::main()
@@ -35,7 +28,7 @@ bool DisplayModules::main()
         Serial.println("[INFO] Display already initialized, skipping...");
         return true;
     }
-    //display_buffer = new LinkedList<String>();
+    display_buffer = new LinkedList<String>();
 
     Serial.println("[INFO] Initializing Display...");
 
@@ -49,6 +42,7 @@ bool DisplayModules::main()
     // Initialize U8g2 display
     u8g2.begin();
     u8g2.enableUTF8Print();  // Enable UTF8 support if needed
+    u8g2.setBitmapMode(1);
     
     Serial.println("[INFO] Display initialized successfully!");
 
@@ -73,6 +67,11 @@ void DisplayModules::clearScreen()
 
 void DisplayModules::printString(String msg) {
     u8g2.print(msg);
+}
+
+void DisplayModules::drawBipmap(int x, int y, int w, int h, const uint8_t* icon, bool senddisplay) {
+    u8g2.drawXBMP(x, y, w, h, icon);
+    if (senddisplay) u8g2.sendBuffer();
 }
 
 void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int color)
@@ -192,20 +191,19 @@ void DisplayModules::displayStringwithCoordinates(String msg, int x, int y, bool
     }
 }
 
-/*
 void DisplayModules::displayBuffer()
 {
     if (!screenInitialized) {
         Serial.println("[ERROR] Display not initialized, cannot display buffer.");
         return;
     }
+    int y = 24; // Start at baseline position
     
-    u8g2.clearBuffer();
-    int y = 12; // Start at baseline position
-    
-    while (display_buffer->size() > 0)
+    if (display_buffer->size() > 5) display_buffer->shift();
+
+    for (int i = 0; i < display_buffer->size(); i++)
     {
-        String msg = display_buffer->shift();
+        String msg = display_buffer->get(i);
         if (msg.length() > 0) {
             // Check if message contains newlines
             if (msg.indexOf('\n') != -1) {
@@ -221,7 +219,7 @@ void DisplayModules::displayBuffer()
                 y += 12;
             }
             
-            if (y > SCR_HEIGHT - 12) break; // Prevent overflow
+            //if (y > SCR_HEIGHT - 12) break; // Prevent overflow
         }
         else {
             Serial.println("[INFO] Empty message in display buffer, skipping...");
@@ -229,7 +227,6 @@ void DisplayModules::displayBuffer()
     }
     u8g2.sendBuffer();
 }
-    */
 
 void DisplayModules::displayEvilPortalText(String username, String password) 
 {

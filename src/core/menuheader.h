@@ -13,6 +13,7 @@
 */
 
 #include <Arduino.h>
+#include "core/assets.h"
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
 #include "modules/ble/bleheader.h"
@@ -20,7 +21,7 @@
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
 
-#define ATTACK_TOOL_VERSION "2.2.3"
+#define ATTACK_TOOL_VERSION "2.2.4"
 
 #define MAX_SHOW_SECLECTION 4
 

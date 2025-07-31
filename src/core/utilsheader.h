@@ -15,7 +15,7 @@
 #include <Arduino.h>
 #include <RotaryEncoder.h>
 
-#define MEM_LOWER_LIM 40000
+#define MEM_LOWER_LIM 20000
 
 // Encoder pins - edit in configs.h
 //#define ENC_PIN_A   14 
@@ -31,6 +31,7 @@
 #define GET_FREE_HEAP 1
 #define GET_USED_HEAP 2
 #define GET_USED_HEAP_PERCENT 3
+
 uint32_t getHeap(uint8_t type);
 String generateRandomName();
 bool checkLeftMemory();

