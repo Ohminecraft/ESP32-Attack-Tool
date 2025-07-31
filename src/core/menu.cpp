@@ -1305,7 +1305,7 @@ void goBack() {
 			if (bleScanRunning && bleScanInProgress) {
 				bleScanInProgress = false;
 				ble.ShutdownBLE();
-				//Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
+				Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
 				displayBLEScanMenu();
 			} else if (bleScanRunning && bleScanOneShot && bleScanDisplay) {
 				bleScanRunning = false;
