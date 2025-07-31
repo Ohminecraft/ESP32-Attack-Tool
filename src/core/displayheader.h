@@ -26,6 +26,7 @@
 // Define color constants for U8g2 compatibility
 #define WHITE 1
 #define BLACK 0
+extern LinkedList<String>* display_buffer;
 
 class DisplayModules
 {
@@ -35,7 +36,6 @@ class DisplayModules
     #elif defined(_I2C_SCREEN)
         U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
     #endif
-        //LinkedList<String>* display_buffer;
         bool screenInitialized = false;
         
     public:
@@ -52,7 +52,7 @@ class DisplayModules
         void displayInvert(bool invert);
         void displayStringwithCoordinates(String msg, int x, int y, bool senddisplay = false, int color = WHITE);
         String wrapText(String input, int lineWidth = 21);
-        //void displayBuffer();
+        void displayBuffer();
         void simpleStrikethrough(String text, int x, int y);
         void displayEvilPortalText(String username, String password);
         void drawingVLine(int x, int y, int h, int color = WHITE);
@@ -60,6 +60,7 @@ class DisplayModules
         void drawingPixel(int x, int y, bool sendDisplay = false);
         void sendDisplay();
         //void addToBuffer(String msg);
+        void drawBipmap(int x, int y, int w, int h, const uint8_t* icon, bool senddisplay = false);
         
         // Additional U8g2 specific methods you might want to add
         void setCursor(int x, int y);

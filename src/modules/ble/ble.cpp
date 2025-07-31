@@ -14,6 +14,7 @@ NimBLEScan *pBLEScan;
 
 
 LinkedList<BLEScanResult>* blescanres;
+bool bleScanRedraw = false;
 
 NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
 {
@@ -175,6 +176,8 @@ void BLEModules::main()
     blescanres = new LinkedList<BLEScanResult>();
       
     // Initialize NimBLE
+    //NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
+    //NimBLEDevice::setScanDuplicateCacheSize(200);
     NimBLEDevice::init("");
     pBLEScan = NimBLEDevice::getScan();
     this->ble_initialized = true;
@@ -187,9 +190,11 @@ bool BLEModules::ShutdownBLE()
 {
     if(this->ble_initialized) {
         Serial.println("[INFO] Shutting down BLE Module");
-        pAdvertising->stop();
-        pBLEScan->clearResults();
-        pBLEScan->stop();
+        if (pAdvertising != nullptr) pAdvertising->stop();
+        if (pBLEScan != nullptr) {
+            pBLEScan->stop();
+            pBLEScan->clearResults();
+        } 
         // Deinitialize NimBLE
         NimBLEDevice::deinit();
         this->ble_initialized = false;
@@ -295,6 +300,9 @@ void BLEModules::initSpam() {
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER); 
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN , MAX_TX_POWER);
 
+    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    esp_ble_gap_set_rand_addr(null_addr);
+
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }
@@ -338,8 +346,9 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     NimBLEDevice::deinit();
 }
 
-class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
+class BLEScanDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
     void onResult(NimBLEAdvertisedDevice *advertisedDevice) {
+        bleScanRedraw = true;
         BLEScanResult bleres;
         String ble_name;
         ble_name = advertisedDevice->getName().c_str();
@@ -348,10 +357,21 @@ class AdvertisedDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
         bleres.rssi = advertisedDevice->getRSSI();
         bleres.addr = advertisedDevice->getAddress();
         blescanres->add(bleres);
+        String add_to_buffer;
+        if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr.toString().c_str());
+        else add_to_buffer = ble_name;
+        //if (display_buffer->size() > 4)
+        //    display_buffer->shift();
+        display_buffer->add(add_to_buffer);
         Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
-        // Serial.println("\n\nAddress - " + bt_address + "Name-"+ bt_name +"\n\n");
     }
 };
+
+void BLEModules::scanCompleteCB(NimBLEScanResults scanResults) {
+    printf("[INFO] Scan complete!\n");
+    printf("[INFO] Found %d devices\n", scanResults.getCount());
+    scanResults.dump();
+  } // scanCompleteCB
 
 void BLEModules::bleScan() {
     delete blescanres;
@@ -359,21 +379,22 @@ void BLEModules::bleScan() {
     NimBLEDevice::init("ESP32 Attack Tool - BLE Utility");
     ble_initialized = true;
     pBLEScan = NimBLEDevice::getScan();
-    pBLEScan->setAdvertisedDeviceCallbacks(new AdvertisedDeviceCallbacks());
+    pBLEScan->setAdvertisedDeviceCallbacks(new BLEScanDeviceCallbacks(), false);
     pBLEScan->setActiveScan(true);
     pBLEScan->setInterval(100);
     pBLEScan->setWindow(99);
+    pBLEScan->setMaxResults(0);
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
     //delay(100);
 
     Serial.println("[INFO] Starting BLE Scan");
-    NimBLEScanResults foundDevices = pBLEScan->start(SCANTIME, false); // Default scan time is 5 seconds
+    pBLEScan->start(0, scanCompleteCB, false);
     
-    Serial.println("[INFO] BLE Scan Done! Found: " + String(foundDevices.getCount()) + " Devices!");
+    //Serial.println("[INFO] BLE Scan Done! Found: " + String(foundDevices.getCount()) + " Devices!");
 
-    this->ShutdownBLE();
+    //this->ShutdownBLE();
 
-    Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
+    //Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
 }
 

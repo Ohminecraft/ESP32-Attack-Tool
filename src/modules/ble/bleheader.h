@@ -18,6 +18,9 @@
 #include <LinkedList.h>
 
 #include "core/utilsheader.h"
+#include "core/displayheader.h"
+
+DisplayModules ble_display_obj;
 
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) ||                              \
     defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -350,10 +353,12 @@ const WatchModel watch_models[26] = {
 
 int android_models_count = (sizeof(android_models) / sizeof(android_models[0]));
 
+extern bool bleScanRedraw;
+
 class BLEModules {
     private:
         NimBLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
-        
+        static void scanCompleteCB(NimBLEScanResults scanResults);
     public:
         bool ble_initialized = false;
 
