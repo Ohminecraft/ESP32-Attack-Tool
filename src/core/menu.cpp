@@ -123,6 +123,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("BLE Attack", 0, 12);
 	else if (currentState == WIFI_SELECT_MENU)
 		display.displayStringwithCoordinates("WiFi Sel Menu", 0, 12);
+	else if (currentState == WIFI_GENERAL_MENU)
+		display.displayStringwithCoordinates("WiFi Gen Menu", 0, 12);
 	else if (currentState == WIFI_ATTACK_MENU)
 		display.displayStringwithCoordinates("WiFi Atk Menu", 0, 12);
 	else if (currentState == WIFI_MENU)
@@ -133,6 +135,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("NRF Jam Menu", 0, 12);
 	else if (currentState == WIFI_SCAN_RUNNING)
 		display.displayStringwithCoordinates("WiFi Scan", 0, 12);
+	else if (currentState == WIFI_SCAN_SNIFFER_RUNNING)
+		display.displayStringwithCoordinates("WiFi Sniffer", 0, 12);
 	else if (currentState == NRF24_ANALYZER_RUNNING)
 		display.displayStringwithCoordinates("NRF Analyzer", 0, 12);
 	else if (currentState == NRF24_SCANNER_RUNNING)
@@ -480,25 +484,37 @@ void displayWiFiMenu() {
 	displayStatusBar();
 	
 	String items[WIFI_MENU_COUNT] = {
-		"Scan WiFi",
-		"Select WiFi",
-		"Attack WiFi",
+		"WiFi General",
+		"WiFi Select",
+		"WiFi Attack",
 		"< Back"
 	};
 	
 	menuNode(items, WIFI_MENU_COUNT);
 }
 
+void displayWiFiGeneralMenu() {
+	displayStatusBar();
+
+	String items[WIFI_GENERAL_MENU_COUNT] = {
+		"Scan AP",
+		"Probe Req Scan",
+		"Deauth Scan",
+		"Beacon Scan",
+		"< Back"
+	};
+
+	menuNode(items, WIFI_GENERAL_MENU_COUNT);
+}
+
 void displayWiFiScanMenu() {
 	displayStatusBar(true);
 	if (wifiScanRunning) {
-		if (wifiScanInProgress) {
-			display.displayStringwithCoordinates("Scanning...", 0, 24, true);
-		} else {
-				wifiScanDisplay = true;
-				display.displayStringwithCoordinates("Scan complete", 0, 24);
-				display.displayStringwithCoordinates("SELECT->back", 0, 36);
-				display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
+		if (!wifiScanInProgress) {
+			wifiScanDisplay = true;
+			display.displayStringwithCoordinates("Scan complete", 0, 24);
+			display.displayStringwithCoordinates("SELECT->back", 0, 36);
+			display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
 		}
 	} else {
 		display.displayStringwithCoordinates("Press SELECT to", 0, 24);
@@ -860,6 +876,9 @@ void navigateUp() {
 		case WIFI_MENU:
 			displayWiFiMenu();
 			break;
+		case WIFI_GENERAL_MENU:
+			displayWiFiGeneralMenu();
+			break;
 		case WIFI_ATTACK_MENU:
 			displayWiFiAttackMenu();
 			break;
@@ -918,6 +937,9 @@ void navigateDown() {
 			break;
 		case WIFI_MENU:
 			displayWiFiMenu();
+			break;
+		case WIFI_GENERAL_MENU:
+			displayWiFiGeneralMenu();
 			break;
 		case WIFI_ATTACK_MENU:
 			displayWiFiAttackMenu();
@@ -1146,9 +1168,11 @@ void selectCurrentItem() {
 			break;
 			
 		case WIFI_MENU:
-			if (currentSelection == WIFI_SCAN) {
-				currentState = WIFI_SCAN_RUNNING;
-				displayWiFiScanMenu();
+			if (currentSelection == WIFI_GENERAL) {
+				currentState = WIFI_GENERAL_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_GENERAL_MENU_COUNT;
+				displayWiFiGeneralMenu(); 
 			} else if (currentSelection == WIFI_SELECT) {
 				currentState = WIFI_SELECT_MENU;
 				currentSelection = 0;
@@ -1167,7 +1191,27 @@ void selectCurrentItem() {
 				goBack();
 			}
 			break;
-			
+		case WIFI_GENERAL_MENU:
+			if (currentSelection == WIFI_GENERAL_BACK) {
+				goBack();
+			}
+			else if (currentSelection == WIFI_GENEARL_AP_SCAN) {
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu();
+			} else if (currentSelection == WIFI_GENERAL_PROBE_REQ_SCAN) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				displayStatusBar(true);
+				startSnifferScan(WIFI_GENERAL_PROBE_REQ_SCAN);
+			} else if (currentSelection == WIFI_GENERAL_DEAUTH_SCAN) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				displayStatusBar(true);
+				startSnifferScan(WIFI_GENERAL_DEAUTH_SCAN);
+			} else if (currentSelection == WIFI_GENERAL_BEACON_SCAN) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				displayStatusBar(true);
+				startSnifferScan(WIFI_GENERAL_BEACON_SCAN);
+			}
+			break;
 		case WIFI_SCAN_RUNNING:
 			if (!wifiScanRunning) {
 				startWiFiScan();
@@ -1282,17 +1326,42 @@ void goBack() {
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
-		case WIFI_SCAN_RUNNING:
-			if (wifiScanRunning) {
-				wifiScanRunning = false;
-				wifiScanOneShot = false;
-				wifiAttackOneShot = false;
-				wifiScanDisplay = false;
-			}
+		case WIFI_GENERAL_MENU:
 			currentState = WIFI_MENU;
 			currentSelection = 0;
 			maxSelections = WIFI_MENU_COUNT;
 			displayWiFiMenu();
+			break;
+		case WIFI_SCAN_RUNNING:
+			if (wifiScanRunning && wifiScanInProgress) {
+				wifiScanInProgress = false;
+				wifi.StartMode(WIFI_SCAN_OFF);
+				Serial.println("[INFO] Wifi Scan completed successfully! Devices in list: " + String(access_points->size()));
+				displayWiFiScanMenu();
+				display.clearBuffer();
+			}
+			else if (!wifiScanRunning) {
+				currentState = WIFI_GENERAL_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_GENERAL_MENU_COUNT;
+				displayWiFiGeneralMenu();
+			}
+			else if (wifiScanRunning && wifiScanOneShot && wifiScanDisplay)  {
+				wifiScanRunning = false;
+				wifiScanOneShot = false;
+				wifiScanDisplay = false;
+				currentState = WIFI_GENERAL_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_GENERAL_MENU_COUNT;
+				displayWiFiGeneralMenu();
+			}
+			break;
+		case WIFI_SCAN_SNIFFER_RUNNING:
+			currentState = WIFI_GENERAL_MENU;
+			currentSelection = 0;
+			maxSelections = WIFI_GENERAL_MENU_COUNT;
+			wifi.StartMode(WIFI_SCAN_OFF);
+			displayWiFiGeneralMenu();
 			break;
 		case WIFI_SELECT_MENU:
 		case WIFI_ATTACK_MENU:
@@ -1307,7 +1376,15 @@ void goBack() {
 				ble.ShutdownBLE();
 				Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
 				displayBLEScanMenu();
-			} else if (bleScanRunning && bleScanOneShot && bleScanDisplay) {
+				display.clearBuffer();
+			}
+			else if (!bleScanRunning) {
+				currentState = BLE_MENU;
+				currentSelection = 0;
+				maxSelections = BLE_MENU_COUNT;
+				displayBLEMenu();
+			}
+			else if (bleScanRunning && bleScanOneShot && bleScanDisplay) {
 				bleScanRunning = false;
 				bleScanOneShot = false;
 				bleScanDisplay = false;
@@ -1679,10 +1756,24 @@ void startWiFiScan() {
 	// Start AP scan
 	wifiScanInProgress = true;
 	displayWiFiScanMenu();
-	wifi.StartMode(WIFI_SCAN_AP);
+	display.clearBuffer();
 	wifiScanOneShot = true;
-	wifi.StartMode(WIFI_SCAN_OFF);
-	wifiScanInProgress = false;
+	wifi.StartMode(WIFI_SCAN_AP);
+	//wifi.StartMode(WIFI_SCAN_OFF);
+	//wifiScanInProgress = false;
+}
+
+void startSnifferScan(WiFiGeneralItem sniffer_mode) {
+	display.clearBuffer();
+	if (sniffer_mode == WIFI_GENERAL_PROBE_REQ_SCAN) {
+		wifi.StartMode(WIFI_SCAN_PROBE_REQ);
+	}
+	else if (sniffer_mode == WIFI_GENERAL_DEAUTH_SCAN) {
+		wifi.StartMode(WIFI_SCAN_DEAUTH);
+	}
+	else if (sniffer_mode == WIFI_GENERAL_BEACON_SCAN) {
+		wifi.StartMode(WIFI_SCAN_BEACON);
+	}
 }
 
 void stopCurrentAttack() {
@@ -1767,6 +1858,7 @@ void performReboot() {
 
 	// Display reboot message
 	display.clearScreen();
+	display.displayBuffer();
 	display.displayStringwithCoordinates("REBOOTING...", 0, 12);
 	display.displayStringwithCoordinates("Please wait...", 0, 21, true);
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -1812,6 +1904,7 @@ void performDeepSleep() {
 	if (autoSleep) display.displayStringwithCoordinates("Forcing by System", 0, 60, true);
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
 	display.clearScreen();
+	display.displayBuffer();
 	// Restart ESP32
 	esp_deep_sleep_enable_gpio_wakeup(1 << ENC_BTN, ESP_GPIO_WAKEUP_GPIO_LOW);
 	esp_deep_sleep_start();
@@ -1821,6 +1914,7 @@ void handleInput(MenuState handle_state) {
 	// Handle Input
 	if (check(selPress)) {
 		if ((wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) ||
+			handle_state == WIFI_SCAN_SNIFFER_RUNNING ||
 			(bleScanRunning && handle_state == BLE_SCAN_RUNNING) ||
 			handle_state == NRF24_ANALYZER_RUNNING ||
 			handle_state == NRF24_JAMMER_RUNNING ||
@@ -1858,8 +1952,39 @@ void handleTasks(MenuState handle_state) {
 
 		if (!wifiScanOneShot) startWiFiScan();
 
-		if (!wifiScanDisplay) displayWiFiScanMenu();
+		if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu();
 
+		if (wifiScanInProgress) {
+			if (wifiScanRedraw) {
+				wifiScanRedraw = false;
+				display.clearScreen();
+				displayStatusBar();
+				display.displayBuffer();
+			}
+		}
+
+		static unsigned long channelhoptimer = 0;
+		if (wifiScanRunning && wifiScanInProgress) {
+			if (millis() - channelhoptimer > 500) {
+				wifi.channelHop();
+				channelhoptimer = millis();
+			}
+		}
+	}
+
+	else if (handle_state == WIFI_SCAN_SNIFFER_RUNNING) {
+		if (wifiScanRedraw) {
+			wifiScanRedraw = false;
+			display.clearScreen();
+			displayStatusBar();
+			display.displayBuffer();
+		}
+
+		static unsigned long channelhoptimer = 0;
+		if (millis() - channelhoptimer > 500) {
+			wifi.channelHop();
+			channelhoptimer = millis();
+		}
 	}
 
 	else if (bleScanRunning && handle_state == BLE_SCAN_RUNNING) {
@@ -1881,6 +2006,8 @@ void handleTasks(MenuState handle_state) {
 	else if (handle_state == NRF24_ANALYZER_RUNNING) {
 		if (!nrfAnalyzerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Analyzer");
+			display.clearScreen();
+			display.sendDisplay();
 			nrf.analyzerSetup();
 			nrfAnalyzerSetupOneShot = true;
 		}
@@ -1905,6 +2032,8 @@ void handleTasks(MenuState handle_state) {
 	else if (handle_state == NRF24_SCANNER_RUNNING) {
 		if (!nrfScannerSetupOneShot) {
 			Serial.println("[INFO] Starting NRF Scanner");
+			display.clearScreen();
+			display.sendDisplay();
 			nrf.scannerSetup();
 			nrfScannerSetupOneShot = true;
 		}
@@ -2074,6 +2203,9 @@ void redrawTasks() {
 		case WIFI_MENU:
 			displayWiFiMenu();
 			break;
+		case WIFI_GENERAL_MENU:
+			displayWiFiGeneralMenu();
+			break;
 		case WIFI_ATTACK_MENU:
 			displayWiFiAttackMenu();
 			break;
@@ -2098,7 +2230,8 @@ void menuloop() {
 		lastRedrawCheck = millis();
 	}
 	static unsigned long autoSleepTimer = 0;
-	if (!(currentState == WIFI_SCAN_RUNNING) &&
+	static unsigned long taskRunningTimerCheck = 0;
+	if (!(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep ode when in attack mode
 		!(currentState == BLE_SCAN_RUNNING) &&
 		!(currentState == NRF24_ANALYZER_RUNNING) &&
 		!(currentState == NRF24_JAMMER_RUNNING) &&
@@ -2107,7 +2240,7 @@ void menuloop() {
 		!(currentState == BLE_ATTACK_RUNNING) &&
 		!(currentState == BLE_SPOOFER_RUNNING))
 	{
-		if (!check(selPress) && !check(prevPress) && !check(nextPress)) {
+		if (!check(selPress) && !check(prevPress) && !check(nextPress)) { // auto deep sleep
 			if (autoSleepTimer == 0) { 
 				autoSleepTimer = millis();
 			}
@@ -2117,6 +2250,11 @@ void menuloop() {
 		if (autoSleepTimer > 0 && (millis() - autoSleepTimer) > 300000) { // 5 mins
 			autoSleep = true;
 			performDeepSleep();
+		}
+	} else {
+		if (millis() - taskRunningTimerCheck > 10000) {
+			autoSleepTimer = millis();
+			taskRunningTimerCheck = millis();
 		}
 	}
 	// Check for critical low memory and auto-reboot

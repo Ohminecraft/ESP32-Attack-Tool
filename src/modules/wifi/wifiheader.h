@@ -19,10 +19,14 @@
 #include <LinkedList.h>
 
 #include "core/utilsheader.h"
+#include "core/displayheader.h"
 
 enum WiFiScanState {
     WIFI_SCAN_OFF,
     WIFI_SCAN_AP,
+    WIFI_SCAN_PROBE_REQ,
+    WIFI_SCAN_DEAUTH,
+    WIFI_SCAN_BEACON,
     WIFI_ATTACK_RND_BEACON,
     WIFI_ATTACK_STA_BEACON, // ATTACK STABLE SSID
     WIFI_ATTACK_RIC_BEACON,
@@ -32,6 +36,17 @@ enum WiFiScanState {
     WIFI_ATTACK_EVIL_PORTAL,
     WIFI_ATTACK_EVIL_PORTAL_DEAUTH 
 };
+
+#define WIFI_SECURITY_OPEN   0
+#define WIFI_SECURITY_WEP    1
+#define WIFI_SECURITY_WPA    2
+#define WIFI_SECURITY_WPA2   3
+#define WIFI_SECURITY_WPA3   4
+#define WIFI_SECURITY_WPA_WPA2_MIXED 5
+#define WIFI_SECURITY_WPA2_ENTERPRISE 6
+#define WIFI_SECURITY_WPA3_ENTERPRISE 7
+#define WIFI_SECURITY_WAPI 8
+#define WIFI_SECURITY_UNKNOWN 255
 
 #define MAX_AP_NAME_SIZE 32
 #define MAX_HTML_SIZE 11400
@@ -50,7 +65,7 @@ struct AccessPoint {
     String essid;
     uint8_t channel;
     uint8_t bssid[6];
-    wifi_auth_mode_t wpa;
+    uint8_t wpa;
     String wpastr;
     bool selected;
     //char beacon[2];
@@ -59,6 +74,8 @@ struct AccessPoint {
 
 extern LinkedList<AccessPoint>* access_points;
 extern LinkedList<AccessPoint>* deauth_flood_ap;
+
+extern bool wifiScanRedraw;
 
 esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
 
@@ -111,6 +128,25 @@ class WiFiModules
             /* 66 */ 0x48,            // 36
             /* 67 */ 0x6c             // 54
         };
+
+        typedef struct
+        {
+        int16_t fctl;
+        int16_t duration;
+        uint8_t da;
+        uint8_t sa;
+        uint8_t bssid;
+        int16_t seqctl;
+        unsigned char payload[];
+        } __attribute__((packed)) WifiMgmtHdr;
+        
+        typedef struct {
+        uint8_t payload[0];
+        WifiMgmtHdr hdr;
+        } wifi_ieee80211_packet_t;
+
+
+        const wifi_promiscuous_filter_t filt = {.filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA};
 
         const char* rick_roll[8] = {
             "01 Never gonna give you up",
@@ -195,7 +231,11 @@ class WiFiModules
 
         bool wsl_bypass_enable = false;
 
+        uint8_t getSecurityType(const uint8_t* beacon, uint16_t len);
         void StartAPWiFiScan();
+        void StartProbeReqScan();
+        void StartBeaconScan();
+        void StartDeauthScan();
         void StartWiFiAttack(WiFiScanState attack_mode);
 
         void sendCustomESSIDBeacon(const char* ESSID);
@@ -227,7 +267,7 @@ class WiFiModules
         
         wifi_config_t ap_config;
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-        /*
+    
         wifi_init_config_t cfg2 = { \
             .event_handler = &esp_event_send_internal, \
             .osi_funcs = &g_wifi_osi_funcs, \
@@ -253,7 +293,6 @@ class WiFiModules
             .espnow_max_encrypt_num = 0, \
             .magic = WIFI_INIT_CONFIG_MAGIC\
         };
-        */
 
         uint8_t deauth_frame_packet[26] = { // Should be in public because evil portal needs it
             /*  0 - 1  */ 0xC0, 0x00,                         // type, subtype c0: deauth (a0: disassociate)
@@ -275,10 +314,11 @@ class WiFiModules
         void StartMode(WiFiScanState mode);
         void mainAttackLoop(WiFiScanState mode);
         void StartDeauthFlood();
-        //void sendDeauthFrame(uint8_t bssid[6], uint8_t channel);
-
-        //static void getMAC(char *mac, uint8_t* data, uint16_t offset);
-        //static void apSnifferCallbackFull(void *buf, wifi_promiscuous_pkt_type_t type);
+        // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.h
+        static void apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
 
 };
 

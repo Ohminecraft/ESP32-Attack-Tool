@@ -62,7 +62,7 @@ void DisplayModules::clearScreen()
         return;
     }
     u8g2.clearBuffer();
-    u8g2.sendBuffer();
+    //u8g2.sendBuffer();
 }
 
 void DisplayModules::printString(String msg) {
@@ -226,6 +226,11 @@ void DisplayModules::displayBuffer()
         }
     }
     u8g2.sendBuffer();
+}
+
+void DisplayModules::clearBuffer() {
+    delete display_buffer;
+    display_buffer = new LinkedList<String>();
 }
 
 void DisplayModules::displayEvilPortalText(String username, String password) 
