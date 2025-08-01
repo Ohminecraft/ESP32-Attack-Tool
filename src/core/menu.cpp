@@ -1858,7 +1858,7 @@ void performReboot() {
 
 	// Display reboot message
 	display.clearScreen();
-	display.displayBuffer();
+	display.sendDisplay();
 	display.displayStringwithCoordinates("REBOOTING...", 0, 12);
 	display.displayStringwithCoordinates("Please wait...", 0, 21, true);
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -1904,7 +1904,7 @@ void performDeepSleep() {
 	if (autoSleep) display.displayStringwithCoordinates("Forcing by System", 0, 60, true);
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
 	display.clearScreen();
-	display.displayBuffer();
+	display.sendDisplay();
 	// Restart ESP32
 	esp_deep_sleep_enable_gpio_wakeup(1 << ENC_BTN, ESP_GPIO_WAKEUP_GPIO_LOW);
 	esp_deep_sleep_start();
