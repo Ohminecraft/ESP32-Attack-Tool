@@ -53,6 +53,7 @@ class DisplayModules
         void displayStringwithCoordinates(String msg, int x, int y, bool senddisplay = false, int color = WHITE);
         String wrapText(String input, int lineWidth = 21);
         void displayBuffer();
+        void clearBuffer();
         void simpleStrikethrough(String text, int x, int y);
         void displayEvilPortalText(String username, String password);
         void drawingVLine(int x, int y, int h, int color = WHITE);

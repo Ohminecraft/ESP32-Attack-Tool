@@ -37,6 +37,7 @@ String generateRandomName();
 bool checkLeftMemory();
 
 void generateRandomMac(uint8_t* mac);
+void getMAC(char *addr, uint8_t* data, uint16_t offset);
 String macToString(uint8_t macAddr[6]);
 void setBaseMacAddress(uint8_t macAddr[6]);
 

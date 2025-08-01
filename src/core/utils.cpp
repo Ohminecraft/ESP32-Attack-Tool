@@ -57,6 +57,10 @@ bool checkLeftMemory() {
 	return true;
 }
 
+void getMAC(char *addr, uint8_t* data, uint16_t offset) {
+	sprintf(addr, "%02x:%02x:%02x:%02x:%02x:%02x", data[offset+0], data[offset+1], data[offset+2], data[offset+3], data[offset+4], data[offset+5]);
+  }
+
 String macToString(uint8_t macAddr[6]) {
 	char macStr[18]; // 17 characters for "XX:XX:XX:XX:XX:XX" + 1 null terminator
 	snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 

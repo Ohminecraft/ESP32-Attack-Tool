@@ -21,7 +21,7 @@
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
 
-#define ATTACK_TOOL_VERSION "2.2.4"
+#define ATTACK_TOOL_VERSION "2.3.0"
 
 #define MAX_SHOW_SECLECTION 4
 
@@ -39,7 +39,9 @@ enum MenuState {
     NRF24_SCANNER_RUNNING,
     NRF24_JAMMER_RUNNING,
     NRF24_JAMMER_MENU,
+    WIFI_GENERAL_MENU,
     WIFI_SCAN_RUNNING,
+    WIFI_SCAN_SNIFFER_RUNNING,
     WIFI_SELECT_MENU,
     WIFI_ATTACK_MENU,
     BLE_SCAN_RUNNING,
@@ -241,11 +243,20 @@ enum BLEExploitAttackMenuItem {
 
 // WiFi menu items
 enum WiFiMenuItem {
-    WIFI_SCAN,
+    WIFI_GENERAL,
     WIFI_SELECT,
     WIFI_ATTACK,
     WIFI_BACK,
     WIFI_MENU_COUNT
+};
+
+enum WiFiGeneralItem {
+    WIFI_GENEARL_AP_SCAN,
+    WIFI_GENERAL_PROBE_REQ_SCAN,
+    WIFI_GENERAL_DEAUTH_SCAN,
+    WIFI_GENERAL_BEACON_SCAN,
+    WIFI_GENERAL_BACK,
+    WIFI_GENERAL_MENU_COUNT
 };
 
 // WiFi Attack menu items
@@ -311,6 +322,8 @@ bool wifiScanOneShot = false;
 bool wifiScanInProgress = false;
 bool wifiScanDisplay = false;
 
+bool wifiSnifferInProgress = false;
+
 // WiFi Attack State
 bool wifiAttackOneShot = false;
 bool fixDeauthFloodDisplayLoop = false;
@@ -367,6 +380,7 @@ void stopCurrentAttack();
         
 // WiFi scan functions
 void startWiFiScan();
+void startSnifferScan(WiFiGeneralItem sniffer_mode);
 //void stopWiFiScan();
 
 // BLE scan functions
