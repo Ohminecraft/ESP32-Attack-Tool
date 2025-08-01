@@ -2232,6 +2232,7 @@ void menuloop() {
 	static unsigned long autoSleepTimer = 0;
 	static unsigned long taskRunningTimerCheck = 0;
 	if (!(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep ode when in attack mode
+		!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
 		!(currentState == BLE_SCAN_RUNNING) &&
 		!(currentState == NRF24_ANALYZER_RUNNING) &&
 		!(currentState == NRF24_JAMMER_RUNNING) &&
