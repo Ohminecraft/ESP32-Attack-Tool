@@ -27,9 +27,6 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 			//nextPress = false;
 			//prevPress = false;
 			//selPress = false;
-			//Serial.print("[INFO] Sel Press: " +  String(selPress));
-			//Serial.print("[INFO] digitalRead SelPress: " + String(digitalRead(ENC_BTN)));
-			//Serial.println("[INFO] Input handled");
 			timer = millis();
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));
@@ -37,13 +34,17 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 }
 
 void menuinit() {
+	#if defined(USING_ENCODER)
 	encoder = new RotaryEncoder(ENC_PIN_A, ENC_PIN_B, RotaryEncoder::LatchMode::FOUR3);
 
     // register interrupt routine
     attachInterrupt(digitalPinToInterrupt(ENC_PIN_A), checkPosition, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENC_PIN_B), checkPosition, CHANGE);
-   // Setup encoder button pin
-	pinMode(ENC_BTN, INPUT_PULLUP);
+	#elif defined(USING_BUTTON)
+	pinMode(LEFT_BTN, INPUT_PULLUP);
+	pinMode(RIGHT_BTN, INPUT_PULLUP);
+	#endif
+	pinMode(SEL_BTN, INPUT_PULLUP);
 	#if defined(_SPI_SCREEN)
 		pinMode(CS_PIN, OUTPUT);
 		pinMode(NRF24_CSN_PIN, OUTPUT);
@@ -65,7 +66,9 @@ void menuinit() {
 	Serial.printf("[INFO] Used: %d%%\n", String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
 	displayWelcome();
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
-	xTaskCreate(taskHandleInput, "HandleInput", 4096, NULL, 2, &xHandle);
+	#if defined(_I2C_SCREEN) || defined(_SPI_SCREEN) // For CLI (Furture)
+		xTaskCreate(taskHandleInput, "HandleInput", 4096, NULL, 2, &xHandle);
+	#endif
 	displayMainMenu();
 }
 
@@ -75,7 +78,7 @@ void displayWelcome() {
 	int yTitle = SCR_HEIGHT / 2 - 5;
 	int yVersion = SCR_HEIGHT / 2 + 5;
 	display.drawingCenterString(title, yTitle);
-	display.drawBipmap((SCR_WIDTH / 2) - 10, yVersion - 4, 22, 22, bitmapicon[0], true);
+	display.drawBipmap((SCR_WIDTH / 2) - 12, yVersion - 4, 22, 22, bitmapicon[0], true);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
 	display.clearScreen();
 	String footer1 = "Code By";
@@ -188,10 +191,10 @@ void menuNode(String items, String info, String errortext[2], int itemCount, boo
 	display.sendDisplay();
 }
 
-void menuNode(String items[], String info, String errortext[2], int itemCount) {
+void menuNode(String items[], size_t item_size, String info, String errortext[2], int itemCount) {
 	if(currentSelection < itemCount) {
 		String itemText;
-		for (int i = 0; i < (int)sizeof(items); i++) {
+		for (int i = 0; i < item_size; i++) {
 			if (i == 0) itemText = "> " + items[i];
 			else itemText = items[i];
 			display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
@@ -575,7 +578,7 @@ void displayWiFiSelectMenu() {
 		"Scan First!"
 	};
 
-	menuNode(items, "APs: ", errorText, access_points->size());
+	menuNode(items, sizeof(items) / sizeof(items[0]), "APs: ", errorText, access_points->size());
 }
 
 void displayWiFiSelectAptoSta() {

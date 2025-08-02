@@ -10,7 +10,7 @@
 #define _I2C_SCREEN
 
 #ifdef _SPI_SCREEN
-    #if defined(BOARD_ESP32_S3) || defined(BOARD_ESP32) || defined(BOARD_ESP32_C3) || defined(BOARD_ESP32_C2)
+    #if defined(BOARD_ESP32)
         #define SPI_MOSI 23
         #define SPI_MISO 19
         #define SPI_SCK 18
@@ -26,7 +26,7 @@
         #define RST_PIN 9
     #endif
 #elif defined(_I2C_SCREEN)
-    #if defined(BOARD_ESP32_S3) || defined(BOARD_ESP32) || defined(BOARD_ESP32_C3) || defined(BOARD_ESP32_C2)
+    #if defined(BOARD_ESP32)
         #define SDA_PIN 21
         #define SCL_PIN 22
         #define RST_PIN -1
@@ -39,17 +39,33 @@
 // LED CONFIGURATION //
 #ifdef BOARD_ESP32_C3_MINI
     #define STA_LED 21 // Not Using
+#elif BOARD_ESP32
+    #define STA_LED 2
 #endif
 
 
 // ENCODER CONFIGURATION //
+#define USING_ENCODER
+
 #define ENC_PIN_A 2
 #define ENC_PIN_B 1
 #define ENC_BTN 0
 
+// BUTTON CONFIGURATION //
+//#define USING_BUTTON
+
+#define LEFT_BTN 1
+#define RIGHT_BTN 2
+
+#if defined(USING_ENCODER)
+    #define SEL_BTN ENC_BTN
+#else
+    #define SEL_BTN 0
+#endif
+
 // NRF24 CONFIGURATION //
 #if defined(BOARD_ESP32)
-    #define NRF24_CE_PIN 5
+    #define NRF24_CE_PIN 8
     #define NRF24_CSN_PIN 17
     #define NRF24_MOSI_PIN 23
     #define NRF24_MISO_PIN 19

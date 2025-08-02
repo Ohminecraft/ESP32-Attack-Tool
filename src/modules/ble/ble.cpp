@@ -156,7 +156,6 @@ NimBLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData.addData(std::string((char *)AdvData_Raw, 14));
             break;
         }
-        
         default: {
             Serial.println("[WARN] Choose Company Type!");
             return AdvData; // Return empty data for default case
@@ -176,8 +175,8 @@ void BLEModules::main()
     blescanres = new LinkedList<BLEScanResult>();
       
     // Initialize NimBLE
-    //NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
-    //NimBLEDevice::setScanDuplicateCacheSize(200);
+    NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
+NimBLEDevice::setScanDuplicateCacheSize(200);
     NimBLEDevice::init("");
     pBLEScan = NimBLEDevice::getScan();
     this->ble_initialized = true;
@@ -189,9 +188,12 @@ void BLEModules::main()
 bool BLEModules::ShutdownBLE()
 {
     if(this->ble_initialized) {
-        pAdvertising->stop();
-        pBLEScan->stop();
-        pBLEScan->clearResults();
+        if (pAdvertising->isAdvertising()) // This stupid things is cause continuous crash
+            pAdvertising->stop();
+        if (pBLEScan->isScanning()) {
+            pBLEScan->stop();
+            pBLEScan->clearResults();
+        }
         // Deinitialize NimBLE
         NimBLEDevice::deinit();
         this->ble_initialized = false;
