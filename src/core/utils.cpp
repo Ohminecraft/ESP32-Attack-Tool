@@ -88,16 +88,18 @@ void setBaseMacAddress(uint8_t macAddr[6]) {
 		Serial.printf("[ERROR] Error: Failed to set MAC address. Code: %d\n", err);
 	}
 }
+
+volatile bool nextPress = false;
+volatile bool prevPress = false;
+volatile bool selPress = false;
+
+#ifdef USING_ENCODER
 // Encoder Object
 RotaryEncoder *encoder = nullptr;
 
 IRAM_ATTR void checkPosition() {
     encoder->tick(); // just call tick() to check the state.
 }
-
-volatile bool nextPress = false;
-volatile bool prevPress = false;
-volatile bool selPress = false;
 
 void handleInputs() {
 	static unsigned long tm = millis();  // debauce for buttons
@@ -107,7 +109,7 @@ void handleInputs() {
 	bool sel = HIGH;
 
 	if (millis() - tm > 300) {
-		sel = digitalRead(ENC_BTN);
+		sel = digitalRead(SEL_BTN);
 	}
 
 	if (encoderDir < 0) {
@@ -128,5 +130,21 @@ void handleInputs() {
 		tm = millis();
 	}
 }
+#elif defined(USING_BUTTON)
+void handleInputs() {
+	static unsigned long tm = 0;
+    if (millis() - tm < 300) return;
+
+    bool leftPressed = (digitalRead(LEFT_BTN) == LOW);
+    bool selPressed = (digitalRead(SEL_BTN) == LOW);
+    bool rightPressed = (digitalRead(RIGHT_BTN) == LOW);
+
+    if (leftPressed || selPressed || rightPressed) tm = millis();
+
+	selPress = selPressed;
+	nextPress = rightPressed;
+	prevPress = leftPressed;
+}
+#endif
 
 TaskHandle_t xHandle;

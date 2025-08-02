@@ -15,17 +15,9 @@
 #include <Arduino.h>
 #include <RotaryEncoder.h>
 
+#include "configs.h"
+
 #define MEM_LOWER_LIM 20000
-
-// Encoder pins - edit in configs.h
-//#define ENC_PIN_A   14 
-//#define ENC_PIN_B   12   
-//#define ENC_BTN     13 
-
-#define MAX_BUTTON 3
-
-// Encoder constants
-//#define ENCODER_THRESHOLD 2  // Threshold cho encoder movement
 
 #define GET_TOTAL_HEAP 0
 #define GET_FREE_HEAP 1
@@ -45,8 +37,10 @@ extern volatile bool nextPress;
 extern volatile bool prevPress; 
 extern volatile bool selPress;
 
+#if defined(USING_ENCODER)
 extern RotaryEncoder *encoder;
 IRAM_ATTR void checkPosition();
+#endif
 
 void handleInputs();
 
