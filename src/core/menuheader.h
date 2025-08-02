@@ -43,6 +43,8 @@ enum MenuState {
     WIFI_SCAN_RUNNING,
     WIFI_SCAN_SNIFFER_RUNNING,
     WIFI_SELECT_MENU,
+    WIFI_SELECT_STA_AP_MENU,
+    WIFI_SELECT_STA_MENU,
     WIFI_ATTACK_MENU,
     BLE_SCAN_RUNNING,
     BLE_INFO_MENU_LIST,
@@ -245,13 +247,15 @@ enum BLEExploitAttackMenuItem {
 enum WiFiMenuItem {
     WIFI_GENERAL,
     WIFI_SELECT,
+    WIFI_STA_SELECT,
     WIFI_ATTACK,
     WIFI_BACK,
     WIFI_MENU_COUNT
 };
 
 enum WiFiGeneralItem {
-    WIFI_GENEARL_AP_SCAN,
+    WIFI_GENERAL_AP_SCAN,
+    WIFI_GENERAL_AP_STA_SCAN,
     WIFI_GENERAL_PROBE_REQ_SCAN,
     WIFI_GENERAL_DEAUTH_SCAN,
     WIFI_GENERAL_BEACON_SCAN,
@@ -262,6 +266,7 @@ enum WiFiGeneralItem {
 // WiFi Attack menu items
 enum WiFiAttackMenuItem {
     WIFI_ATK_DEAUTH,
+    WIFI_ATK_STA_DEAUTH,
     WIFI_ATK_DEAUTH_FLOOD,
     WIFI_ATK_AUTH,
     WIFI_ATK_RIC_BEACON,
@@ -324,6 +329,8 @@ bool wifiScanDisplay = false;
 
 bool wifiSnifferInProgress = false;
 
+int ap_index = 0;
+
 // WiFi Attack State
 bool wifiAttackOneShot = false;
 bool fixDeauthFloodDisplayLoop = false;
@@ -354,7 +361,7 @@ void displayAdTypeSpooferMenu();
 void displaySpooferRunning();
 void displayExploitAttackBLEMenu();
 void displayWiFiMenu();
-void displayWiFiScanMenu();
+void displayWiFiScanMenu(WiFiGeneralItem mode);
 //void displayWiFiReScanMenu(uint32_t elapsedTime);
 void displayWiFiSelectMenu();
 void displayWiFiAttackMenu();
@@ -379,7 +386,7 @@ void startNRFJammer(NRFJammerMode jammerMode);
 void stopCurrentAttack();
         
 // WiFi scan functions
-void startWiFiScan();
+void startWiFiScan(WiFiGeneralItem mode);
 void startSnifferScan(WiFiGeneralItem sniffer_mode);
 //void stopWiFiScan();
 
@@ -393,6 +400,7 @@ void nrfScanner();
         
 // Helper functions
 bool hasSelectedAPs();
+bool hasSelectedSTAs();
         
 // System functions
 void performReboot();

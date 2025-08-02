@@ -24,6 +24,7 @@
 enum WiFiScanState {
     WIFI_SCAN_OFF,
     WIFI_SCAN_AP,
+    WIFI_SCAN_AP_STA,
     WIFI_SCAN_PROBE_REQ,
     WIFI_SCAN_DEAUTH,
     WIFI_SCAN_BEACON,
@@ -31,6 +32,7 @@ enum WiFiScanState {
     WIFI_ATTACK_STA_BEACON, // ATTACK STABLE SSID
     WIFI_ATTACK_RIC_BEACON,
     WIFI_ATTACK_DEAUTH,
+    WIFI_ATTACK_STA_DEAUTH,
     WIFI_ATTACK_DEAUTH_FLOOD,
     WIFI_ATTACK_AUTH,// ATTACK PROBE
     WIFI_ATTACK_EVIL_PORTAL,
@@ -68,12 +70,20 @@ struct AccessPoint {
     uint8_t wpa;
     String wpastr;
     bool selected;
+    LinkedList<uint16_t>* stations;
     //char beacon[2];
     int8_t rssi;
 };
 
+struct Station {
+    uint8_t mac[6];
+    bool selected;
+    uint16_t ap;
+  };
+
 extern LinkedList<AccessPoint>* access_points;
 extern LinkedList<AccessPoint>* deauth_flood_ap;
+extern LinkedList<Station>* device_station;
 
 extern bool wifiScanRedraw;
 
@@ -232,6 +242,7 @@ class WiFiModules
         bool wsl_bypass_enable = false;
 
         uint8_t getSecurityType(const uint8_t* beacon, uint16_t len);
+        void StartAPStaWiFiScan();
         void StartAPWiFiScan();
         void StartProbeReqScan();
         void StartBeaconScan();
@@ -241,6 +252,7 @@ class WiFiModules
         void sendCustomESSIDBeacon(const char* ESSID);
         void sendBeaconRandomSSID();
         void sendDeauthAttack();
+        void sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]);
         void sendProbeAttack();
 
     public:
@@ -316,6 +328,7 @@ class WiFiModules
         void StartDeauthFlood();
         // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.h
         static void apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);

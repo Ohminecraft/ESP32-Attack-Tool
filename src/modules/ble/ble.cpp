@@ -189,16 +189,13 @@ void BLEModules::main()
 bool BLEModules::ShutdownBLE()
 {
     if(this->ble_initialized) {
-        Serial.println("[INFO] Shutting down BLE Module");
-        if (pAdvertising != nullptr) pAdvertising->stop();
-        if (pBLEScan != nullptr) {
-            pBLEScan->stop();
-            pBLEScan->clearResults();
-        } 
+        pAdvertising->stop();
+        pBLEScan->stop();
+        pBLEScan->clearResults();
         // Deinitialize NimBLE
         NimBLEDevice::deinit();
         this->ble_initialized = false;
-        
+        Serial.println("[INFO] Shutting down BLE Module Successfully");
         return true;
     }
     return false;

