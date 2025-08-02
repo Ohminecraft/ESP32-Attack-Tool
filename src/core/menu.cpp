@@ -627,6 +627,8 @@ void displayWiFiAttackMenu() {
 		"AP Beacon",
 		"Evil Portal",
 		"Evil Portal Deauth",
+		"Target Bad Msg",
+		"Bad Msg",
 		"< Back"
 	};
 	
@@ -831,6 +833,12 @@ void displayAttackStatus() {
 				break;
 			case WIFI_ATTACK_AP_BEACON:
 				attackName = "AP Beacon";
+				break;
+			case WIFI_ATTACK_BAD_MSG:
+				attackName = "Target Bad Msg";
+				break;
+			case WIFI_ATTACK_BAD_MSG_ALL:
+				attackName = "Bad Msg";
 				break;
 		}
 	}
@@ -1364,7 +1372,9 @@ void selectCurrentItem() {
 					 currentSelection == WIFI_ATK_STA_DEAUTH ||
 					 currentSelection == WIFI_ATK_AUTH ||
 					 currentSelection == WIFI_ATK_AP_BEACON ||
-					 currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH) && 
+					 currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH ||
+					 currentSelection == WIFI_ATK_BAD_MSG ||
+					 currentSelection == WIFI_ATK_BAD_MSG_ALL) && 
 					(!access_points || !hasSelectedAPs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO APs SELECTED!", 0, 12);
@@ -1374,7 +1384,9 @@ void selectCurrentItem() {
 					return;
 				}
 
-				if (currentSelection == WIFI_ATK_STA_DEAUTH && (!device_station || !hasSelectedSTAs())) {
+				if ((currentSelection == WIFI_ATK_STA_DEAUTH ||
+				 	 currentSelection == WIFI_ATK_BAD_MSG) &&
+					(!device_station || !hasSelectedSTAs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO STAs SELECTED!", 0, 12);
 					display.displayStringwithCoordinates("Select STAs first", 0, 21, true);
@@ -1395,7 +1407,7 @@ void selectCurrentItem() {
 				
 				// Start WiFi attack
 				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_STA_BEACON,
-									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH};
+									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH, WIFI_ATTACK_BAD_MSG, WIFI_ATTACK_BAD_MSG_ALL};
 				startWiFiAttack(attackTypes[currentSelection]);
 			}
 			break;
@@ -1852,6 +1864,12 @@ void startWiFiAttack(WiFiScanState attackType) {
 	}
 	else if (attackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
 		strmode = "Evil Portal Deauth";
+	}
+	else if (attackType == WIFI_ATTACK_BAD_MSG) {
+		strmode = "Target Bad Msg";
+	}
+	else if (attackType == WIFI_ATTACK_BAD_MSG_ALL) {
+		strmode = "Bad Msg";
 	}
 	Serial.println("[INFO] Starting WiFi attack: " + strmode);
 	
