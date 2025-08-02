@@ -502,6 +502,8 @@ void displayWiFiGeneralMenu() {
 		"Probe Req Scan",
 		"Deauth Scan",
 		"Beacon Scan",
+		"EAPOL/PMKID Scan",
+		"EAPOL.. Deauth Scan",
 		"< Back"
 	};
 
@@ -1288,7 +1290,16 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
 				displayStatusBar(true);
 				startSnifferScan(WIFI_GENERAL_BEACON_SCAN);
+			} else if (currentSelection == WIFI_GENERAL_EAPOL_SCAN) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				displayStatusBar(true);
+				startSnifferScan(WIFI_GENERAL_EAPOL_SCAN);
+			} else if (currentSelection == WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				displayStatusBar(true);
+				startSnifferScan(WIFI_GENERAL_EAPOL_DEAUTH_SCAN);
 			}
+			wifiSnifferMode = currentSelection;
 			break;
 		case WIFI_SCAN_RUNNING:
 			if (!wifiScanRunning) {
@@ -1485,6 +1496,7 @@ void goBack() {
 			currentState = WIFI_GENERAL_MENU;
 			currentSelection = 0;
 			maxSelections = WIFI_GENERAL_MENU_COUNT;
+			wifiSnifferMode = -1;
 			wifi.StartMode(WIFI_SCAN_OFF);
 			displayWiFiGeneralMenu();
 			break;
@@ -1919,6 +1931,13 @@ void startSnifferScan(WiFiGeneralItem sniffer_mode) {
 	else if (sniffer_mode == WIFI_GENERAL_BEACON_SCAN) {
 		wifi.StartMode(WIFI_SCAN_BEACON);
 	}
+	else if (sniffer_mode == WIFI_GENERAL_EAPOL_SCAN) {
+		wifi.StartMode(WIFI_SCAN_EAPOL);
+	}
+	else if (sniffer_mode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+		wifi.StartMode(WIFI_SCAN_EAPOL_DEAUTH);
+	}
+
 }
 
 void stopCurrentAttack() {
@@ -2097,14 +2116,30 @@ void handleInput(MenuState handle_state) {
 			(handle_state == BLE_SCAN_RUNNING && !bleScanOneShot))
 		{
 			goBack();
-		} 
+		}
+		else if (wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN || wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+			if (wifi.set_channel < 2) wifi.set_channel = 14;
+			else wifi.set_channel = wifi.set_channel - 1;
+			wifi.changeChannel();
+			display_buffer->add("Change Ch to: " + String(wifi.set_channel));
+			Serial.println("[INFO] Manually change channel to " + String(wifi.set_channel));
+			wifiScanRedraw = true;
+		}
 		else {
 			navigateUp();
 		}
 	}
 
 	if (check(nextPress)) {
-		navigateDown();
+		if (wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN || wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+			if (wifi.set_channel > 13) wifi.set_channel = 1;
+			else wifi.set_channel = wifi.set_channel + 1;
+			wifi.changeChannel();
+			display_buffer->add("Change Ch to: " + String(wifi.set_channel));
+			Serial.println("[INFO] Manually change channel to " + String(wifi.set_channel));
+			wifiScanRedraw = true;
+		}
+		else navigateDown();
 	}
 }
 
@@ -2153,10 +2188,12 @@ void handleTasks(MenuState handle_state) {
 			display.displayBuffer();
 		}
 
-		static unsigned long channelhoptimer = 0;
-		if (millis() - channelhoptimer > 500) {
-			wifi.channelHop();
-			channelhoptimer = millis();
+		if (wifiSnifferMode != WIFI_GENERAL_EAPOL_SCAN && wifiSnifferMode != WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+			static unsigned long channelhoptimer = 0;
+			if (millis() - channelhoptimer > 500) {
+				wifi.channelHop();
+				channelhoptimer = millis();
+			}
 		}
 	}
 
@@ -2329,10 +2366,7 @@ void handleTasks(MenuState handle_state) {
 		}
 
 		// Update display every 1 second (not using with evil portal)
-		if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL || currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH || currentWiFiAttackType == WIFI_ATTACK_DEAUTH_FLOOD) {
-			// i can't using != for wtf reason, idk to fix this
-			// Deauth Flood using different redraw
-		} else {
+		if (currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL && currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH && currentWiFiAttackType != WIFI_ATTACK_DEAUTH_FLOOD) {
 			if (millis() - lastDisplayUpdate > 2000) {
 				displayAttackStatus();
 				wifi.packet_sent = 0;

@@ -28,6 +28,8 @@ enum WiFiScanState {
     WIFI_SCAN_PROBE_REQ,
     WIFI_SCAN_DEAUTH,
     WIFI_SCAN_BEACON,
+    WIFI_SCAN_EAPOL,
+    WIFI_SCAN_EAPOL_DEAUTH,
     WIFI_ATTACK_RND_BEACON,
     WIFI_ATTACK_STA_BEACON, // ATTACK STABLE SSID
     WIFI_ATTACK_RIC_BEACON,
@@ -248,6 +250,7 @@ class WiFiModules
         void StartProbeReqScan();
         void StartBeaconScan();
         void StartDeauthScan();
+        void StartEapolScan();
         void StartWiFiAttack(WiFiScanState attack_mode);
 
         void sendCustomBeacon(AccessPoint custom_ssid);
@@ -334,6 +337,7 @@ class WiFiModules
         static void probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
 
 };
 
