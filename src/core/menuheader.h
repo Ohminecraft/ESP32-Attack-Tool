@@ -21,7 +21,7 @@
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
 
-#define ATTACK_TOOL_VERSION "2.3.0"
+#define ATTACK_TOOL_VERSION "2.4.0"
 
 #define MAX_SHOW_SECLECTION 4
 
@@ -43,6 +43,8 @@ enum MenuState {
     WIFI_SCAN_RUNNING,
     WIFI_SCAN_SNIFFER_RUNNING,
     WIFI_SELECT_MENU,
+    WIFI_SELECT_STA_AP_MENU,
+    WIFI_SELECT_STA_MENU,
     WIFI_ATTACK_MENU,
     BLE_SCAN_RUNNING,
     BLE_INFO_MENU_LIST,
@@ -245,16 +247,20 @@ enum BLEExploitAttackMenuItem {
 enum WiFiMenuItem {
     WIFI_GENERAL,
     WIFI_SELECT,
+    WIFI_STA_SELECT,
     WIFI_ATTACK,
     WIFI_BACK,
     WIFI_MENU_COUNT
 };
 
 enum WiFiGeneralItem {
-    WIFI_GENEARL_AP_SCAN,
+    WIFI_GENERAL_AP_SCAN,
+    WIFI_GENERAL_AP_STA_SCAN,
     WIFI_GENERAL_PROBE_REQ_SCAN,
     WIFI_GENERAL_DEAUTH_SCAN,
     WIFI_GENERAL_BEACON_SCAN,
+    WIFI_GENERAL_EAPOL_SCAN,
+    WIFI_GENERAL_EAPOL_DEAUTH_SCAN,
     WIFI_GENERAL_BACK,
     WIFI_GENERAL_MENU_COUNT
 };
@@ -262,13 +268,17 @@ enum WiFiGeneralItem {
 // WiFi Attack menu items
 enum WiFiAttackMenuItem {
     WIFI_ATK_DEAUTH,
+    WIFI_ATK_STA_DEAUTH,
     WIFI_ATK_DEAUTH_FLOOD,
     WIFI_ATK_AUTH,
     WIFI_ATK_RIC_BEACON,
     WIFI_ATK_STA_BEACON,
     WIFI_ATK_RND_BEACON,
+    WIFI_ATK_AP_BEACON,
     WIFI_ATK_EVIL_PORTAL,
     WIFI_ATK_EVIL_PORTAL_DEAUTH,
+    WIFI_ATK_BAD_MSG,
+    WIFI_ATK_BAD_MSG_ALL,
     WIFI_ATK_BACK,
     WIFI_ATK_MENU_COUNT
 };
@@ -323,6 +333,9 @@ bool wifiScanInProgress = false;
 bool wifiScanDisplay = false;
 
 bool wifiSnifferInProgress = false;
+uint8_t wifiSnifferMode;
+
+int ap_index = 0;
 
 // WiFi Attack State
 bool wifiAttackOneShot = false;
@@ -354,7 +367,7 @@ void displayAdTypeSpooferMenu();
 void displaySpooferRunning();
 void displayExploitAttackBLEMenu();
 void displayWiFiMenu();
-void displayWiFiScanMenu();
+void displayWiFiScanMenu(WiFiGeneralItem mode);
 //void displayWiFiReScanMenu(uint32_t elapsedTime);
 void displayWiFiSelectMenu();
 void displayWiFiAttackMenu();
@@ -379,7 +392,7 @@ void startNRFJammer(NRFJammerMode jammerMode);
 void stopCurrentAttack();
         
 // WiFi scan functions
-void startWiFiScan();
+void startWiFiScan(WiFiGeneralItem mode);
 void startSnifferScan(WiFiGeneralItem sniffer_mode);
 //void stopWiFiScan();
 
@@ -393,6 +406,7 @@ void nrfScanner();
         
 // Helper functions
 bool hasSelectedAPs();
+bool hasSelectedSTAs();
         
 // System functions
 void performReboot();
