@@ -21,7 +21,7 @@
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
 
-#define ATTACK_TOOL_VERSION "2.3.0"
+#define ATTACK_TOOL_VERSION "2.4.0"
 
 #define MAX_SHOW_SECLECTION 4
 
