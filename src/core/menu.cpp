@@ -622,6 +622,7 @@ void displayWiFiAttackMenu() {
 		"Rickroll Beacon",
 		"Stable SSID Beacon",
 		"Random Beacon",
+		"AP Beacon",
 		"Evil Portal",
 		"Evil Portal Deauth",
 		"< Back"
@@ -825,6 +826,9 @@ void displayAttackStatus() {
 				break;
 			case WIFI_ATTACK_RND_BEACON:
 				attackName = "Random Beacon";
+				break;
+			case WIFI_ATTACK_AP_BEACON:
+				attackName = "AP Beacon";
 				break;
 		}
 	}
@@ -1345,7 +1349,11 @@ void selectCurrentItem() {
 				goBack();
 			} else {
 				// Check if we have selected APs for deauth, AP for probe and AP beacon attacks
-				if ((currentSelection == 0 || currentSelection == 1 || currentSelection == 3 || currentSelection == 8) && 
+				if ((currentSelection == WIFI_ATK_DEAUTH ||
+					 currentSelection == WIFI_ATK_STA_DEAUTH ||
+					 currentSelection == WIFI_ATK_AUTH ||
+					 currentSelection == WIFI_ATK_AP_BEACON ||
+					 currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH) && 
 					(!access_points || !hasSelectedAPs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO APs SELECTED!", 0, 12);
@@ -1355,7 +1363,7 @@ void selectCurrentItem() {
 					return;
 				}
 
-				if (currentSelection == 1 && (!device_station || !hasSelectedSTAs())) {
+				if (currentSelection == WIFI_ATK_STA_DEAUTH && (!device_station || !hasSelectedSTAs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO STAs SELECTED!", 0, 12);
 					display.displayStringwithCoordinates("Select STAs first", 0, 21, true);
@@ -1376,7 +1384,7 @@ void selectCurrentItem() {
 				
 				// Start WiFi attack
 				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_STA_BEACON,
-									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH};
+									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH};
 				startWiFiAttack(attackTypes[currentSelection]);
 			}
 			break;
@@ -1823,6 +1831,9 @@ void startWiFiAttack(WiFiScanState attackType) {
 	}
 	else if (attackType == WIFI_ATTACK_RIC_BEACON) {
 		strmode = "Rick Roll Beacon";
+	}
+	else if (attackType == WIFI_ATTACK_AP_BEACON) {
+		strmode = "AP Beacon";
 	}
 	else if (attackType == WIFI_ATTACK_EVIL_PORTAL) {
 		strmode = "Evil Portal";

