@@ -21,5 +21,6 @@
         "functional": "cpp",
         "tuple": "cpp"
     },
-    "git.useEditorAsCommitInput": false
+    "git.useEditorAsCommitInput": false,
+    "cmake.sourceDirectory": "C:/Users/Administrator/Desktop/ESP32-Attack-Tool/lib/AsyncTCP-esphome"
 }

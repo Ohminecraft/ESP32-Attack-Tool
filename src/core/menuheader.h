@@ -21,6 +21,8 @@
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
 
+#include "configs.h"
+
 #define ATTACK_TOOL_VERSION "2.4.0"
 
 #define MAX_SHOW_SECLECTION 4
@@ -39,6 +41,8 @@ enum MenuState {
     NRF24_SCANNER_RUNNING,
     NRF24_JAMMER_RUNNING,
     NRF24_JAMMER_MENU,
+    WIFI_UTILS_MENU,
+    WIFI_UTILS_SET_MAC_MENU,
     WIFI_GENERAL_MENU,
     WIFI_SCAN_RUNNING,
     WIFI_SCAN_SNIFFER_RUNNING,
@@ -248,13 +252,24 @@ enum WiFiMenuItem {
     WIFI_GENERAL,
     WIFI_SELECT,
     WIFI_STA_SELECT,
+    WIFI_UTILS,
     WIFI_ATTACK,
     WIFI_BACK,
     WIFI_MENU_COUNT
 };
 
+enum WiFiUtils {
+    WIFI_UTILS_SET_AP_MAC,
+    WIFI_UTILS_SET_STA_MAC,
+    WIFI_UTILS_GENERATE_AP_MAC,
+    WIFI_UTILS_GENERATE_STA_MAC,
+    WIFI_UTILS_BACK,
+    WIFI_UTILS_MENU_COUNT
+};
+
 enum WiFiGeneralItem {
     WIFI_GENERAL_AP_SCAN,
+    WIFI_GENERAL_AP_SCAN_OLD,
     WIFI_GENERAL_AP_STA_SCAN,
     WIFI_GENERAL_PROBE_REQ_SCAN,
     WIFI_GENERAL_DEAUTH_SCAN,
@@ -336,6 +351,7 @@ bool wifiSnifferInProgress = false;
 uint8_t wifiSnifferMode;
 
 int ap_index = 0;
+bool set_mac = false;
 
 // WiFi Attack State
 bool wifiAttackOneShot = false;
@@ -351,6 +367,7 @@ bool nrfScannerSetupOneShot = false;
 
 // System
 bool autoSleep = false;
+bool standby = false;
 
 // Menu display functions
 void displayWelcome();

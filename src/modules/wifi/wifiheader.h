@@ -24,6 +24,7 @@
 enum WiFiScanState {
     WIFI_SCAN_OFF,
     WIFI_SCAN_AP,
+    WIFI_SCAN_AP_OLD,
     WIFI_SCAN_AP_STA,
     WIFI_SCAN_PROBE_REQ,
     WIFI_SCAN_DEAUTH,
@@ -97,10 +98,7 @@ esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *buffer, int len, b
 class WiFiModules
 {
     private:
-
-        //const wifi_promiscuous_filter_t filt = {.filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA};
         uint32_t initTime = 0;
-        uint8_t ap_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
         uint8_t channel_hop_delay = 1;
 
         // ESP32 Marauder
@@ -295,6 +293,7 @@ class WiFiModules
         uint8_t getSecurityType(const uint8_t* beacon, uint16_t len);
         void StartAPStaWiFiScan();
         void StartAPWiFiScan();
+        void StartAPWiFiScanOld();
         void StartProbeReqScan();
         void StartBeaconScan();
         void StartDeauthScan();
@@ -322,6 +321,9 @@ class WiFiModules
         //String dst_mac = "ff:ff:ff:ff:ff:ff";
         //byte src_mac[6] = {};
 
+
+        uint8_t ap_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+        uint8_t sta_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
         uint8_t packet_sent = 0;
         uint8_t set_channel = 1;
         const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";

@@ -64,11 +64,10 @@ void menuinit() {
 	Serial.printf("[INFO] Free heap: %d bytes\n", String(getHeap(GET_FREE_HEAP)).toInt());
 	Serial.printf("[INFO] Used heap: %d bytes\n", String(getHeap(GET_USED_HEAP)).toInt());
 	Serial.printf("[INFO] Used: %d%%\n", String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
-	displayWelcome();
-	vTaskDelay(2000 / portTICK_PERIOD_MS);
-	#if defined(_I2C_SCREEN) || defined(_SPI_SCREEN) // For CLI (Furture)
+	#if defined(_I2C_SCREEN) || defined(_SPI_SCREEN) // For CLI (Future)
 		xTaskCreate(taskHandleInput, "HandleInput", 4096, NULL, 2, &xHandle);
 	#endif
+	displayWelcome();
 	displayMainMenu();
 }
 
@@ -90,11 +89,20 @@ void displayWelcome() {
 	display.displayInvert(true);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
 	display.displayInvert(false);
-	display.clearScreen();
-	String readyText1 = "Welcome Hacker";
-	String readyText2 = "Home!";
-	display.drawingCenterString(readyText1, yTitle);
-	display.drawingCenterString(readyText2, yVersion, true);
+	//display.clearScreen();
+	for (int i = 0; i < 9; i++) {
+		for (int x = 0; x < startup_bitmap_allArray_LEN; x++) {
+			if (selPress) break;
+			display.clearScreen();
+			display.drawBipmap(0, 0, 128, 64, startup_bitmap_allArray[x], true);
+			vTaskDelay(1 / portTICK_PERIOD_MS);
+		}
+		if (check(selPress)) break;
+	}
+	//String readyText1 = "Welcome Hacker";
+	//String readyText2 = "Home!";
+	//display.drawingCenterString(readyText1, yTitle);
+	//display.drawingCenterString(readyText2, yVersion, true);
 }
 
 void displayStatusBar(bool sendDisplay = false) {
@@ -133,6 +141,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Scan", 0, 12);
 	else if (currentState == WIFI_MENU)
 		display.displayStringwithCoordinates("WiFi Menu", 0, 12);
+	else if (currentState == WIFI_UTILS_MENU)
+		display.displayStringwithCoordinates("WiFi Utils", 0, 12);
 	else if (currentState == NRF24_MENU)
 		display.displayStringwithCoordinates("NRF Menu", 0, 12);
 	else if (currentState == NRF24_JAMMER_MENU)
@@ -489,6 +499,7 @@ void displayWiFiMenu() {
 		"WiFi General",
 		"WiFi Select",
 		"WiFi Sta Select",
+		"WiFi Utils",
 		"WiFi Attack",
 		"< Back"
 	};
@@ -496,11 +507,26 @@ void displayWiFiMenu() {
 	menuNode(items, WIFI_MENU_COUNT);
 }
 
+void displayWiFiUtilsMenu() {
+	displayStatusBar();
+	
+	String items[WIFI_UTILS_MENU_COUNT] = {
+		"Set AP MAC",
+		"Set STA MAC",
+		"Generate AP MAC",
+		"Generate STA MAC",
+		"< Back"
+	};
+	
+	menuNode(items, WIFI_UTILS_MENU_COUNT);
+}
+
 void displayWiFiGeneralMenu() {
 	displayStatusBar();
 
 	String items[WIFI_GENERAL_MENU_COUNT] = {
 		"Scan AP",
+		"Scan AP (Old)",
 		"Scan AP/STA",
 		"Probe Req Scan",
 		"Deauth Scan",
@@ -520,11 +546,15 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 			wifiScanDisplay = true;
 			display.displayStringwithCoordinates("Scan complete", 0, 24);
 			display.displayStringwithCoordinates("SELECT->back", 0, 36);
-			if (mode == WIFI_GENERAL_AP_SCAN)
+			if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_SCAN_OLD)
 				display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
 			else if (mode == WIFI_GENERAL_AP_STA_SCAN) {
 				display.displayStringwithCoordinates("AP Found: " + String(access_points ? access_points->size() : 0), 0, 48);
 				display.displayStringwithCoordinates("STA Found: " + String(device_station ? device_station->size() : 0), 0, 60, true);
+			}
+		} else {
+			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
+				display.displayStringwithCoordinates("Scanning...", 0, 24, true);
 			}
 		}
 	} else {
@@ -551,26 +581,43 @@ void displayWiFiSelectMenu() {
 	
 	if (currentSelection < access_points->size()) {
 
-		AccessPoint ap = access_points->get(currentSelection);
-		String status = ap.selected ? "[*] " : "[ ] ";
-		String apInfo = status + ap.essid;
-		char bssidStr[18];
+		if (!set_mac) {
+			AccessPoint ap = access_points->get(currentSelection);
+			String status = ap.selected ? "[*] " : "[ ] ";
+			String apInfo = status + ap.essid;
+			char bssidStr[18];
 
-		snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
-		ap.bssid[0], ap.bssid[1], ap.bssid[2], 
-		ap.bssid[3], ap.bssid[4], ap.bssid[5]);
+			snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+			ap.bssid[0], ap.bssid[1], ap.bssid[2], 
+			ap.bssid[3], ap.bssid[4], ap.bssid[5]);
+			
+			// Truncate if too long
+			if (apInfo.length() > 14) {
+				apInfo = apInfo.substring(0, 18) + "...";
+			}
+
+			for (int i = 0; i < 4; i++) {
+				if (i == 0) items[i] = apInfo;
+				else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi));
+				else if (i == 2) items[i] = ("B:" + String(bssidStr));
+				else if (i == 3) items[i] = ("Enc:" + ap.wpastr);
+			}
+		} else {
+			AccessPoint ap = access_points->get(currentSelection);
+			String apInfo = ap.essid;
+			char bssidStr[18];
+
+			snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+			ap.bssid[0], ap.bssid[1], ap.bssid[2], 
+			ap.bssid[3], ap.bssid[4], ap.bssid[5]);
+
+			for (int i = 0; i < 3; i++) {
+				if (i == 0) items[i] = apInfo;
+				else if (i == 1) items[i] = ("B:" + String(bssidStr));
+				else if (i == 2) items[i] = ("Mac:" + String(macToString(wifi.ap_mac)));
+			}
+		}
 		
-		// Truncate if too long
-		if (apInfo.length() > 14) {
-			apInfo = apInfo.substring(0, 18) + "...";
-		}
-
-		for (int i = 0; i < 4; i++) {
-			if (i == 0) items[i] = apInfo;
-			else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi));
-			else if (i == 2) items[i] = ("B:" + String(bssidStr));
-			else if (i == 3) items[i] = ("Enc:" + ap.wpastr);
-		}
 	}
 
 	String errorText[2] = {
@@ -595,14 +642,30 @@ void displayWiFiSelectAptoSta() {
 void displayWiFiSelectStaInAp() {
 	displayStatusBar();
 	
+	String items[2] = {};
 	String staInfo = "";
 	AccessPoint ap = access_points->get(ap_index);
 
 	if (currentSelection < ap.stations->size()) {
 
-		Station sta = device_station->get(ap.stations->get(currentSelection));
-		String status = sta.selected ? "[*] " : "[ ] ";
-		staInfo = status + macToString(sta.mac);
+		if (!set_mac) {
+			Station sta = device_station->get(ap.stations->get(currentSelection));
+			String status = sta.selected ? "[*] " : "[ ] ";
+			staInfo = status + macToString(sta.mac);
+			items[0] = staInfo;
+		} else {
+			// If set_mac is true, we just show the MAC address
+			// of the selected station
+			Station sta = device_station->get(ap.stations->get(currentSelection));
+			staInfo =  macToString(sta.mac);
+			for (int i = 0; i < 2; i++) {
+				if (i == 0) {
+					items[i] = staInfo;
+				} else if (i == 1) {
+					items[i] = "Mac: " + String(macToString(wifi.sta_mac));
+				}
+			}
+		}
 
 	}
 
@@ -611,9 +674,7 @@ void displayWiFiSelectStaInAp() {
 		"Scan First!"
 	};
 
-	menuNode(staInfo, "STAs in AP: ", errorText, ap.stations->size());
-
-	
+	menuNode(items, sizeof(items) / sizeof(items[0]), "STA in AP: ", errorText, ap.stations->size());
 }
 
 void displayWiFiAttackMenu() {
@@ -648,7 +709,7 @@ void displayRebootConfirm() {
 
 void displayDeepSleepConfirm() {
 	display.clearScreen();
-	display.displayStringwithCoordinates("==== DeepSleep ====", 0, 12);
+	display.displayStringwithCoordinates("===== DeepSleep =====", 0, 12);
 	display.displayStringwithCoordinates("Press SELECT to", 0, 24);
 	display.displayStringwithCoordinates("confirm deepsleep", 0, 36);
 	display.displayStringwithCoordinates("or LEFT to cancel", 0, 48, true);
@@ -941,6 +1002,9 @@ void navigateUp() {
 		case WIFI_GENERAL_MENU:
 			displayWiFiGeneralMenu();
 			break;
+		case WIFI_UTILS_MENU:
+			displayWiFiUtilsMenu();
+			break;
 		case WIFI_ATTACK_MENU:
 			displayWiFiAttackMenu();
 			break;
@@ -1008,6 +1072,9 @@ void navigateDown() {
 			break;
 		case WIFI_GENERAL_MENU:
 			displayWiFiGeneralMenu();
+			break;
+		case WIFI_UTILS_MENU:
+			displayWiFiUtilsMenu();
 			break;
 		case WIFI_ATTACK_MENU:
 			displayWiFiAttackMenu();
@@ -1246,7 +1313,12 @@ void selectCurrentItem() {
 				currentState = WIFI_GENERAL_MENU;
 				currentSelection = 0;
 				maxSelections = WIFI_GENERAL_MENU_COUNT;
-				displayWiFiGeneralMenu(); 
+				displayWiFiGeneralMenu();
+			} else if (currentSelection == WIFI_UTILS) {
+				currentState = WIFI_UTILS_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_UTILS_MENU_COUNT;
+				displayWiFiUtilsMenu();
 			} else if (currentSelection == WIFI_SELECT) {
 				currentState = WIFI_SELECT_MENU;
 				currentSelection = 0;
@@ -1275,6 +1347,63 @@ void selectCurrentItem() {
 				goBack();
 			}
 			break;
+		case WIFI_UTILS_MENU:
+			if (currentSelection == WIFI_UTILS_GENERATE_AP_MAC) {
+				uint8_t mac[6];
+				generateRandomMac(mac);
+				for (int i = 0; i < 6; i++) {
+					wifi.ap_mac[i] = mac[i];
+				}
+				display.clearScreen();
+				display.displayStringwithCoordinates("AP MAC Generated", 0, 12);
+				display.displayStringwithCoordinates("MAC: " + macToString(wifi.ap_mac), 0, 24);
+				display.displayStringwithCoordinates("Press SELECT to", 0, 36);
+				display.displayStringwithCoordinates("go Back", 0, 48, true);
+				while(!check(selPress)) {
+					vTaskDelay(10 / portTICK_PERIOD_MS);
+				}
+				displayWiFiUtilsMenu();
+			} else if (currentSelection == WIFI_UTILS_GENERATE_STA_MAC) {
+				uint8_t mac[6];
+				generateRandomMac(mac);
+				for (int i = 0; i < 6; i++) {
+					wifi.sta_mac[i] = mac[i];
+				}
+				display.clearScreen();
+				display.displayStringwithCoordinates("STA MAC Generated", 0, 12);
+				display.displayStringwithCoordinates("MAC:" + macToString(wifi.sta_mac), 0, 24);
+				display.displayStringwithCoordinates("Press SELECT to", 0, 36);
+				display.displayStringwithCoordinates("go Back", 0, 48, true);
+				while(!check(selPress)) {
+					vTaskDelay(10 / portTICK_PERIOD_MS);
+				}
+				displayWiFiUtilsMenu();
+			}
+			else if (currentSelection == WIFI_UTILS_SET_AP_MAC) {
+				set_mac = true;
+				currentState = WIFI_SELECT_MENU;
+				currentSelection = 0;
+				if (access_points && access_points->size() > 0) {
+					maxSelections = access_points->size() + 1;
+				} else {
+					maxSelections = 1;
+				}
+				displayWiFiSelectMenu();
+			}
+			else if (currentSelection == WIFI_UTILS_SET_STA_MAC) {
+				set_mac = true;
+				currentState = WIFI_SELECT_STA_AP_MENU;
+				currentSelection = 0;
+				if (access_points && access_points->size() > 0) {
+					maxSelections = access_points->size() + 1;
+				} else {
+					maxSelections = 1;
+				}
+				displayWiFiSelectAptoSta();
+			} else if (currentSelection == WIFI_UTILS_BACK) {
+				goBack();
+			}
+			break;
 		case WIFI_GENERAL_MENU:
 			if (currentSelection == WIFI_GENERAL_BACK) {
 				goBack();
@@ -1283,6 +1412,10 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 				//startWiFiScan(WIFI_GENERAL_AP_SCAN);
+			}
+			else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
 			}
 			else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
 				currentState = WIFI_SCAN_RUNNING;
@@ -1317,6 +1450,9 @@ void selectCurrentItem() {
 				if (currentSelection == WIFI_GENERAL_AP_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN);
 				}
+				else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
+					startWiFiScan(WIFI_GENERAL_AP_SCAN_OLD);
+				}
 				else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 				}
@@ -1327,10 +1463,22 @@ void selectCurrentItem() {
 				goBack();
 			} else {
 				if (currentSelection < access_points->size()) {
-					AccessPoint ap = access_points->get(currentSelection);
-					ap.selected = !ap.selected;
-					access_points->set(currentSelection, ap);
-					displayWiFiSelectMenu();
+					if (!set_mac) {
+						AccessPoint ap = access_points->get(currentSelection);
+						ap.selected = !ap.selected;
+						access_points->set(currentSelection, ap);
+						displayWiFiSelectMenu();
+					} else {
+						AccessPoint ap = access_points->get(currentSelection);
+						for (int i = 0; i < 6; i++) {
+							wifi.ap_mac[i] = ap.bssid[i];
+						}
+						display.clearScreen();
+						display.displayStringwithCoordinates("AP MAC Set To", 0, 12);
+						display.displayStringwithCoordinates(macToString(wifi.ap_mac), 0, 24, true);
+						vTaskDelay(2000 / portTICK_PERIOD_MS);
+						goBack();
+					}	
 				} else {
 					goBack();
 				}
@@ -1355,14 +1503,31 @@ void selectCurrentItem() {
 			if (!device_station || access_points->get(ap_index).stations->size() == 0) {
 				goBack();
 			} else {
-				if (currentSelection < access_points->get(ap_index).stations->size()) {
-					int sta = access_points->get(ap_index).stations->get(currentSelection);
-					Station new_sta = device_station->get(sta);
-					new_sta.selected = !new_sta.selected;
-					device_station->set(sta, new_sta);
-					displayWiFiSelectStaInAp();
+				if (!set_mac) {
+					if (currentSelection < access_points->get(ap_index).stations->size()) {
+						int sta = access_points->get(ap_index).stations->get(currentSelection);
+						Station new_sta = device_station->get(sta);
+						new_sta.selected = !new_sta.selected;
+						device_station->set(sta, new_sta);
+						displayWiFiSelectStaInAp();
+					} else {
+						goBack();
+					}
 				} else {
-					goBack();
+					if (currentSelection < access_points->get(ap_index).stations->size()) {
+						int sta = access_points->get(ap_index).stations->get(currentSelection);
+						Station new_sta = device_station->get(sta);
+						for (int i = 0; i < 6; i++) {
+							wifi.sta_mac[i] = new_sta.mac[i];
+						}
+						display.clearScreen();
+						display.displayStringwithCoordinates("STA MAC Set To", 0, 12);
+						display.displayStringwithCoordinates(macToString(wifi.sta_mac), 0, 24, true);
+						vTaskDelay(2000 / portTICK_PERIOD_MS);
+						goBack();
+					} else {
+						goBack();
+					}
 				}
 			}
 			break;
@@ -1479,33 +1644,53 @@ void goBack() {
 			displayWiFiMenu();
 			break;
 		case WIFI_SCAN_RUNNING:
-			if (wifiScanRunning && wifiScanInProgress) {
-				wifiScanInProgress = false;
-				wifi.StartMode(WIFI_SCAN_OFF);
-				if (currentSelection == WIFI_GENERAL_AP_SCAN) {
-					Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()));
-					displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
-				} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
-					Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()) + " Station in list: " + String(device_station->size()));
-					displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
+			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN) {
+				if (wifiScanRunning && wifiScanInProgress) {
+					wifiScanInProgress = false;
+					wifi.StartMode(WIFI_SCAN_OFF);
+					if (currentSelection == WIFI_GENERAL_AP_SCAN) {
+						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()));
+						displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
+					} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
+						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()) + " Station in list: " + String(device_station->size()));
+						displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
+					}
+					display.clearBuffer();
 				}
-				display.clearBuffer();
-			}
-			else if (!wifiScanRunning) {
+				else if (!wifiScanRunning) {
+					currentState = WIFI_GENERAL_MENU;
+					currentSelection = 0;
+					maxSelections = WIFI_GENERAL_MENU_COUNT;
+					displayWiFiGeneralMenu();
+				}
+				else if (wifiScanRunning && wifiScanOneShot &&wifiScanDisplay)  {
+					wifiScanRunning = false;
+					wifiScanOneShot = false;
+					wifiScanDisplay = false;
+					currentState = WIFI_GENERAL_MENU;
+					currentSelection = 0;
+					maxSelections = WIFI_GENERAL_MENU_COUNT;
+					wifiSnifferMode = -1;
+					displayWiFiGeneralMenu();
+				}
+			} else {
+				if (wifiScanRunning) {
+					wifiScanRunning = false;
+					wifiScanOneShot = false;
+					wifiScanDisplay = false;
+				}
 				currentState = WIFI_GENERAL_MENU;
 				currentSelection = 0;
 				maxSelections = WIFI_GENERAL_MENU_COUNT;
+				wifiSnifferMode = -1;
 				displayWiFiGeneralMenu();
 			}
-			else if (wifiScanRunning && wifiScanOneShot &&wifiScanDisplay)  {
-				wifiScanRunning = false;
-				wifiScanOneShot = false;
-				wifiScanDisplay = false;
-				currentState = WIFI_GENERAL_MENU;
-				currentSelection = 0;
-				maxSelections = WIFI_GENERAL_MENU_COUNT;
-				displayWiFiGeneralMenu();
-			}
+			break;
+		case WIFI_UTILS_MENU:
+			currentState = WIFI_MENU;
+			currentSelection = 0;
+			maxSelections = WIFI_MENU_COUNT;
+			displayWiFiMenu();
 			break;
 		case WIFI_SCAN_SNIFFER_RUNNING:
 			currentState = WIFI_GENERAL_MENU;
@@ -1515,8 +1700,21 @@ void goBack() {
 			wifi.StartMode(WIFI_SCAN_OFF);
 			displayWiFiGeneralMenu();
 			break;
-		case WIFI_SELECT_STA_AP_MENU:
 		case WIFI_SELECT_MENU:
+			if (!set_mac) {
+				currentState = WIFI_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_MENU_COUNT;
+				displayWiFiMenu();
+			} else {
+				set_mac = false;
+				currentState = WIFI_UTILS_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_UTILS_MENU_COUNT;
+				displayWiFiUtilsMenu();
+			}
+			break;
+		case WIFI_SELECT_STA_AP_MENU:
 		case WIFI_ATTACK_MENU:
 			currentState = WIFI_MENU;
 			currentSelection = 0;
@@ -1524,10 +1722,18 @@ void goBack() {
 			displayWiFiMenu();
 			break;
 		case WIFI_SELECT_STA_MENU:
-			currentState = WIFI_SELECT_STA_AP_MENU;
-			currentSelection = 0;
-			maxSelections = access_points->size() + 1;
-			displayWiFiSelectAptoSta();
+			if (!set_mac) {
+				currentState = WIFI_SELECT_STA_AP_MENU;
+				currentSelection = 0;
+				maxSelections = access_points->size() + 1;
+				displayWiFiSelectAptoSta();
+			} else {
+				set_mac = false;
+				currentState = WIFI_UTILS_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_UTILS_MENU_COUNT;
+				displayWiFiUtilsMenu();
+			}
 			break;
 		case BLE_SCAN_RUNNING:
 			if (bleScanRunning && bleScanInProgress) {
@@ -1926,17 +2132,27 @@ void startWiFiScan(WiFiGeneralItem mode) {
 	wifiScanOneShot = false;
 	
 	// Start AP scan
-	wifiScanInProgress = true;
-	display.clearBuffer();
-	wifiScanOneShot = true;
-	if (mode == WIFI_GENERAL_AP_SCAN) {
-		displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
-		wifi.StartMode(WIFI_SCAN_AP);
+	if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_STA_SCAN) {
+		wifiScanInProgress = true;
+		display.clearBuffer();
+		wifiScanOneShot = true;
+		if (mode == WIFI_GENERAL_AP_SCAN) {
+			displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
+			wifi.StartMode(WIFI_SCAN_AP);
+		}
+		else if (mode == WIFI_GENERAL_AP_STA_SCAN) {
+			displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
+			wifi.StartMode(WIFI_SCAN_AP_STA);
+		}
+	} else {
+		wifiScanInProgress = true;
+		displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
+		wifi.StartMode(WIFI_SCAN_AP_OLD);
+		wifiScanOneShot = true;
+		wifi.StartMode(WIFI_SCAN_OFF);
+		wifiScanInProgress = false;
 	}
-	else if (mode == WIFI_GENERAL_AP_STA_SCAN) {
-		displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
-		wifi.StartMode(WIFI_SCAN_AP_STA);
-	}
+	
 	//wifi.StartMode(WIFI_SCAN_OFF);
 	//wifiScanInProgress = false;
 }
@@ -2169,21 +2385,21 @@ void handleTasks(MenuState handle_state) {
 	if (wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) {
 
 		if (!wifiScanOneShot) {
-			if (currentSelection == WIFI_GENERAL_AP_SCAN) {
+			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN) {
 				startWiFiScan(WIFI_GENERAL_AP_SCAN);
 			}
 			else {
 				startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 			}
 		}
-		if (currentSelection == WIFI_GENERAL_AP_SCAN) {
+		if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 		}
 		else {
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 		}
 
-		if (wifiScanInProgress) {
+		if (wifiScanInProgress && wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
 			if (wifiScanRedraw) {
 				wifiScanRedraw = false;
 				display.clearScreen();
@@ -2192,11 +2408,13 @@ void handleTasks(MenuState handle_state) {
 			}
 		}
 
-		static unsigned long channelhoptimer = 0;
-		if (wifiScanRunning && wifiScanInProgress) {
-			if (millis() - channelhoptimer > 500) {
-				wifi.channelHop();
-				channelhoptimer = millis();
+		if (wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
+			static unsigned long channelhoptimer = 0;
+			if (wifiScanRunning && wifiScanInProgress) {
+				if (millis() - channelhoptimer > 500) {
+					wifi.channelHop();
+					channelhoptimer = millis();
+				}
 			}
 		}
 	}
@@ -2397,67 +2615,9 @@ void handleTasks(MenuState handle_state) {
 	}
 }
 
-void redrawTasks() {
-	switch (currentState) {
-		case MAIN_MENU:
-			displayMainMenu();
-			break;
-		case BLE_MENU:
-			displayBLEMenu();
-			break;
-		case BLE_INFO_MENU_LIST:
-			displayBLEInfoListMenu();
-			break;
-		case BLE_INFO_MENU_DETAIL:
-			break;
-		case BLE_SPOOFER_MAIN_MENU:
-			displayMainSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_MENU:
-			displayAppleSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_MENU:
-			displaySamsungSpooferMenu();
-			break;
-		case BLE_SPOOFER_GOOGLE_MENU:
-			displayGoogleSpooferMenu();
-			break;
-		case BLE_SPOOFER_AD_TYPE_MENU:
-			displayAdTypeSpooferMenu();
-			break;
-		case BLE_EXPLOIT_ATTACK_MENU:
-			displayExploitAttackBLEMenu();
-			break;
-		case WIFI_MENU:
-			displayWiFiMenu();
-			break;
-		case WIFI_GENERAL_MENU:
-			displayWiFiGeneralMenu();
-			break;
-		case WIFI_ATTACK_MENU:
-			displayWiFiAttackMenu();
-			break;
-		case WIFI_SELECT_MENU:
-			displayWiFiSelectMenu();
-			break;
-		case NRF24_MENU:
-			displayNRF24Menu();
-			break;
-		case NRF24_JAMMER_MENU:
-			displayNRF24JammerMenu();
-			break;
-	}
-}
+static unsigned long autoSleepTimer = 0;
 
-void menuloop() {
-	handleInput(currentState);
-	handleTasks(currentState);
-	static unsigned long lastRedrawCheck = 0;
-	if (millis() - lastRedrawCheck > 30000) {
-		redrawTasks();
-		lastRedrawCheck = millis();
-	}
-	static unsigned long autoSleepTimer = 0;
+void autoSleepCheck() {
 	static unsigned long taskRunningTimerCheck = 0;
 	if (!(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep ode when in attack mode
 		!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
@@ -2478,12 +2638,34 @@ void menuloop() {
 		}
 		if (autoSleepTimer > 0 && (millis() - autoSleepTimer) > 300000) { // 5 mins
 			autoSleep = true;
+			if (standby) standby = false;
 			performDeepSleep();
+		}
+		if (autoSleepTimer > 0 && (millis() - autoSleepTimer) > 30000) { // 30 secs
+			if (!standby) standby = true;
 		}
 	} else {
 		if (millis() - taskRunningTimerCheck > 10000) {
 			autoSleepTimer = millis();
 			taskRunningTimerCheck = millis();
+		}
+	}
+}
+
+void menuloop() {
+	handleInput(currentState);
+	handleTasks(currentState);
+	autoSleepCheck();
+	if (standby) {
+		for (int i = 0; i < standby_bitmap_allArray_LEN; i++) {
+			if (check(selPress) || check(prevPress) || check(nextPress)) { // auto deep sleep
+				if (standby) standby = false;
+				autoSleepTimer = millis();
+				break;
+			}
+			display.clearScreen();
+			display.drawBipmap(0, 0, 128, 64, standby_bitmap_allArray[i], true);
+			vTaskDelay(20 / portTICK_PERIOD_MS);
 		}
 	}
 	// Check for critical low memory and auto-reboot
