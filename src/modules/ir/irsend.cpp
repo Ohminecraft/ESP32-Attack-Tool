@@ -55,6 +55,7 @@ uint8_t read_bits(uint8_t count) {
 
 TvBeGoneRegion begoneregion;
 
+// https://github.com/pr3y/Bruce/blob/main/src/modules/ir/TV-B-Gone.cpp
 void IRSendModules::startTVBeGone() {
     if (begoneregion == NA) size_num_codes = num_NAcodes;
     else size_num_codes = num_EUcodes;
