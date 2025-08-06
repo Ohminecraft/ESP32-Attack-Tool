@@ -368,7 +368,6 @@ class BLEScanDeviceCallbacks: public NimBLEAdvertisedDeviceCallbacks {
 
 void BLEModules::scanCompleteCB(NimBLEScanResults scanResults) {
     printf("[INFO] Scan complete!\n");
-    printf("[INFO] Found %d devices\n", scanResults.getCount());
     scanResults.dump();
   } // scanCompleteCB
 

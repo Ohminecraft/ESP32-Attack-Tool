@@ -16,6 +16,8 @@ BLEModules ble;
 DisplayModules display;
 EvilPortalAddtional eportal;
 NRF24Modules nrf;
+IRSendModules irtx;
+IRReadModules irrx;
 
 
 // https://github.com/pr3y/Bruce/blob/main/src/main.cpp
@@ -56,6 +58,8 @@ void menuinit() {
 		Serial.println("[ERROR] Failed to initialize display!");
 		while(1); // Halt if display fails
 	}
+	irtx.main();
+	irrx.main();
 	wifi.main();
 	ble.main();
 	eportal.setup();
@@ -157,6 +161,12 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("NRF Jammer", 0, 12);
 	else if (currentState == WIFI_ATTACK_RUNNING)
 		display.displayStringwithCoordinates("WiFi Attack", 0, 12);
+	else if (currentState == IR_MENU)
+		display.displayStringwithCoordinates("IR Menu", 0, 12);
+	else if (currentState == IR_TV_BE_GONE_REGION)
+		display.displayStringwithCoordinates("IR TVBeGone", 0, 12);
+	else if (currentState == IR_SEND_RUNNING)
+		display.displayStringwithCoordinates("IR Send", 0, 12);
 	else
 		display.displayStringwithCoordinates("Unknown State", 0, 12);
 	
@@ -226,6 +236,7 @@ void displayMainMenu() {
 		"BLE",
 		"WiFi",
 		"NRF24",
+		"IR",
 		"Deep Sleep",
 		"Reboot"
 	};
@@ -855,6 +866,29 @@ void displayNRFJammerStatus() {
 	display.sendDisplay();
 }
 
+void displayIRMenu() {
+	displayStatusBar();
+
+	String items[IR_MENU_COUNT] = {
+		"Tv Be Gone",
+		"< Back"
+	};
+
+	menuNode(items, IR_MENU_COUNT);
+}
+
+void displayIRTvBeGoneRegionMenu() {
+	displayStatusBar();
+
+	String items[IR_TV_BE_GONE_REGION_COUNT] = {
+		"NA",
+		"EU",
+		"< Back"
+	};
+
+	menuNode(items, IR_TV_BE_GONE_REGION_COUNT);
+}
+
 void displayAttackStatus() {
 	String attackName = "";
 	if (currentState == BLE_ATTACK_RUNNING) {
@@ -1023,6 +1057,12 @@ void navigateUp() {
 		case NRF24_JAMMER_MENU:
 			displayNRF24JammerMenu();
 			break;
+		case IR_MENU:
+			displayIRMenu();
+			break;
+		case IR_TV_BE_GONE_REGION:
+			displayIRTvBeGoneRegionMenu();
+			break;
 	}
 	
 }
@@ -1094,6 +1134,12 @@ void navigateDown() {
 		case NRF24_JAMMER_MENU:
 			displayNRF24JammerMenu();
 			break;
+		case IR_MENU:
+			displayIRMenu();
+			break;
+		case IR_TV_BE_GONE_REGION:
+			displayIRTvBeGoneRegionMenu();
+			break;
 	}
 	
 }
@@ -1117,6 +1163,11 @@ void selectCurrentItem() {
 				currentSelection = 0;
 				maxSelections = NRF24_MENU_COUNT;
 				displayNRF24Menu();
+			} else if (currentSelection == MAIN_IR) {
+				currentState = IR_MENU;
+				currentSelection = 0;
+				maxSelections = IR_MENU_COUNT;
+				displayIRMenu();
 			} else if (currentSelection == MAIN_REBOOT) {
 				displayRebootConfirm();
 				//delay(1000); // Give user time to see the message
@@ -1623,7 +1674,39 @@ void selectCurrentItem() {
 				displayNRFJammerStatus();
 				}
 			break;
-
+		case IR_MENU:
+			if (currentSelection == IR_TV_BE_GONE) {
+				currentState = IR_TV_BE_GONE_REGION;
+				currentSelection = 0;
+				maxSelections = IR_TV_BE_GONE_REGION_COUNT;
+				displayIRTvBeGoneRegionMenu();
+			} else if (currentSelection == IR_BACK) {
+				goBack();
+			}
+			break;
+		case IR_TV_BE_GONE_REGION:
+			if (currentSelection == IR_TV_BE_GONE_BACK) {
+				goBack();
+			} else {
+				// Check memory before starting attack
+				if (!checkLeftMemory()) {
+					display.clearScreen();
+					display.displayStringwithCoordinates("LOW MEMORY!", 0, 12);
+					display.displayStringwithCoordinates("Cannot start", 0, 21);
+					display.displayStringwithCoordinates("attack", 0, 31, true);
+					vTaskDelay(2000 / portTICK_PERIOD_MS);
+					displayIRTvBeGoneRegionMenu();
+					return;
+				}
+				if (currentSelection == IR_TV_BE_GONE_NA) {
+					irTvBeGoneRegion = NA;
+				} else {
+					irTvBeGoneRegion = EU;
+				}
+				currentState = IR_SEND_RUNNING;
+				starttvbegone = true;
+			}
+			break;
 	}
 	
 }
@@ -1892,6 +1975,24 @@ void goBack() {
 			nrfScannerSetupOneShot = false;
 			display.setCursor(0, 0);
 			displayNRF24Menu();
+			break;
+		case IR_MENU:
+			currentState = MAIN_MENU;
+			currentSelection = 0;
+			maxSelections = MAIN_MENU_COUNT;
+			displayMainMenu();
+			break;
+		case IR_TV_BE_GONE_REGION:
+			currentState = IR_MENU;
+			currentSelection = 0;
+			maxSelections = IR_MENU_COUNT;
+			displayIRMenu();
+			break;
+		case IR_SEND_RUNNING:
+			currentState = IR_MENU;
+			currentSelection = 0;
+			maxSelections = IR_MENU_COUNT;
+			displayIRMenu();
 			break;
 	}
 	
@@ -2339,7 +2440,8 @@ void handleInput(MenuState handle_state) {
 			handle_state == NRF24_SCANNER_RUNNING ||
 			handle_state == WIFI_ATTACK_RUNNING ||
 			handle_state == BLE_ATTACK_RUNNING ||
-			handle_state == BLE_SPOOFER_RUNNING)
+			handle_state == BLE_SPOOFER_RUNNING ||
+			handle_state == IR_SEND_RUNNING)
 		{
 			goBack();
 		}
@@ -2495,6 +2597,37 @@ void handleTasks(MenuState handle_state) {
 		}
 	}
 
+	else if (handle_state == IR_SEND_RUNNING) {
+		if (starttvbegone) {
+			Serial.println("[INFO] Starting IR TV Be Gone");
+			String region;
+			if (irTvBeGoneRegion == NA) {
+				region = "NA";
+				begoneregion = NA;
+			}
+			else {
+				region = "EU";
+				begoneregion = EU;
+			}
+			display.clearScreen();
+			displayStatusBar();
+			display.displayStringwithCoordinates("TV Be Gone Mode", 0, 24);
+			display.displayStringwithCoordinates("Region:" + region, 0,36);
+			display.displayStringwithCoordinates("Press Sel to stop", 0, 48, true);
+			irtx.startTVBeGone();
+			display.clearScreen();
+			displayStatusBar();
+			display.displayStringwithCoordinates("All Codes", 0, 24);
+			display.displayStringwithCoordinates("Sended", 0, 36);
+			display.displayStringwithCoordinates("Total:" + String(irtx.begone_code_sended),0, 48, true);
+			Serial.println("[INFO] IR Tv Be Gone Done! Total: " + String(irtx.begone_code_sended));
+			vTaskDelay(2000 / portTICK_PERIOD_MS);
+			starttvbegone = false;
+			irtx.begone_code_sended = 0;
+			goBack();
+		}
+	}
+
 	else if (handle_state == BLE_SPOOFER_RUNNING) {
 		if (!bleSpooferDone) {
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE)
@@ -2618,8 +2751,7 @@ void handleTasks(MenuState handle_state) {
 static unsigned long autoSleepTimer = 0;
 
 void autoSleepCheck() {
-	static unsigned long taskRunningTimerCheck = 0;
-	if (!(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep ode when in attack mode
+	if (!(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep mode when in attack mode 
 		!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
 		!(currentState == BLE_SCAN_RUNNING) &&
 		!(currentState == NRF24_ANALYZER_RUNNING) &&
@@ -2627,9 +2759,10 @@ void autoSleepCheck() {
 		!(currentState == NRF24_SCANNER_RUNNING) &&
 		!(currentState == WIFI_ATTACK_RUNNING) &&
 		!(currentState == BLE_ATTACK_RUNNING) &&
-		!(currentState == BLE_SPOOFER_RUNNING))
+		!(currentState == BLE_SPOOFER_RUNNING) &&
+		!(currentState == IR_SEND_RUNNING))  // prevent into deep sleep mode when in IR send mode
 	{
-		if (!check(selPress) && !check(prevPress) && !check(nextPress)) { // auto deep sleep
+		if (!selPress && !prevPress && !nextPress) { // auto deep sleep
 			if (autoSleepTimer == 0) { 
 				autoSleepTimer = millis();
 			}
@@ -2645,10 +2778,7 @@ void autoSleepCheck() {
 			if (!standby) standby = true;
 		}
 	} else {
-		if (millis() - taskRunningTimerCheck > 10000) {
-			autoSleepTimer = millis();
-			taskRunningTimerCheck = millis();
-		}
+		autoSleepTimer = millis();
 	}
 }
 

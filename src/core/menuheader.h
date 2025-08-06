@@ -20,6 +20,8 @@
 #include "modules/wifi/wifiheader.h"
 #include "modules/wifi/evilportalheader.h"
 #include "modules/nrf24header.h"
+#include "modules/ir/irsend_header.h"
+#include "modules/ir/irread_header.h"
 
 #include "configs.h"
 
@@ -37,6 +39,9 @@ enum MenuState {
     BLE_MENU,
     WIFI_MENU,
     NRF24_MENU,
+    IR_MENU,
+    IR_TV_BE_GONE_REGION,
+    IR_SEND_RUNNING,
     NRF24_ANALYZER_RUNNING,
     NRF24_SCANNER_RUNNING,
     NRF24_JAMMER_RUNNING,
@@ -69,6 +74,7 @@ enum MainMenuItem {
     MAIN_BLE,
     MAIN_WIFI,
     MAIN_NRF24,
+    MAIN_IR,
     MAIN_DEEP_SLEEP,
     MAIN_REBOOT,
     MAIN_MENU_COUNT
@@ -319,6 +325,19 @@ enum NRFJammerItem {
     NRF24_JAM_MENU_COUNT
 };
 
+enum IRMenuItem {
+    IR_TV_BE_GONE,
+    IR_BACK,
+    IR_MENU_COUNT
+};
+
+enum IRTVBeGoneRegion {
+    IR_TV_BE_GONE_NA,
+    IR_TV_BE_GONE_EU,
+    IR_TV_BE_GONE_BACK,
+    IR_TV_BE_GONE_REGION_COUNT
+};
+
 MenuState currentState = MAIN_MENU;
 uint8_t currentSelection = 0;
 uint8_t maxSelections = MAIN_MENU_COUNT;
@@ -364,6 +383,11 @@ bool evilPortalOneShot = false;
 bool nrfAnalyzerSetupOneShot = false;
 bool nrfJammerSetupOneShot = false;
 bool nrfScannerSetupOneShot = false;
+
+// IRSend
+
+TvBeGoneRegion irTvBeGoneRegion;
+bool starttvbegone = false;
 
 // System
 bool autoSleep = false;

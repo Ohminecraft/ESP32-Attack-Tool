@@ -50,6 +50,9 @@ void WiFiModules::main() {
 	Serial.printf("[INFO] AP MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n", 
 				this->ap_mac[0], this->ap_mac[1], this->ap_mac[2],
 				this->ap_mac[3], this->ap_mac[4], this->ap_mac[5]);
+	Serial.printf("[INFO] STA MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
+				this->sta_mac[0], this->sta_mac[1], this->sta_mac[2],
+				this->sta_mac[3], this->sta_mac[4], this->sta_mac[5]);
 	this->ShutdownWiFi();
 }
 
