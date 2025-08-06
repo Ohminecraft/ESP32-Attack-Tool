@@ -1924,9 +1924,9 @@ void nrfAnalyzer() {
 				return;
 			} 
 			nrf.setChannel(i);
-			nrf.enableCE();
+			digitalWrite(NRF24_CE_PIN, HIGH);
 			delayMicroseconds(128);
-			nrf.disableCE();
+			digitalWrite(NRF24_CE_PIN, LOW);
 			if (nrf.carrierDetected()) {
 				++values[i];
 			}
