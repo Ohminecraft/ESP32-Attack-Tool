@@ -163,8 +163,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Attack", 0, 12);
 	else if (currentState == IR_MENU)
 		display.displayStringwithCoordinates("IR Menu", 0, 12);
-	else if (currentState == IR_TV_BE_GONE_REGION)
-		display.displayStringwithCoordinates("IR TVBeGone", 0, 12);
+	else if (currentState == IR_TV_B_GONE_REGION)
+		display.displayStringwithCoordinates("IR Tv-B-Gone", 0, 12);
 	else if (currentState == IR_SEND_RUNNING)
 		display.displayStringwithCoordinates("IR Send", 0, 12);
 	else
@@ -870,23 +870,23 @@ void displayIRMenu() {
 	displayStatusBar();
 
 	String items[IR_MENU_COUNT] = {
-		"Tv Be Gone",
+		"Tv-B-Gone",
 		"< Back"
 	};
 
 	menuNode(items, IR_MENU_COUNT);
 }
 
-void displayIRTvBeGoneRegionMenu() {
+void displayIRTvBGoneRegionMenu() {
 	displayStatusBar();
 
-	String items[IR_TV_BE_GONE_REGION_COUNT] = {
+	String items[IR_TV_B_GONE_REGION_COUNT] = {
 		"NA",
 		"EU",
 		"< Back"
 	};
 
-	menuNode(items, IR_TV_BE_GONE_REGION_COUNT);
+	menuNode(items, IR_TV_B_GONE_REGION_COUNT);
 }
 
 void displayAttackStatus() {
@@ -1060,8 +1060,8 @@ void navigateUp() {
 		case IR_MENU:
 			displayIRMenu();
 			break;
-		case IR_TV_BE_GONE_REGION:
-			displayIRTvBeGoneRegionMenu();
+		case IR_TV_B_GONE_REGION:
+			displayIRTvBGoneRegionMenu();
 			break;
 	}
 	
@@ -1137,8 +1137,8 @@ void navigateDown() {
 		case IR_MENU:
 			displayIRMenu();
 			break;
-		case IR_TV_BE_GONE_REGION:
-			displayIRTvBeGoneRegionMenu();
+		case IR_TV_B_GONE_REGION:
+			displayIRTvBGoneRegionMenu();
 			break;
 	}
 	
@@ -1675,17 +1675,17 @@ void selectCurrentItem() {
 				}
 			break;
 		case IR_MENU:
-			if (currentSelection == IR_TV_BE_GONE) {
-				currentState = IR_TV_BE_GONE_REGION;
+			if (currentSelection == IR_TV_B_GONE) {
+				currentState = IR_TV_B_GONE_REGION;
 				currentSelection = 0;
-				maxSelections = IR_TV_BE_GONE_REGION_COUNT;
-				displayIRTvBeGoneRegionMenu();
+				maxSelections = IR_TV_B_GONE_REGION_COUNT;
+				displayIRTvBGoneRegionMenu();
 			} else if (currentSelection == IR_BACK) {
 				goBack();
 			}
 			break;
-		case IR_TV_BE_GONE_REGION:
-			if (currentSelection == IR_TV_BE_GONE_BACK) {
+		case IR_TV_B_GONE_REGION:
+			if (currentSelection == IR_TV_B_GONE_BACK) {
 				goBack();
 			} else {
 				// Check memory before starting attack
@@ -1695,16 +1695,16 @@ void selectCurrentItem() {
 					display.displayStringwithCoordinates("Cannot start", 0, 21);
 					display.displayStringwithCoordinates("attack", 0, 31, true);
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
-					displayIRTvBeGoneRegionMenu();
+					displayIRTvBGoneRegionMenu();
 					return;
 				}
-				if (currentSelection == IR_TV_BE_GONE_NA) {
-					irTvBeGoneRegion = NA;
+				if (currentSelection == IR_TV_B_GONE_NA) {
+					irTvBGoneRegion = NA;
 				} else {
-					irTvBeGoneRegion = EU;
+					irTvBGoneRegion = EU;
 				}
 				currentState = IR_SEND_RUNNING;
-				starttvbegone = true;
+				starttvbgone = true;
 			}
 			break;
 	}
@@ -1982,7 +1982,7 @@ void goBack() {
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
-		case IR_TV_BE_GONE_REGION:
+		case IR_TV_B_GONE_REGION:
 			currentState = IR_MENU;
 			currentSelection = 0;
 			maxSelections = IR_MENU_COUNT;
@@ -2598,10 +2598,10 @@ void handleTasks(MenuState handle_state) {
 	}
 
 	else if (handle_state == IR_SEND_RUNNING) {
-		if (starttvbegone) {
-			Serial.println("[INFO] Starting IR TV Be Gone");
+		if (starttvbgone) {
+			Serial.println("[INFO] Starting IR TV-B-Gone");
 			String region;
-			if (irTvBeGoneRegion == NA) {
+			if (irTvBGoneRegion == NA) {
 				region = "NA";
 				begoneregion = NA;
 			}
@@ -2611,18 +2611,19 @@ void handleTasks(MenuState handle_state) {
 			}
 			display.clearScreen();
 			displayStatusBar();
-			display.displayStringwithCoordinates("TV Be Gone Mode", 0, 24);
+			display.displayStringwithCoordinates("TV-B-Gone Mode", 0, 24);
 			display.displayStringwithCoordinates("Region:" + region, 0,36);
 			display.displayStringwithCoordinates("Press Sel to stop", 0, 48, true);
-			irtx.startTVBeGone();
+			irtx.startTVBGone();
 			display.clearScreen();
 			displayStatusBar();
 			display.displayStringwithCoordinates("All Codes", 0, 24);
 			display.displayStringwithCoordinates("Sended", 0, 36);
-			display.displayStringwithCoordinates("Total:" + String(irtx.begone_code_sended),0, 48, true);
-			Serial.println("[INFO] IR Tv Be Gone Done! Total: " + String(irtx.begone_code_sended));
-			vTaskDelay(2000 / portTICK_PERIOD_MS);
-			starttvbegone = false;
+			display.displayStringwithCoordinates("Total:" + String(irtx.begone_code_sended),0, 48);
+			display.displayStringwithCoordinates("Press Sel to exit", 0, 60, true);
+			while(!check(selPress)) yield();
+			Serial.println("[INFO] IR TV-B-Gone Done! Total: " + String(irtx.begone_code_sended) + " codes sended.");
+			starttvbgone = false;
 			irtx.begone_code_sended = 0;
 			goBack();
 		}
@@ -2783,9 +2784,9 @@ void autoSleepCheck() {
 }
 
 void menuloop() {
+	autoSleepCheck();
 	handleInput(currentState);
 	handleTasks(currentState);
-	autoSleepCheck();
 	if (standby) {
 		for (int i = 0; i < standby_bitmap_allArray_LEN; i++) {
 			if (check(selPress) || check(prevPress) || check(nextPress)) { // auto deep sleep

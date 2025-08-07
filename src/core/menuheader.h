@@ -40,7 +40,7 @@ enum MenuState {
     WIFI_MENU,
     NRF24_MENU,
     IR_MENU,
-    IR_TV_BE_GONE_REGION,
+    IR_TV_B_GONE_REGION,
     IR_SEND_RUNNING,
     NRF24_ANALYZER_RUNNING,
     NRF24_SCANNER_RUNNING,
@@ -326,21 +326,21 @@ enum NRFJammerItem {
 };
 
 enum IRMenuItem {
-    IR_TV_BE_GONE,
+    IR_TV_B_GONE,
     IR_BACK,
     IR_MENU_COUNT
 };
 
-enum IRTVBeGoneRegion {
-    IR_TV_BE_GONE_NA,
-    IR_TV_BE_GONE_EU,
-    IR_TV_BE_GONE_BACK,
-    IR_TV_BE_GONE_REGION_COUNT
+enum IRTVBGoneRegion {
+    IR_TV_B_GONE_NA,
+    IR_TV_B_GONE_EU,
+    IR_TV_B_GONE_BACK,
+    IR_TV_B_GONE_REGION_COUNT
 };
 
 MenuState currentState = MAIN_MENU;
-uint8_t currentSelection = 0;
-uint8_t maxSelections = MAIN_MENU_COUNT;
+uint16_t currentSelection = 0;
+uint16_t maxSelections = MAIN_MENU_COUNT;
 
 // Attack State
 unsigned long attackStartTime;
@@ -386,8 +386,8 @@ bool nrfScannerSetupOneShot = false;
 
 // IRSend
 
-TvBeGoneRegion irTvBeGoneRegion;
-bool starttvbegone = false;
+TvBeGoneRegion irTvBGoneRegion;
+bool starttvbgone = false;
 
 // System
 bool autoSleep = false;

@@ -12,16 +12,13 @@
 */
 
 #include <Arduino.h>
+#include <IRremoteESP8266.h>
 #include <IRSend.h>
 #include "configs.h"
-#include "modules/ir/tv_be_gone_code.h"
+#include "WORLD_IR_CODES.h"
 #include "core/utilsheader.h"
-#define NOPP __asm__ __volatile__("nop")
 
-uint8_t bitsleft_r = 0;
-uint8_t bits_r = 0;
-uint8_t code_ptr;
-uint16_t ontime, offtime;
+#define NOPP __asm__ __volatile__("nop")
 
 enum TvBeGoneRegion {
     NA = 0,
@@ -39,7 +36,7 @@ class IRSendModules {
 
         uint8_t begone_code_sended = 0;
         void main();
-        void startTVBeGone();
+        void startTVBGone();
 };
 
 #endif
