@@ -41,6 +41,7 @@ enum WiFiScanState {
     WIFI_ATTACK_AUTH,// ATTACK PROBE
     WIFI_ATTACK_EVIL_PORTAL,
     WIFI_ATTACK_EVIL_PORTAL_DEAUTH,
+    WIFI_ATTACK_KARMA,
     WIFI_ATTACK_BAD_MSG,
     WIFI_ATTACK_BAD_MSG_ALL
 };
@@ -85,11 +86,20 @@ struct Station {
     uint8_t mac[6];
     bool selected;
     uint16_t ap;
-  };
+};
+
+struct ProbeReqSsid {
+    String essid;
+    bool selected;
+    uint8_t requests;
+    uint8_t channel;
+    int8_t rssi;
+};
 
 extern LinkedList<AccessPoint>* access_points;
 extern LinkedList<AccessPoint>* deauth_flood_ap;
 extern LinkedList<Station>* device_station;
+extern LinkedList<ProbeReqSsid>* probe_req_ssids;
 
 extern bool wifiScanRedraw;
 

@@ -135,7 +135,11 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("BLE Exploit Atk", 0, 12);
 	else if (currentState == BLE_ATTACK_RUNNING)
 		display.displayStringwithCoordinates("BLE Attack", 0, 12);
-	else if (currentState == WIFI_SELECT_MENU || currentState == WIFI_SELECT_STA_AP_MENU || currentState == WIFI_SELECT_STA_MENU)
+	else if (currentState == WIFI_SELECT_MENU ||
+		 	 currentState == WIFI_SELECT_STA_AP_MENU ||
+			 currentState == WIFI_SELECT_STA_MENU ||
+			 currentState == WIFI_SELECT_PROBE_REQ_SSIDS_MENU
+	) 
 		display.displayStringwithCoordinates("WiFi Sel Menu", 0, 12);
 	else if (currentState == WIFI_GENERAL_MENU)
 		display.displayStringwithCoordinates("WiFi Gen Menu", 0, 12);
@@ -510,6 +514,7 @@ void displayWiFiMenu() {
 		"WiFi General",
 		"WiFi Select",
 		"WiFi Sta Select",
+		"WiFi Probe SSIDs Sel",
 		"WiFi Utils",
 		"WiFi Attack",
 		"< Back"
@@ -602,10 +607,6 @@ void displayWiFiSelectMenu() {
 			ap.bssid[0], ap.bssid[1], ap.bssid[2], 
 			ap.bssid[3], ap.bssid[4], ap.bssid[5]);
 			
-			// Truncate if too long
-			if (apInfo.length() > 14) {
-				apInfo = apInfo.substring(0, 18) + "...";
-			}
 
 			for (int i = 0; i < 4; i++) {
 				if (i == 0) items[i] = apInfo;
@@ -637,6 +638,32 @@ void displayWiFiSelectMenu() {
 	};
 
 	menuNode(items, sizeof(items) / sizeof(items[0]), "APs: ", errorText, access_points->size());
+}
+
+void displayWiFiSelectProbeReqSsidsMenu() {
+	displayStatusBar();
+
+	String items[3] = {};
+	
+	if (currentSelection < probe_req_ssids->size()) {
+
+		ProbeReqSsid ssid = probe_req_ssids->get(currentSelection);
+		String status = ssid.selected ? "[*] " : "[ ] ";
+		String ssidInfo = status + ssid.essid;	
+
+		for (int i = 0; i < 3; i++) {
+			if (i == 0) items[i] = ssidInfo;
+			else if (i == 1) items[i] = ("Ch:" + String(ssid.channel) + " R:" + String(ssid.rssi));
+			else if (i == 2) items[i] = ("Requests:" + String(ssid.requests));
+		}
+	}
+
+	String errorText[2] = {
+		"No Ssid found!",
+		"Scan First!"
+	};
+
+	menuNode(items, sizeof(items) / sizeof(items[0]), "Ssids: ", errorText, probe_req_ssids->size());
 }
 
 void displayWiFiSelectAptoSta() {
@@ -702,6 +729,7 @@ void displayWiFiAttackMenu() {
 		"AP Beacon",
 		"Evil Portal",
 		"Evil Portal Deauth",
+		"Karma",
 		"Target Bad Msg",
 		"Bad Msg",
 		"< Back"
@@ -788,8 +816,17 @@ void displayEvilPortalInfo() {
 			for (int i = 0; i < access_points->size(); i++) {
 				if (access_points->get(i).selected) {
 					display.displayStringwithCoordinates("Selected AP:", 0, 12);
-					display.displayStringwithCoordinates(access_points->get(i).essid, 0, 24, true);
+					display.displayStringwithCoordinates(access_points->get(i).essid, 0, 24);
 					display.displayStringwithCoordinates("Enable Deauth Sel AP", 0, 48, true);
+					break;
+				}
+			}
+		} else if (currentWiFiAttackType == WIFI_ATTACK_KARMA) {
+			for (int i = 0; i < probe_req_ssids->size(); i++) {
+				if (probe_req_ssids->get(i).selected) {
+					display.displayStringwithCoordinates("Selected Probe Ssid:", 0, 12);
+					display.displayStringwithCoordinates(probe_req_ssids->get(i).essid, 0, 24);
+					display.displayStringwithCoordinates("Enable Karma", 0, 48, true);
 					break;
 				}
 			}
@@ -1049,6 +1086,9 @@ void navigateUp() {
 		case WIFI_SELECT_MENU:
 			displayWiFiSelectMenu();
 			break;
+		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
+			displayWiFiSelectProbeReqSsidsMenu();
+			break;
 		case WIFI_SELECT_STA_AP_MENU:
 			displayWiFiSelectAptoSta();
 			break;
@@ -1068,7 +1108,6 @@ void navigateUp() {
 			displayIRTvBGoneRegionMenu();
 			break;
 	}
-	
 }
 
 void navigateDown() {
@@ -1126,6 +1165,9 @@ void navigateDown() {
 		case WIFI_SELECT_MENU:
 			displayWiFiSelectMenu();
 			break;
+		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
+			displayWiFiSelectProbeReqSsidsMenu();
+			break;
 		case WIFI_SELECT_STA_AP_MENU:
 			displayWiFiSelectAptoSta();
 			break;
@@ -1149,7 +1191,6 @@ void navigateDown() {
 }
 
 void selectCurrentItem() {
-   
 	switch(currentState) {
 		case MAIN_MENU:
 			if (currentSelection == MAIN_BLE) {
@@ -1383,6 +1424,15 @@ void selectCurrentItem() {
 					maxSelections = 1;
 				}
 				displayWiFiSelectMenu();
+			} else if (currentSelection == WIFI_PROBE_REQ_SSIDS_SELECT) {
+				currentState = WIFI_SELECT_PROBE_REQ_SSIDS_MENU;
+				currentSelection = 0;
+				if (probe_req_ssids && probe_req_ssids->size() > 0) {
+					maxSelections = probe_req_ssids->size() + 1;
+				} else {
+					maxSelections = 1;
+				}
+				displayWiFiSelectProbeReqSsidsMenu();
 			} else if (currentSelection == WIFI_STA_SELECT) {
 				currentState = WIFI_SELECT_STA_AP_MENU;
 				currentSelection = 0;
@@ -1539,6 +1589,20 @@ void selectCurrentItem() {
 				}
 			}
 			break;
+		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
+			if (!probe_req_ssids || probe_req_ssids->size() == 0) {
+				goBack();
+			} else {
+				if (currentSelection < probe_req_ssids->size()) {
+					ProbeReqSsid ssid = probe_req_ssids->get(currentSelection);
+					ssid.selected = !ssid.selected;
+					probe_req_ssids->set(currentSelection, ssid);
+					displayWiFiSelectProbeReqSsidsMenu();
+				} else {
+					goBack();
+				}
+			}
+			break;
 		case WIFI_SELECT_STA_AP_MENU:
 			if (!access_points || access_points->size() == 0) {
 				goBack();
@@ -1600,8 +1664,8 @@ void selectCurrentItem() {
 					 currentSelection == WIFI_ATK_BAD_MSG_ALL) && 
 					(!access_points || !hasSelectedAPs())) {
 					display.clearScreen();
-					display.displayStringwithCoordinates("NO APs SELECTED!", 0, 12);
-					display.displayStringwithCoordinates("Select APs first", 0, 21, true);
+					display.displayStringwithCoordinates("NO AP SELECTED!", 0, 12);
+					display.displayStringwithCoordinates("Select AP first", 0, 21, true);
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
 					displayWiFiAttackMenu();
 					return;
@@ -1611,10 +1675,20 @@ void selectCurrentItem() {
 				 	 currentSelection == WIFI_ATK_BAD_MSG) &&
 					(!device_station || !hasSelectedSTAs())) {
 					display.clearScreen();
-					display.displayStringwithCoordinates("NO STAs SELECTED!", 0, 12);
-					display.displayStringwithCoordinates("Select STAs first", 0, 21, true);
+					display.displayStringwithCoordinates("NO STA SELECTED!", 0, 12);
+					display.displayStringwithCoordinates("Select STA first", 0, 21, true);
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
 					displayWiFiAttackMenu();
+				}
+
+				if (currentSelection == WIFI_ATK_KARMA &&
+					(!probe_req_ssids || !hasSelectedProbeReqSSID())) {
+					display.clearScreen();
+					display.displayStringwithCoordinates("NO SSID SELECTED!", 0, 12);
+					display.displayStringwithCoordinates("Select SSID first", 0, 21, true);
+					vTaskDelay(2000 / portTICK_PERIOD_MS);
+					displayWiFiAttackMenu();
+					return;
 				}
 				
 				// Check memory before starting attack
@@ -1630,7 +1704,7 @@ void selectCurrentItem() {
 				
 				// Start WiFi attack
 				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_STA_BEACON,
-									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH, WIFI_ATTACK_BAD_MSG, WIFI_ATTACK_BAD_MSG_ALL};
+									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH, WIFI_ATTACK_KARMA, WIFI_ATTACK_BAD_MSG, WIFI_ATTACK_BAD_MSG_ALL};
 				startWiFiAttack(attackTypes[currentSelection]);
 			}
 			break;
@@ -1801,6 +1875,7 @@ void goBack() {
 				displayWiFiUtilsMenu();
 			}
 			break;
+		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
 		case WIFI_SELECT_STA_AP_MENU:
 		case WIFI_ATTACK_MENU:
 			currentState = WIFI_MENU;
@@ -2180,6 +2255,9 @@ void startWiFiAttack(WiFiScanState attackType) {
 	else if (attackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
 		strmode = "Evil Portal Deauth";
 	}
+	else if (attackType == WIFI_ATTACK_KARMA) {
+		strmode = "Karma";
+	}
 	else if (attackType == WIFI_ATTACK_BAD_MSG) {
 		strmode = "Target Bad Msg";
 	}
@@ -2194,7 +2272,8 @@ void startWiFiAttack(WiFiScanState attackType) {
 	digitalWrite(STA_LED, HIGH);
 
 	if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL ||
-		currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) displayEvilPortalInfo();
+		currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH ||
+		currentWiFiAttackType == WIFI_ATTACK_KARMA) displayEvilPortalInfo();
 	else if (currentWiFiAttackType == WIFI_ATTACK_DEAUTH_FLOOD) displayDeauthFloodInfo();
 	else displayAttackStatus();
 }
@@ -2208,7 +2287,8 @@ void startNRFJammer(NRFJammerMode jammer_mode) {
 	else if (jammer_mode == RC) strmode = "RC";
 	else if (jammer_mode == Video_Transmitter) strmode = "Video Transmitter";
 	else if (jammer_mode == Usb_Wireless) strmode = "USB Wireless";
-	else if (jammer_mode == Full_Channel) strmode = "Full Channel 1 . 100";
+	else if (jammer_mode == Drone) strmode = "Drone";
+	else if (jammer_mode == Full_Channel) strmode = "Full Channel 1 -> 100";
 
 	Serial.println("[INFO] Starting Jamming | Mode: " + strmode);
 
@@ -2289,7 +2369,9 @@ void stopCurrentAttack() {
 	if (currentState == BLE_ATTACK_RUNNING) {
 		ble.ShutdownBLE();
 	} else if (currentState == WIFI_ATTACK_RUNNING) {
-		if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL || currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
+		if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL ||
+			currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH ||
+			currentWiFiAttackType == WIFI_ATTACK_KARMA) {
 			eportal.shutdownServer();
 			evilPortalOneShot = false;
 		}
@@ -2346,7 +2428,7 @@ bool hasSelectedSTAs() {
 	
 	for (int i = 0; i < access_points->size(); i++) {
 		if (access_points->get(i).selected) {
-			for (int x = 0; i < access_points->get(i).stations->size(); x++) {
+			for (int x = 0; x < access_points->get(i).stations->size(); x++) {
 				if (device_station->get(access_points->get(i).stations->get(x)).selected) {
 					return true;
 				}
@@ -2355,6 +2437,20 @@ bool hasSelectedSTAs() {
 	}
 	return false;
 }
+
+bool hasSelectedProbeReqSSID() {
+	if (!probe_req_ssids || probe_req_ssids->size() == 0) {
+		return false;
+	}
+	
+	for (int i = 0; i < probe_req_ssids->size(); i++) {
+		if (probe_req_ssids->get(i).selected) {
+			return true;
+		}
+	}
+	return false;
+}
+
 
 void performReboot() {
 	Serial.println("[SYSTEM_REBOOT] Performing system reboot...");
@@ -2470,7 +2566,7 @@ void handleInput(MenuState handle_state) {
 			wifiScanRedraw = true;
 		}
 		else {
-			navigateUp();
+			if (handleStateRunningCheck) navigateUp();
 		}
 	}
 
@@ -2483,7 +2579,9 @@ void handleInput(MenuState handle_state) {
 			Serial.println("[INFO] Manually change channel to " + String(wifi.set_channel));
 			wifiScanRedraw = true;
 		}
-		else navigateDown();
+		else {
+			if (handleStateRunningCheck) navigateDown();
+		}
 	}
 }
 
@@ -2684,17 +2782,30 @@ void handleTasks(MenuState handle_state) {
 		} 
 		else if (handle_state == WIFI_ATTACK_RUNNING) {
 			// SỬA: Tách biệt xử lý Evil Portal và các WiFi attack khác
-			if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL || currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
+			if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL ||
+				currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH || 
+				currentWiFiAttackType == WIFI_ATTACK_KARMA) {
 				// Evil Portal handling
 
 				if (!evilPortalOneShot) {
-					bool _ap;
+					bool _ap = false;
 					Serial.println("[INFO] Starting Setup Portal");
-					if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
-						_ap = eportal.apSetup(true);
+					if (currentWiFiAttackType == WIFI_ATTACK_KARMA) {
+						for (int i = 0; i < probe_req_ssids->size(); i++) {
+							if (probe_req_ssids->get(i).selected) {
+								_ap = eportal.apSetup(probe_req_ssids->get(i).essid, false);
+								Serial.println("[INFO] Karma Mode Enable");
+								break;
+							}
+						}
 					} else {
-						_ap = eportal.apSetup(false);
+						if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
+							_ap = eportal.apSetup("", true);
+						} else {
+							_ap = eportal.apSetup("", false);
+						}
 					}
+					
 					bool _html = eportal.htmlSetup();
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					if (_ap && _html) {
@@ -2744,7 +2855,10 @@ void handleTasks(MenuState handle_state) {
 		}
 
 		// Update display every 1 second (not using with evil portal)
-		if (currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL && currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH && currentWiFiAttackType != WIFI_ATTACK_DEAUTH_FLOOD) {
+		if (currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL &&
+			currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
+			currentWiFiAttackType != WIFI_ATTACK_DEAUTH_FLOOD &&
+			currentWiFiAttackType != WIFI_ATTACK_KARMA) {
 			if (millis() - lastDisplayUpdate > 2000) {
 				displayAttackStatus();
 				wifi.packet_sent = 0;
@@ -2756,17 +2870,79 @@ void handleTasks(MenuState handle_state) {
 
 static unsigned long autoSleepTimer = 0;
 
+void redrawTasks() {
+	switch(currentState) {
+		case MAIN_MENU:
+			displayMainMenu();
+			break;
+		case BLE_MENU:
+			displayBLEMenu();
+			break;
+		case BLE_INFO_MENU_LIST:
+			displayBLEInfoListMenu();
+			break;
+		case BLE_INFO_MENU_DETAIL:
+			displayBLEInfoDetail();
+			break;
+		case BLE_SPOOFER_MAIN_MENU:
+			displayMainSpooferMenu();
+			break;
+		case BLE_SPOOFER_APPLE_MENU:
+			displayAppleSpooferMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_MENU:
+			displaySamsungSpooferMenu();
+			break;
+		case BLE_SPOOFER_GOOGLE_MENU:
+			displayGoogleSpooferMenu();
+			break;
+		case BLE_SPOOFER_AD_TYPE_MENU:
+			displayAdTypeSpooferMenu();
+			break;
+		case BLE_EXPLOIT_ATTACK_MENU:
+			displayExploitAttackBLEMenu();
+			break;
+		case WIFI_MENU:
+			displayWiFiMenu();
+			break;
+		case WIFI_GENERAL_MENU:
+			displayWiFiGeneralMenu();
+			break;
+		case WIFI_UTILS_MENU:
+			displayWiFiUtilsMenu();
+			break;
+		case WIFI_ATTACK_MENU:
+			displayWiFiAttackMenu();
+			break;
+		case WIFI_SELECT_MENU:
+			displayWiFiSelectMenu();
+			break;
+		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
+			displayWiFiSelectProbeReqSsidsMenu();
+			break;
+		case WIFI_SELECT_STA_AP_MENU:
+			displayWiFiSelectAptoSta();
+			break;
+		case WIFI_SELECT_STA_MENU:
+			displayWiFiSelectStaInAp();
+			break;
+		case NRF24_MENU:
+			displayNRF24Menu();
+			break;
+		case NRF24_JAMMER_MENU:
+			displayNRF24JammerMenu();
+			break;
+		case IR_MENU:
+			displayIRMenu();
+			break;
+		case IR_TV_B_GONE_REGION:
+			displayIRTvBGoneRegionMenu();
+			break;
+	}
+}
+
 void autoSleepCheck() {
-	if (!(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep mode when in attack mode 
-		!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
-		!(currentState == BLE_SCAN_RUNNING) &&
-		!(currentState == NRF24_ANALYZER_RUNNING) &&
-		!(currentState == NRF24_JAMMER_RUNNING) &&
-		!(currentState == NRF24_SCANNER_RUNNING) &&
-		!(currentState == WIFI_ATTACK_RUNNING) &&
-		!(currentState == BLE_ATTACK_RUNNING) &&
-		!(currentState == BLE_SPOOFER_RUNNING) &&
-		!(currentState == IR_SEND_RUNNING))  // prevent into deep sleep mode when in IR send mode
+	if (handleStateRunningCheck)  // prevent into deep sleep mode when in IR send mode
 	{
 		if (!selPress && !prevPress && !nextPress) { // auto deep sleep
 			if (autoSleepTimer == 0) { 
@@ -2789,6 +2965,16 @@ void autoSleepCheck() {
 }
 
 void menuloop() {
+	handleStateRunningCheck = !(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep mode when in attack mode 
+							!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
+							!(currentState == BLE_SCAN_RUNNING) &&
+							!(currentState == NRF24_ANALYZER_RUNNING) &&
+							!(currentState == NRF24_JAMMER_RUNNING) &&
+							!(currentState == NRF24_SCANNER_RUNNING) &&
+							!(currentState == WIFI_ATTACK_RUNNING) &&
+							!(currentState == BLE_ATTACK_RUNNING) &&
+							!(currentState == BLE_SPOOFER_RUNNING) &&
+							!(currentState == IR_SEND_RUNNING);
 	autoSleepCheck();
 	handleInput(currentState);
 	handleTasks(currentState);
@@ -2797,6 +2983,7 @@ void menuloop() {
 			if (check(selPress) || check(prevPress) || check(nextPress)) { // auto deep sleep
 				if (standby) standby = false;
 				autoSleepTimer = millis();
+				redrawTasks();
 				break;
 			}
 			display.clearScreen();

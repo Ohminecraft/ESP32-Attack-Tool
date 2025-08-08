@@ -12,6 +12,7 @@
 LinkedList<AccessPoint>* access_points;
 LinkedList<AccessPoint>* deauth_flood_ap;
 LinkedList<Station>* device_station;
+LinkedList<ProbeReqSsid>* probe_req_ssids;
 
 bool wifiScanRedraw = false;
 bool eapol_scan_send_deauth = false;
@@ -37,6 +38,7 @@ void WiFiModules::main() {
     access_points = new LinkedList<AccessPoint>();
 	deauth_flood_ap = new LinkedList<AccessPoint>();
 	device_station = new LinkedList<Station>();
+	probe_req_ssids = new LinkedList<ProbeReqSsid>();
 
 	esp_wifi_init(&cfg);
 	esp_wifi_set_mode(WIFI_AP_STA);
@@ -769,9 +771,31 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 			getMAC(addr, snifferPacket->payload, 10);
 			for (int i = 0; i < snifferPacket->payload[25]; i++)
 			{
-			Serial.print((char)snifferPacket->payload[26 + i]);
-			probe_req_essid.concat((char)snifferPacket->payload[26 + i]);
+				probe_req_essid.concat((char)snifferPacket->payload[26 + i]);
 			}
+
+			if (probe_req_essid.length() > 0) {
+				bool essidExist = false;
+				for (int i = 0; i < probe_req_ssids->size(); i++) {
+					ProbeReqSsid cur_probe_ssid = probe_req_ssids->get(i);
+					if (cur_probe_ssid.essid == probe_req_essid) {
+						cur_probe_ssid.requests++;
+					  	probe_req_ssids->set(i, cur_probe_ssid);
+						essidExist = true;
+						break;
+					}
+				}
+				if (!essidExist) {
+					ProbeReqSsid probeReqSsid;
+					probeReqSsid.essid = probe_req_essid;
+				  	probeReqSsid.requests = 1;
+					probeReqSsid.selected = false;
+					probeReqSsid.channel = snifferPacket->rx_ctrl.channel;
+					probeReqSsid.rssi = snifferPacket->rx_ctrl.rssi;
+				  	probe_req_ssids->add(probeReqSsid);
+				}
+			}
+
 			display_buffer->add(addr);
 			display_buffer->add("->" + probe_req_essid);
 			wifiScanRedraw = true;
@@ -907,6 +931,8 @@ void WiFiModules::StartBeaconScan() {
 }
 
 void WiFiModules::StartProbeReqScan() {
+	delete probe_req_ssids;
+	probe_req_ssids = new LinkedList<ProbeReqSsid>();
 	
 	Serial.println("[INFO] Starting Probe Request scan...");
 

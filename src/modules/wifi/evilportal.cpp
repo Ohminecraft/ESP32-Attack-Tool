@@ -132,34 +132,39 @@ bool EvilPortalAddtional::htmlSetup() {
     return true;
 }
 
-bool EvilPortalAddtional::apSetup(bool _deauth) {
+bool EvilPortalAddtional::apSetup(String essid, bool _deauth) {
     String ap_name = "";
     user_name = "";
     password = "";
-    for (int i = 0; i < access_points->size(); i++) {
-        if (access_points->get(i).selected) {
-            if (_deauth) {
-                memcpy(deauth_frame, wifi_obj.deauth_frame_packet, sizeof(wifi_obj.deauth_frame_packet));
-                esp_wifi_set_channel(access_points->get(i).channel, WIFI_SECOND_CHAN_NONE);
-                vTaskDelay(50 / portTICK_PERIOD_MS);
-                deauth_frame[10] = access_points->get(i).bssid[0];
-                deauth_frame[11] = access_points->get(i).bssid[1];
-                deauth_frame[12] = access_points->get(i).bssid[2];
-                deauth_frame[13] = access_points->get(i).bssid[3];
-                deauth_frame[14] = access_points->get(i).bssid[4];
-                deauth_frame[15] = access_points->get(i).bssid[5];
-            
-                deauth_frame[16] = access_points->get(i).bssid[0];
-                deauth_frame[17] = access_points->get(i).bssid[1];
-                deauth_frame[18] = access_points->get(i).bssid[2];
-                deauth_frame[19] = access_points->get(i).bssid[3];
-                deauth_frame[20] = access_points->get(i).bssid[4];
-                deauth_frame[21] = access_points->get(i).bssid[5];
+    if (essid == "") {
+        for (int i = 0; i < access_points->size(); i++) {
+            if (access_points->get(i).selected) {
+                if (_deauth) {
+                    memcpy(deauth_frame, wifi_obj.deauth_frame_packet, sizeof(wifi_obj.deauth_frame_packet));
+                    esp_wifi_set_channel(access_points->get(i).channel, WIFI_SECOND_CHAN_NONE);
+                    vTaskDelay(50 / portTICK_PERIOD_MS);
+                    deauth_frame[10] = access_points->get(i).bssid[0];
+                    deauth_frame[11] = access_points->get(i).bssid[1];
+                    deauth_frame[12] = access_points->get(i).bssid[2];
+                    deauth_frame[13] = access_points->get(i).bssid[3];
+                    deauth_frame[14] = access_points->get(i).bssid[4];
+                    deauth_frame[15] = access_points->get(i).bssid[5];
+                
+                    deauth_frame[16] = access_points->get(i).bssid[0];
+                    deauth_frame[17] = access_points->get(i).bssid[1];
+                    deauth_frame[18] = access_points->get(i).bssid[2];
+                    deauth_frame[19] = access_points->get(i).bssid[3];
+                    deauth_frame[20] = access_points->get(i).bssid[4];
+                    deauth_frame[21] = access_points->get(i).bssid[5];
+                }
+                ap_name = access_points->get(i).essid;
+                break;
             }
-            ap_name = access_points->get(i).essid;
-            break;
         }
+    } else {
+        ap_name = essid;
     }
+    
     if (ap_name == "") {
         Serial.println("[WARN] Cannot get selected AP Name, using default name instead");
         ap_name = "ESP32 Attack Tool";

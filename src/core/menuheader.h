@@ -52,6 +52,7 @@ enum MenuState {
     WIFI_SCAN_RUNNING,
     WIFI_SCAN_SNIFFER_RUNNING,
     WIFI_SELECT_MENU,
+    WIFI_SELECT_PROBE_REQ_SSIDS_MENU,
     WIFI_SELECT_STA_AP_MENU,
     WIFI_SELECT_STA_MENU,
     WIFI_ATTACK_MENU,
@@ -258,6 +259,7 @@ enum WiFiMenuItem {
     WIFI_GENERAL,
     WIFI_SELECT,
     WIFI_STA_SELECT,
+    WIFI_PROBE_REQ_SSIDS_SELECT,
     WIFI_UTILS,
     WIFI_ATTACK,
     WIFI_BACK,
@@ -298,6 +300,7 @@ enum WiFiAttackMenuItem {
     WIFI_ATK_AP_BEACON,
     WIFI_ATK_EVIL_PORTAL,
     WIFI_ATK_EVIL_PORTAL_DEAUTH,
+    WIFI_ATK_KARMA,
     WIFI_ATK_BAD_MSG,
     WIFI_ATK_BAD_MSG_ALL,
     WIFI_ATK_BACK,
@@ -393,6 +396,7 @@ bool starttvbgone = false;
 // System
 bool autoSleep = false;
 bool standby = false;
+bool handleStateRunningCheck = false; // Used to check if the handle state is running
 
 // Menu display functions
 void displayWelcome();
@@ -449,6 +453,7 @@ void nrfScanner();
 // Helper functions
 bool hasSelectedAPs();
 bool hasSelectedSTAs();
+bool hasSelectedProbeReqSSID();
         
 // System functions
 void performReboot();
