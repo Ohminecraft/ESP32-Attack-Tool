@@ -750,6 +750,7 @@ void displayNRF24JammerMenu() {
 		"RC",
 		"Video Transmitter",
 		"USB Wireless",
+		"Drone",
 		"Full Channel",
 		"< Back"
 	};
@@ -847,6 +848,9 @@ void displayNRFJammerStatus() {
 			break;
 		case Usb_Wireless:
 			attackName = "USB Wireless";
+			break;
+		case Drone:
+			attackName = "Drone";
 			break;
 		case Full_Channel:
 			attackName = "Full Channel";
@@ -1668,7 +1672,7 @@ void selectCurrentItem() {
 				}
 				
 				NRFJammerMode listjammermode[] = {Wifi, BLE, Bluetooth, Zigbee, RC, Video_Transmitter, 
-											Usb_Wireless, Full_Channel};
+											Usb_Wireless, Drone, Full_Channel};
 				currentNRFJammerMode = listjammermode[currentSelection];
 				startNRFJammer(currentNRFJammerMode);
 				displayNRFJammerStatus();
@@ -1974,6 +1978,7 @@ void goBack() {
 			maxSelections = NRF24_MENU_COUNT;
 			nrfScannerSetupOneShot = false;
 			display.setCursor(0, 0);
+			nrf.shutdownNRF();
 			displayNRF24Menu();
 			break;
 		case IR_MENU:

@@ -199,7 +199,7 @@ void DisplayModules::displayBuffer()
     }
     int y = 24; // Start at baseline position
     
-    if (display_buffer->size() > 4) display_buffer->shift();
+    while (display_buffer->size() > 4) display_buffer->shift();
 
     for (int i = 0; i < display_buffer->size(); i++)
     {

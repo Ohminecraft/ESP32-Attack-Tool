@@ -19,7 +19,7 @@
 #include "modules/ble/bleheader.h"
 #include "modules/wifi/wifiheader.h"
 #include "modules/wifi/evilportalheader.h"
-#include "modules/nrf24header.h"
+#include "modules/nrf24/nrf24header.h"
 #include "modules/ir/irsend_header.h"
 #include "modules/ir/irread_header.h"
 
@@ -320,6 +320,7 @@ enum NRFJammerItem {
     NRF24_JAM_RC,
     NRF24_JAM_VIDEO_TRANS,
     NRF24_JAM_USB_WIRELESS,
+    NRF24_JAM_DRONE,
     NRF24_JAM_FULL_CHAN,
     NRF24_JAM_BACK,
     NRF24_JAM_MENU_COUNT
