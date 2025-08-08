@@ -7,7 +7,7 @@
 #include <USB.h>
 
 #include <USBHIDKeyboard.h>
-#include <BLEKeyboard.h>
+#include "libs/Bad_Usb_Lib/BleKeyboard.h"
 
 #include "core/utilsheader.h"
 #include "configs.h"

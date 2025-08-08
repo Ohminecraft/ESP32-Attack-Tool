@@ -12,8 +12,13 @@
 */
 
 #include <Arduino.h>
+#include "configs.h"
+#ifdef USE_NIMBLE
 #include <NimBLEDevice.h>
 #include "esp_gap_ble_api.h"
+#else
+#include <BLEDevice.h>
+#endif
 
 #include <LinkedList.h>
 
@@ -41,8 +46,6 @@ enum BLEScanState {
     BLE_ATTACK_GOOGLE
 };
 
-#define SCANTIME 5
-
 #define SERVICE_UUID "1bc68b2a-f3e3-11e9-81b4-2a2ae2dbcce4"
 
 enum EBLEPayloadType
@@ -54,9 +57,15 @@ enum EBLEPayloadType
     Google
 };
 
+#ifndef USE_NIMBLE
+#define ADV_MODE_NON 0
+#define ADV_MODE_IND 1
+#define ADV_MODE_SCAN 2
+#else
 #define ADV_MODE_NON 0
 #define ADV_MODE_DIR 1
 #define ADV_MODE_UND 2
+#endif
 
 #define BLE_SPOOFER_DEVICE_BRAND_APPLE 0
 #define BLE_SPOOFER_DEVICE_BRAND_SAMSUNG 1
@@ -65,7 +74,11 @@ enum EBLEPayloadType
 struct BLEScanResult {
     String name;
     int rssi;
-    NimBLEAddress addr;
+    #ifdef USE_NIMBLE
+    BLEAddress addr;
+    #else
+    String addr;
+    #endif
 };
 
 extern LinkedList<BLEScanResult>* blescanres;
@@ -357,13 +370,9 @@ extern bool bleScanRedraw;
 
 class BLEModules {
     private:
-        NimBLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
-        static void scanCompleteCB(NimBLEScanResults scanResults);
+        BLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
+        static void scanCompleteCB(BLEScanResults scanResults);
     public:
-        bool ble_initialized = false;
-
-        // Constructor and Destructor
-        BLEModules() : ble_initialized(false) {}
         
         ~BLEModules() {
             ShutdownBLE();
@@ -375,7 +384,7 @@ class BLEModules {
         void initSpoofer();
         void initSpam();
 
-        NimBLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
+        BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
         void startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
         void stopSpoofer();
 

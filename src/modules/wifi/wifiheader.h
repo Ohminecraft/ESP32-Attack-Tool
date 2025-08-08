@@ -319,9 +319,6 @@ class WiFiModules
         void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);;
 
     public:
-        bool wifi_initialized = false;  
-
-        WiFiModules() : wifi_initialized(false) {}
 
         ~WiFiModules() {
             //setMac();

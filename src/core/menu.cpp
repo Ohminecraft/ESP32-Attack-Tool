@@ -282,8 +282,12 @@ void displayBLEInfoListMenu() {
 	if (currentSelection < blescanres->size()) {
 		BLEScanResult bledevice = blescanres->get(currentSelection);
 		ble_title = bledevice.name;
+		#ifdef USE_NIMBLE
 		if (ble_title == "<no name>") ble_title = bledevice.addr.toString().c_str();
-			// Truncate if too long
+		#else
+		if (ble_title == "<no name>") ble_title = bledevice.addr;
+		#endif
+		// Truncate if too long
 		if (ble_title.length() > 17)
 			ble_title = ble_title.substring(0, 18) + "...";
 	}
@@ -304,7 +308,11 @@ void displayBLEInfoDetail() {
 
 	BLEScanResult res = blescanres->get(currentSelection);
 	String nameStr = res.name;
+	#ifdef USE_NIMBLE
 	String addrStr = res.addr.toString().c_str();
+	#else
+	String addrStr = res.addr;
+	#endif
 	String rssiStr = "RSSI: " + String(res.rssi);
 
 	display.displayStringwithCoordinates(nameStr, 0, 24);
@@ -476,9 +484,15 @@ void displayAdTypeSpooferMenu() {
 	displayStatusBar();
 
 	String items[BLE_SPO_AD_TYPE_COUNT] = {
+		#ifndef USE_NIMBLE
+		"Type NON",
+		"Type IND",
+		"Type SCAN",
+		#else
 		"Type NON",
 		"Type DIR",
 		"Type UND",
+		#endif
 		"< Back"
 	};
 
@@ -2013,7 +2027,8 @@ void goBack() {
 				currentSelection = 0;
 				maxSelections = BLE_SPO_GOOGLE_COUNT;
 				displayGoogleSpooferMenu();
-			} 
+			}
+			ble.stopSpoofer();
 			break;
 		case WIFI_ATTACK_RUNNING:
 			stopCurrentAttack();
@@ -2465,12 +2480,13 @@ void performReboot() {
 	}
 	
 	// Shutdown BLE
-	if (ble.ble_initialized) {
+	if (ble_initialized) {
 		ble.ShutdownBLE();
+
 	}
 	
 	// Shutdown WiFi
-	if (wifi.wifi_initialized) {
+	if (wifi_initialized) {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
 	
@@ -2503,12 +2519,12 @@ void performDeepSleep() {
 	}
 	
 	// Shutdown BLE
-	if (ble.ble_initialized) {
+	if (ble_initialized) {
 		ble.ShutdownBLE();
 	}
 	
 	// Shutdown WiFi
-	if (wifi.wifi_initialized) {
+	if (wifi_initialized) {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
 

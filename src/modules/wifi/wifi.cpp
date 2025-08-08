@@ -44,7 +44,7 @@ void WiFiModules::main() {
 	esp_wifi_set_mode(WIFI_AP_STA);
 	esp_wifi_start();
 	//WiFi.mode(WIFI_AP_STA);
-	this->wifi_initialized = true;
+	wifi_initialized = true;
 	Serial.println("[INFO] WiFi initialized successfully");
 	esp_wifi_get_mac(WIFI_IF_AP, this->ap_mac);
 	esp_wifi_get_mac(WIFI_IF_STA, this->sta_mac);
@@ -59,7 +59,7 @@ void WiFiModules::main() {
 }
 
 bool WiFiModules::ShutdownWiFi() {
-	if (this->wifi_initialized) {
+	if (wifi_initialized) {
 
 		if (eapol_scan_send_deauth) eapol_scan_send_deauth = false;
 
@@ -74,7 +74,7 @@ bool WiFiModules::ShutdownWiFi() {
 		esp_wifi_restore();
 		esp_wifi_deinit();
 		esp_netif_deinit();
-		this->wifi_initialized = false;
+		wifi_initialized = false;
 
 		Serial.println("[INFO] WiFi shutdown successfully");
 		return true;
@@ -160,7 +160,7 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 
 void WiFiModules::StartMode(WiFiScanState mode) {
 	if (mode == WIFI_SCAN_OFF) {
-		if (this->wifi_initialized) this->ShutdownWiFi();
+		if (wifi_initialized) this->ShutdownWiFi();
 		this->packet_sent = 0;
 		Serial.println("[INFO] WiFi scan mode is OFF, WiFi shutdown.");
 	}
@@ -254,7 +254,7 @@ void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
 	//esp_wifi_set_promiscuous(true);
 	esp_wifi_set_max_tx_power(82);
 	this->packet_sent = 0;
-	this->wifi_initialized = true;
+	wifi_initialized = true;
 	Serial.println("[INFO] WiFi re-initialized successfully");
 	Serial.println("[INFO] Ready to attack!");
 }
@@ -1004,7 +1004,7 @@ void WiFiModules::StartEapolScan() {
 	esp_wifi_set_promiscuous_filter(&filt);
 	esp_wifi_set_promiscuous_rx_cb(&eapolSnifferCallback);
 	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
-	this->wifi_initialized = true;
+	wifi_initialized = true;
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
@@ -1125,7 +1125,7 @@ void WiFiModules::StartAPWiFiScanOld() { // using old scan to scan wifi
 
 // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp
 void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
 		return;
 	}
@@ -1182,7 +1182,7 @@ void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
 }
 
 void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
 		return;
 	}
@@ -1233,7 +1233,7 @@ void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 }
 
 void WiFiModules::sendBeaconRandomSSID() {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
 		return;
 	}
@@ -1278,7 +1278,7 @@ void WiFiModules::sendBeaconRandomSSID() {
 }
 
 void WiFiModules::sendDeauthAttack() {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send deauth frame.");
 		return;
 	}
@@ -1324,7 +1324,7 @@ void WiFiModules::sendDeauthAttack() {
 }
 
 void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]) {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send deauth frame.");
 		return;
 	}

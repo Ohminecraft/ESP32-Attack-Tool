@@ -4,6 +4,14 @@
 // BOARD CONFIGURATION //
 #define BOARD_ESP32_C3_MINI
 
+// BLE Configuration //
+/*
+    Using NimBLE Arduino Library For Better Life Time And Efficiency
+    If You Want To Use ESP32 BLE Library, Just Comment This Line
+    Use Original ESP32 BLE Library For Better Spoofer Experience
+*/
+#define USE_NIMBLE 
+
 // SCREEN CONFIGURATION //
 #define SCR_WIDTH 128
 #define SCR_HEIGHT 64
