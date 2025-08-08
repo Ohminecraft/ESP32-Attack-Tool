@@ -77,4 +77,13 @@
     #define NRF24_MISO_PIN 5
     #define NRF24_SCK_PIN 4
 #endif
+
+// IR Configuration //
+#ifdef BOARD_ESP32
+    #define IR_PIN 15
+    #define IR_RX_PIN 16 // RX PIN
+#elif defined(BOARD_ESP32_C3_MINI)
+    #define IR_PIN 20 // RX PIN in Esp32-C3-MINI
+    #define IR_RX_PIN 21 // TX PIN in Esp32-C3-MINI
+#endif
 #endif

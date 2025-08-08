@@ -59,7 +59,17 @@ bool checkLeftMemory() {
 
 void getMAC(char *addr, uint8_t* data, uint16_t offset) {
 	sprintf(addr, "%02x:%02x:%02x:%02x:%02x:%02x", data[offset+0], data[offset+1], data[offset+2], data[offset+3], data[offset+4], data[offset+5]);
-  }
+}
+
+void generateRandomMac(uint8_t* mac) {
+	// Set the locally administered bit and unicast bit for the first byte
+	mac[0] = 0x02; // The locally administered bit is the second least significant bit
+  
+	// Generate the rest of the MAC address
+	for (int i = 1; i < 6; i++) {
+	  mac[i] = random(0, 255);
+	}
+}
 
 String macToString(uint8_t macAddr[6]) {
 	char macStr[18]; // 17 characters for "XX:XX:XX:XX:XX:XX" + 1 null terminator
@@ -67,12 +77,6 @@ String macToString(uint8_t macAddr[6]) {
 	  macAddr[0], macAddr[1], macAddr[2], 
 	  macAddr[3], macAddr[4], macAddr[5]);
 	return String(macStr);
-}
-	
-void generateRandomMac(uint8_t* mac) {
-	esp_fill_random(mac, 6); // Fill MAC address with random bytes
-    mac[0] &= 0xFE; // Unicast MAC address (least significant bit of the first byte should be 0)
-    mac[0] |= 0x02; // Locally administered MAC address (set the second least significant bit)
 }
 	
 void setBaseMacAddress(uint8_t macAddr[6]) {

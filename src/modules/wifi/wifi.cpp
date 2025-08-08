@@ -45,10 +45,14 @@ void WiFiModules::main() {
 	this->wifi_initialized = true;
 	Serial.println("[INFO] WiFi initialized successfully");
 	esp_wifi_get_mac(WIFI_IF_AP, this->ap_mac);
+	esp_wifi_get_mac(WIFI_IF_STA, this->sta_mac);
 	this->setMac();
 	Serial.printf("[INFO] AP MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n", 
 				this->ap_mac[0], this->ap_mac[1], this->ap_mac[2],
 				this->ap_mac[3], this->ap_mac[4], this->ap_mac[5]);
+	Serial.printf("[INFO] STA MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
+				this->sta_mac[0], this->sta_mac[1], this->sta_mac[2],
+				this->sta_mac[3], this->sta_mac[4], this->sta_mac[5]);
 	this->ShutdownWiFi();
 }
 
@@ -161,6 +165,9 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 	else if (mode == WIFI_SCAN_AP) {
 		this->StartAPWiFiScan();
 	}
+	else if (mode == WIFI_SCAN_AP_OLD) {
+		this->StartAPWiFiScanOld();
+	}
 	else if (mode == WIFI_SCAN_AP_STA) {
 		this->StartAPStaWiFiScan();
 	}
@@ -259,6 +266,12 @@ void WiFiModules::setMac() {
         Serial.printf("[WARN] Failed to set AP MAC: %s | 0x%X\n", macToString(this->ap_mac).c_str(), result);
   	else if ((currentWiFiMode == WIFI_MODE_AP) || (currentWiFiMode == WIFI_MODE_NULL))
     	Serial.printf("[INFO] Successfully set AP MAC: %s\n", macToString(this->ap_mac).c_str());
+	result = esp_wifi_set_mac(WIFI_IF_STA, this->sta_mac);
+	if ((result != ESP_OK) &&
+	  ((currentWiFiMode == WIFI_MODE_STA) || (currentWiFiMode == WIFI_MODE_NULL)))
+		Serial.printf("[WARN] Failed to set STA MAC: %s | 0x%X\n", macToString(this->sta_mac).c_str(), result);
+  	else if ((currentWiFiMode == WIFI_MODE_STA) || (currentWiFiMode == WIFI_MODE_NULL))
+		Serial.printf("[INFO] Successfully set STA MAC: %s\n", macToString(this->sta_mac).c_str());
 }
 
 void WiFiModules::changeChannel() {
@@ -277,7 +290,7 @@ void WiFiModules::channelHop() {
 }
 
 void WiFiModules::channelRandom() {
-	this->set_channel = (rand() % 14) + 1;
+	this->set_channel = random(14) + 1;
 	esp_wifi_set_channel(this->set_channel, WIFI_SECOND_CHAN_NONE);
 	//Serial.printf("Channel channel to %d using channel random\n", this->set_channel);
 	vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -294,7 +307,7 @@ void WiFiModules::StartDeauthFlood() {
 
 		deauth_flood_scan_one_shot = true;
 
-		int numNetworks = WiFi.scanNetworks(false, true); // use original scan for deauth flood
+		int numNetworks = WiFi.scanNetworks(false, true); // use old scan for deauth flood
 
 		Serial.println("[INFO] Deauth WiFi Scan Done! Total: " + String(numNetworks) + " Found!");
 
@@ -1011,6 +1024,77 @@ void WiFiModules::StartAPWiFiScan() {
 	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
 	wifi_initialized = true;
     vTaskDelay(100 / portTICK_PERIOD_MS);
+}
+
+void WiFiModules::StartAPWiFiScanOld() { // using old scan to scan wifi
+	delete access_points;
+    access_points = new LinkedList<AccessPoint>();
+
+    Serial.println("[INFO] Starting WiFi scan (Old)...");
+    
+    WiFi.mode(WIFI_STA);
+	wifi_initialized = true;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    
+    int numNetworks = WiFi.scanNetworks(false, true);
+    
+    if (numNetworks == -1) {
+        Serial.println("[ERROR] WiFi scan failed or No network found!");
+        return;
+    }
+    
+    Serial.println("[INFO] WiFi Scan Done! Total: " + String(numNetworks) + " Found!");
+    
+    for (int i = 0; i < numNetworks; i++) {
+        AccessPoint ap;
+        ap.essid = WiFi.SSID(i);
+        ap.channel = static_cast<uint8_t>(WiFi.channel(i));
+        
+        uint8_t* bssid = WiFi.BSSID(i);
+        if (bssid != nullptr) {
+            memcpy(ap.bssid, bssid, 6);
+        } else {
+            memset(ap.bssid, 0, 6);
+        }
+
+		if (ap.essid.isEmpty()) {
+			ap.essid = macToString(ap.bssid);
+		}
+
+        wifi_auth_mode_t old_security_type = WiFi.encryptionType(i);
+		uint8_t security_type = -1;
+		switch (old_security_type) {
+            case WIFI_AUTH_OPEN: security_type = WIFI_SECURITY_OPEN; break;
+            case WIFI_AUTH_WEP: security_type = WIFI_SECURITY_WEP; break;
+            case WIFI_AUTH_WPA_PSK: security_type = WIFI_SECURITY_WPA; break;
+            case WIFI_AUTH_WPA2_PSK: security_type = WIFI_SECURITY_WPA2; break;
+            case WIFI_AUTH_WPA_WPA2_PSK: security_type = WIFI_SECURITY_WPA_WPA2_MIXED; break;
+            case WIFI_AUTH_WPA2_ENTERPRISE: security_type = WIFI_SECURITY_WPA2_ENTERPRISE; break;
+			case WIFI_AUTH_WPA3_PSK: security_type = WIFI_SECURITY_WPA3; break;
+			case WIFI_AUTH_WAPI_PSK: security_type = WIFI_SECURITY_WAPI; break;
+            default: security_type = -1; break;
+        }
+		ap.wpa = security_type;
+		switch(security_type) {
+			case WIFI_SECURITY_OPEN: ap.wpastr = "Open"; break;
+			case WIFI_SECURITY_WEP: ap.wpastr = "WEP"; break;
+			case WIFI_SECURITY_WPA: ap.wpastr = "WPA"; break;
+			case WIFI_SECURITY_WPA2: ap.wpastr = "WPA2"; break;
+			case WIFI_SECURITY_WPA2_ENTERPRISE: ap.wpastr = "WPA2/Enterprise"; break;
+			case WIFI_SECURITY_WPA3: ap.wpastr = "WPA3"; break;
+			case WIFI_SECURITY_WPA_WPA2_MIXED: ap.wpastr = "WPA/WPA2 Mixed"; break;
+			case WIFI_SECURITY_WAPI: ap.wpastr = "WAPI"; break;
+		}
+        ap.selected = false;
+        ap.rssi = static_cast<int8_t>(WiFi.RSSI(i));
+        access_points->add(ap);
+        
+        Serial.println("[INFO] Added: " + ap.essid + " (Ch:" + String(ap.channel) + ")" + " (Enc:" + ap.wpastr + ")");
+    }
+    
+    WiFi.scanDelete();
+    
+    Serial.println("[INFO] Scan completed successfully! Networks in list: " + String(access_points->size()));
 }
 
 // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp

@@ -39,6 +39,8 @@ const unsigned long saveInterval = 5000;
 
 byte sensorArray[129];
 
+const char write_text[] = "xxxxxxxxxxxxxxxx";
+
 const byte bluetooth_channels[] =        {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
 const byte ble_channels[] =              {2, 26, 80};
 const byte WiFi_channels[] =             {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
@@ -70,16 +72,14 @@ enum NRFJammerMode {
 class NRF24Modules
 {
     private:
-        byte getRegister(byte r);
-        void setRegister(byte r, byte v);
+        byte getRegister(SPIClass &SPIIN, byte r);
+        void setRegister(SPIClass &SPIIN, byte r, byte v);
         void setRX();
-        void writeRegister(uint8_t reg, uint8_t value);
-        uint8_t readRegister(uint8_t reg);
+        void writeRegister(SPIClass &SPIIN, uint8_t reg, uint8_t value);
+        uint8_t readRegister(SPIClass &SPIIN, uint8_t reg);
     public:
         void initNRF();
         void shutdownNRF();
-        void enableCE();
-        void disableCE();
         void analyzerScanChannels();
         void setChannel(uint8_t channel);
         bool carrierDetected();
