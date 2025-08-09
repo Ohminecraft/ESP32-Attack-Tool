@@ -491,7 +491,10 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					essid = bssid;
 				}
 
+				if (!low_memory_warning)
 				display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+				else
+				display_buffer->add("Low Mem! Ignore!");
 				wifiScanRedraw = true;
 
 				String wpastr = "";
@@ -521,9 +524,14 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
-				access_points->add(_temp_ap);
-				Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
-				+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				if (!low_memory_warning) {
+					access_points->add(_temp_ap);
+					Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				} else {
+					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ") - Not added to list");
+				}
 			}
 		}
 	}
@@ -579,7 +587,10 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					essid = bssid;
 				}
 
+				if (!low_memory_warning)
 				display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+				else
+				display_buffer->add("Low Mem! Ignore!");
 				wifiScanRedraw = true;
 
 				String wpastr = "";
@@ -609,9 +620,15 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
-				access_points->add(_temp_ap);
-				Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
-				+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				if (!low_memory_warning) {
+					access_points->add(_temp_ap);
+					Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				} else {
+					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				}
+				
 			}
 		}
 	}
@@ -699,8 +716,8 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 						snifferPacket->payload[frame_offset + 5]},
 						false
 						};
-
-		device_station->add(sta);
+		
+		if (!low_memory_warning) device_station->add(sta);
 			
 		char sta_addr[] = "00:00:00:00:00:00";
 			
@@ -711,13 +728,23 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 			getMAC(sta_addr, snifferPacket->payload, 10);
 		}
 
-		Serial.println("[INFO] Added Station " + String(sta_addr)  +" -> Ap:" + access_points->get(ap_index).essid);
-		display_buffer->add(String(sta_addr));
-		display_buffer->add("->" + access_points->get(ap_index).essid);
+		if (!low_memory_warning) {
+			Serial.println("[INFO] Added Station " + String(sta_addr)  +" -> Ap:" + access_points->get(ap_index).essid);
+			display_buffer->add(String(sta_addr));
+			display_buffer->add("->" + access_points->get(ap_index).essid);
+		} else {
+			Serial.println("[WARN] Low Memory! Ignore Station " + String(sta_addr) + " -> Ap:" + access_points->get(ap_index).essid + " not added to display buffer!");
+			display_buffer->add("Low Mem! Ignore!");
+		}
+		
 		wifiScanRedraw = true;
 
 		AccessPoint ap = access_points->get(ap_index);
-		ap.stations->add(device_station->size() - 1);
+
+		if (!low_memory_warning) {
+			ap.stations->add(device_station->size() - 1);
+		}
+		
 
 		access_points->set(ap_index, ap);
 	}
@@ -792,12 +819,16 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					probeReqSsid.selected = false;
 					probeReqSsid.channel = snifferPacket->rx_ctrl.channel;
 					probeReqSsid.rssi = snifferPacket->rx_ctrl.rssi;
-				  	probe_req_ssids->add(probeReqSsid);
+					if (!low_memory_warning) {
+				  		probe_req_ssids->add(probeReqSsid);
+					}
 				}
 			}
 
-			display_buffer->add(addr);
-			display_buffer->add("->" + probe_req_essid);
+			if (!low_memory_warning) {
+				display_buffer->add(addr);
+				display_buffer->add("->" + probe_req_essid);
+			} else display_buffer->add("Low Mem! Ignore!");
 			wifiScanRedraw = true;
 			Serial.println("[INFO] Probe Detected! Client:" + String(addr) + " Requesting: (CH:" + String(snifferPacket->rx_ctrl.channel) \
 			+ ") " + probe_req_essid + " RSSI: " + String(snifferPacket->rx_ctrl.rssi));

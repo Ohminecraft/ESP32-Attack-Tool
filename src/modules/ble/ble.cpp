@@ -284,9 +284,7 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    //uint8_t macAddr[6];
-    //generateRandomMac(macAddr);
-    //esp_base_mac_addr_set(macAddr);
+
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER);
     #ifndef USE_NIMBLE
     BLEDevice::init("ESP32 Attack Tool"); 
@@ -351,9 +349,7 @@ void BLEModules::stopSpoofer() {
 }
 
 void BLEModules::initSpam() {
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, MAX_TX_POWER); 
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER); 
-    esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_SCAN , MAX_TX_POWER);
 
     esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
     #ifdef USE_NIMBLE
@@ -364,52 +360,37 @@ void BLEModules::initSpam() {
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }
 
-/*
-void BLEModules::executeAppleSpam(EBLEPayloadType apple_mode)
-{
-    uint8_t macAddr[6];
-    generateRandomMac(macAddr);
-    esp_base_mac_addr_set(macAddr);
-    BLEDevice::init("");
-    BLEServer *pServer = BLEDevice::createServer();
-    pAdvertising = pServer->getAdvertising();
-    vTaskDelay(40 / portTICK_PERIOD_MS);
-    BLEAdvertisementData advertisementData;
-    if (apple_mode == AppleJuice) advertisementData = this->GetAdvertismentData(AppleJuice);
-    else advertisementData = this->GetAdvertismentData(SourApple);
-    //pAdvertising->addServiceUUID(SERVICE_UUID);
-    pAdvertising->setAdvertisementData(advertisementData);
-    pAdvertising->start();
-    vTaskDelay(20 / portTICK_PERIOD_MS);
-    pAdvertising->stop();
-    BLEDevice::deinit();
-}
-*/
-
 void BLEModules::executeSwiftpair(EBLEPayloadType type)
 {
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     esp_base_mac_addr_set(macAddr);
-    #ifndef USE_NIMBLE
     esp_bd_addr_t dummy_addr = {0x00};
       for (int i = 0; i < 6; i++) {
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
     }
-    #endif
+    esp_ble_gap_set_rand_addr(dummy_addr);
     BLEDevice::init("");
     BLEServer *pServer = BLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
     vTaskDelay(40 / portTICK_PERIOD_MS);
     BLEAdvertisementData advertisementData = GetAdvertismentData(type);
+    pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
     #ifndef USE_NIMBLE
     pAdvertising->setDeviceAddress(dummy_addr, BLE_ADDR_TYPE_RANDOM);
     #endif
+    pAdvertising->setMinInterval(0x20);
+    pAdvertising->setMaxInterval(0x20);
+    pAdvertising->setMinPreferred(0x20);
+    pAdvertising->setMaxPreferred(0x20);
     pAdvertising->start();
-    vTaskDelay(20 / portTICK_PERIOD_MS);
+    if (type == AppleJuice) vTaskDelay(APPLE_JUICE_SPAM_DELAY / portTICK_PERIOD_MS);
+    else if (type == SourApple) vTaskDelay(SOUR_APPLE_SPAM_DELAY / portTICK_PERIOD_MS);
+    else vTaskDelay(SWIFTPAIR_SPAM_DELAY / portTICK_PERIOD_MS);
     pAdvertising->stop();
+    vTaskDelay(10 / portTICK_PERIOD_MS);
     BLEDevice::deinit();
 }
 
@@ -424,14 +405,19 @@ class BLEScanDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
         else bleres.name = ble_name;
         bleres.rssi = advertisedDevice->getRSSI();
         bleres.addr = advertisedDevice->getAddress();
-        blescanres->add(bleres);
+        if (!low_memory_warning)
+            blescanres->add(bleres);
         String add_to_buffer;
-        if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr.toString().c_str());
-        else add_to_buffer = ble_name;
+        if (!low_memory_warning) {
+            if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr.toString().c_str());
+            else add_to_buffer = ble_name;
+        } else add_to_buffer = String("Low Mem! Ignore!");
+        
         //if (display_buffer->size() > 4)
         //    display_buffer->shift();
         display_buffer->add(add_to_buffer);
-        Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+        if (!low_memory_warning) Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+        else Serial.println("[INFO] Low Memory Warning! Ignore: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
     }
     #else
     void onResult(BLEAdvertisedDevice advertisedDevice) override {
@@ -477,11 +463,5 @@ void BLEModules::bleScan() {
 
     Serial.println("[INFO] Starting BLE Scan");
     pBLEScan->start(0, scanCompleteCB, false);
-    
-    //Serial.println("[INFO] BLE Scan Done! Found: " + String(foundDevices.getCount()) + " Devices!");
-
-    //this->ShutdownBLE();
-
-    //Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
 }
 

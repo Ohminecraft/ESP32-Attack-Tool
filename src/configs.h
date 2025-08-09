@@ -2,17 +2,22 @@
 #define CONFIGS_H
 
 // BOARD CONFIGURATION //
+
 #define BOARD_ESP32_C3_MINI
 
 // BLE Configuration //
 /*
-    Using NimBLE Arduino Library For Better Life Time And Efficiency
+    Using NimBLE Arduino Library For Better Battery Life Time And Efficiency
     If You Want To Use ESP32 BLE Library, Just Comment This Line
     Use Original ESP32 BLE Library For Better Spoofer Experience
 */
-#define USE_NIMBLE 
+#define USE_NIMBLE
+#define SOUR_APPLE_SPAM_DELAY 20
+#define APPLE_JUICE_SPAM_DELAY 400
+#define SWIFTPAIR_SPAM_DELAY 10
 
 // SCREEN CONFIGURATION //
+
 #define SCR_WIDTH 128
 #define SCR_HEIGHT 64
 #define _I2C_SCREEN
@@ -44,7 +49,9 @@
         #define RST_PIN -1
     #endif
 #endif
+
 // LED CONFIGURATION //
+
 #ifdef BOARD_ESP32_C3_MINI
     #define STA_LED 21 // Not Using
 #elif BOARD_ESP32
@@ -52,15 +59,14 @@
 #endif
 
 
-// ENCODER CONFIGURATION //
+// INPUT CONFIGURATION //
+
 #define USING_ENCODER
+//#define USING_BUTTON
 
 #define ENC_PIN_A 2
 #define ENC_PIN_B 1
 #define ENC_BTN 0
-
-// BUTTON CONFIGURATION //
-//#define USING_BUTTON
 
 #define LEFT_BTN 1
 #define RIGHT_BTN 2
@@ -72,6 +78,7 @@
 #endif
 
 // NRF24 CONFIGURATION //
+
 #if defined(BOARD_ESP32)
     #define NRF24_CE_PIN 8
     #define NRF24_CSN_PIN 17
@@ -87,6 +94,7 @@
 #endif
 
 // IR Configuration //
+
 #ifdef BOARD_ESP32
     #define IR_PIN 15
     #define IR_RX_PIN 16 // RX PIN

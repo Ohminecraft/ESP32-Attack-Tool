@@ -2199,7 +2199,7 @@ void nrfOutputScanChannel() {
 	display.setCursor(12, 12);
 	display.printString("[" + String(norm) + "]");
 	display.sendDisplay();
-}
+}        
 
 void nrfScanner() {
 	if (selPress) {
@@ -2765,17 +2765,7 @@ void handleTasks(MenuState handle_state) {
 	else if (handle_state == BLE_ATTACK_RUNNING || handle_state == WIFI_ATTACK_RUNNING) {
 		static unsigned long lastDisplayUpdate = 0;
 		static unsigned long lastMemoryCheck = 0;
-		
-		// Memory check
-		if (millis() - lastMemoryCheck > 5000) {
-			if (!checkLeftMemory()) {
-				Serial.println("[WARN] Low memory detected, stopping attack");
-				stopCurrentAttack();
-				return;
-			}
-			lastMemoryCheck = millis();
-		}
-		
+
 		if (handle_state == BLE_ATTACK_RUNNING) {
 			// BLE attack handling...
 			switch(currentBLEAttackType) {
@@ -3008,22 +2998,22 @@ void menuloop() {
 		}
 	}
 	// Check for critical low memory and auto-reboot
-	static unsigned long lastMemoryCheck = 0;
-	if (millis() - lastMemoryCheck > 3000) { // Check every 3 seconds
-		if (getHeap(GET_FREE_HEAP) < MEM_LOWER_LIM) { // Critical low memory threshold
-			Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Auto-rebooting...");
-			display.clearScreen();
-			display.displayStringwithCoordinates("CRITICAL LOW MEM!", 0, 12);
-			display.displayStringwithCoordinates("AUTO REBOOTING...", 0, 21, true);
-			vTaskDelay(2000 / portTICK_PERIOD_MS);
-			wifi.StartMode(WIFI_SCAN_OFF);
-			ble.ShutdownBLE();
-			nrf.shutdownNRFJammer();
-			nrf.shutdownNRF();
+	if (getHeap(GET_FREE_HEAP) < MEM_LOWER_LIM) { // Critical low memory threshold
+		if (!low_memory_warning)
+		Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Stop add to buffer...");
+		low_memory_warning = true;
+			//display.clearScreen();
+			//display.displayStringwithCoordinates("CRITICAL LOW MEM!", 0, 12);
+			//display.displayStringwithCoordinates("AUTO REBOOTING...", 0, 21, true);
+			//vTaskDelay(2000 / portTICK_PERIOD_MS);
+			//wifi.StartMode(WIFI_SCAN_OFF);
+			//ble.ShutdownBLE();
+			//nrf.shutdownNRFJammer();
+			//nrf.shutdownNRF();
 			// Ensure all tasks are stopped before rebooting
-			ESP.restart();
-		}
-		lastMemoryCheck = millis();
+			//ESP.restart();
+	} else {
+		low_memory_warning = false;
 	}
 	
 }
