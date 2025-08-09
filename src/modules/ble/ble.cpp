@@ -203,6 +203,7 @@ bool BLEModules::ShutdownBLE()
             pBLEScan->clearResults();
         #endif
         // Deinitialize BLE
+        vTaskDelay(10 / portTICK_PERIOD_MS); // need delay to prevent crash
         BLEDevice::deinit();
         ble_initialized = false;
         Serial.println("[INFO] Shutting down BLE Module Successfully");
@@ -283,10 +284,16 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    BLEDevice::init("ESP32 Attack Tool");
+    //uint8_t macAddr[6];
+    //generateRandomMac(macAddr);
+    //esp_base_mac_addr_set(macAddr);
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER);
+    #ifndef USE_NIMBLE
+    BLEDevice::init("ESP32 Attack Tool"); 
     BLEServer *pServer = BLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
+    ble_initialized = true;
+    #endif
     esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
     #ifndef USE_NIMBLE
     pAdvertising->setDeviceAddress(null_addr, BLE_ADDR_TYPE_RANDOM);
@@ -294,7 +301,6 @@ void BLEModules::initSpoofer() {
     esp_ble_gap_set_rand_addr(null_addr);
     #endif
 
-    ble_initialized = true;
     Serial.println("[INFO] BLE Spoofer Initialized Successfully!");
 }
 
@@ -304,12 +310,21 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
     }
-    BLEAdvertisementData oAdvertisementData = selectSpooferDevices(device_type, device_brand, adv_type);
-    #ifndef USE_NIMBLE
-    pAdvertising->setDeviceAddress(dummy_addr, BLE_ADDR_TYPE_RANDOM);
+    #ifdef USE_NIMBLE
+    if (!ble_initialized) {
+        uint8_t macAddr[6];
+        generateRandomMac(macAddr);
+        esp_base_mac_addr_set(macAddr);
+        esp_ble_gap_set_rand_addr(dummy_addr);
+        BLEDevice::init("ESP32 Attack Tool");
+        BLEServer *pServer = BLEDevice::createServer();
+        pAdvertising = pServer->getAdvertising();
+        ble_initialized = true;
+    }
     #else
-    esp_ble_gap_set_rand_addr(dummy_addr);
+    pAdvertising->setDeviceAddress(dummy_addr, BLE_ADDR_TYPE_RANDOM);
     #endif
+    BLEAdvertisementData oAdvertisementData = selectSpooferDevices(device_type, device_brand, adv_type);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(oAdvertisementData);
     pAdvertising->setMinInterval(0x20); // 32.5ms
@@ -321,7 +336,17 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
 }
 
 void BLEModules::stopSpoofer() {
+    #ifdef USE_NIMBLE
+    if (ble_initialized && pAdvertising->isAdvertising()) {
+        vTaskDelay(50 / portTICK_PERIOD_MS); // Wait for advertisement to stop
+        pAdvertising->stop();
+        vTaskDelay(10 / portTICK_PERIOD_MS); // Wait for stop to complete
+        BLEDevice::deinit();
+        ble_initialized = false;
+    }
+    #else
     pAdvertising->stop();
+    #endif
     Serial.println("[INFO] Stopping Spoofer Advertisement");
 }
 

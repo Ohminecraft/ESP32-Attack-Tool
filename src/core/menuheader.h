@@ -93,8 +93,8 @@ enum BLEMenuItem {
 
 enum BLESpooferAdType {
     BLE_SPO_AD_TYPE_NON,
-    BLE_SPO_AD_TYPE_IND,
-    BLE_SPO_AD_TYPE_SCAN,
+    BLE_SPO_AD_TYPE_IND, // in NimBLE this is define for DIR Ad Type
+    BLE_SPO_AD_TYPE_SCAN, // in NimBLE this is define for UND Ad Type
     BLE_SPO_AD_TYPE_BACK,
     BLE_SPO_AD_TYPE_COUNT
 };
