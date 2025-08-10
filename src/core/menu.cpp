@@ -2044,7 +2044,7 @@ void goBack() {
 			currentSelection = 0;
 			maxSelections = NRF24_MENU_COUNT;
 			nrfAnalyzerSetupOneShot = false;
-			nrf.shutdownNRF();
+			nrf.shutdownNRF(*NRFSPI);
 			displayNRF24Menu();
 			break;
 		case NRF24_JAMMER_MENU:
@@ -2068,7 +2068,7 @@ void goBack() {
 			maxSelections = NRF24_MENU_COUNT;
 			nrfScannerSetupOneShot = false;
 			display.setCursor(0, 0);
-			nrf.shutdownNRF();
+			nrf.shutdownNRF(*NRFSPI);
 			displayNRF24Menu();
 			break;
 		case IR_MENU:
@@ -2103,7 +2103,7 @@ void nrfAnalyzer() {
 		return;
 	}
 
-	memset(values, 0, sizeof(uint8_t)*N);
+	memset(values, 0, sizeof(uint8_t)*SCR_WIDTH);
 
 	int n = 200;
 	while (n--) {
@@ -2112,18 +2112,19 @@ void nrfAnalyzer() {
 			goBack();
 			break;
 		} 
-		int i = N;
+		int i = SCR_WIDTH;
 		while (i--) {
 			if (check(selPress)) {
 				Serial.println("[INFO] NRF24 Analyzer stopped by user.");
 				goBack();
 				return;
-			} 
-			nrf.setChannel(i);
+			}
+			nrf.setChannel(*NRFSPI, i);
 			digitalWrite(NRF24_CE_PIN, HIGH);
 			delayMicroseconds(128);
 			digitalWrite(NRF24_CE_PIN, LOW);
-			if (nrf.carrierDetected()) {
+			if (nrf.carrierDetected(*NRFSPI))
+			{
 				++values[i];
 			}
 		}
@@ -2136,16 +2137,20 @@ void nrfAnalyzer() {
 	}
 
 	display.clearScreen();
-	int barWidth = SCR_WIDTH / N;
 	int x = 0;
-	for (int i = 0; i < N; ++i) {
+	int peak = 0;
+	for (int i = 0; i < SCR_WIDTH; i++) {
+		if (values[i] > peak) {
+			peak = values[i];
+		}
 		int v = 63 - values[i] * 3;
 		if (v < 0) {
 			v = 0;
 		}
 		display.drawingVLine(x, v - 10, 64 - v);
-		x += barWidth;
+		x += 1;
 	}
+	Serial.println("[INFO] NRF24 Analyzer | Peak: " + String(peak));
 	//display.setFont(u8g2_font_ncenB08_tr);
 	display.displayStringwithCoordinates("1...5...10...25..50...80...128", 0, 64);
 	display.sendDisplay();
@@ -2154,68 +2159,64 @@ void nrfAnalyzer() {
 void nrfOutputScanChannel() {
 	int norm = 0;
 
-	for (int i = 0; i < SCAN_CHANNELS; i++) {
-	  if (scan_channel[i] > norm) {
-		norm = scan_channel[i];
-	  }
-	}
+    for (int i = 0; i < SCAN_CHANNELS; i++) {
+      if (scan_channel[i] > norm) {
+        norm = scan_channel[i];
+      }
+    }
 
-	byte drawHeight = map(norm, 0, 64, 0, 64);
+	Serial.println("[INFO] NRF24 Scanner | Data: " + String(norm));
 
-	for (byte count = 126; count > 0; count--) {
-	  sensorArray[count] = sensorArray[count - 1];
-	}
-	sensorArray[0] = drawHeight;
+    byte drawHeight = (norm > SCR_HEIGHT) ? SCR_HEIGHT - 1 : norm;
 
-	display.clearScreen();
+    for (byte count = 126; count > 0; count--) {
+      sensorArray[count] = sensorArray[count - 1];
+    }
+    sensorArray[0] = drawHeight;
 
-	display.drawingLine(0, 0, 0, 63);
-	display.drawingLine(127, 0, 127, 63);
+    display.clearScreen();
 
-	for (byte count = 0; count < 64; count += 10) {
-	  display.drawingLine(127, count, 122, count);
-	  display.drawingLine(0, count, 5, count);
-	  if (selPress) {
-		return;
-		}
-	}
+    display.drawingLine(0, 0, 0, 63);
+    display.drawingLine(SCR_WIDTH - 1, 0, SCR_WIDTH - 1, 63);
 
-	for (byte count = 10; count < 127; count += 10) {
-	  display.drawingPixel(count, 0);
-	  display.drawingPixel(count, 63);
-	  if (selPress) {
-		return;
-		}
-	}
+    for (byte count = 0; count < 64; count += 10) {
+		display.drawingLine(SCR_WIDTH - 1, count, 122, count);
+		display.drawingLine(0, count, 5, count);
+    }
 
-	for (byte count = 0; count < 127; count++) {
-	  display.drawingLine(127 - count, 63, 127 - count, 63 - sensorArray[count]);
-	  if (selPress) {
-		return;
-		}
-	}
+    for (byte count = 10; count < SCR_WIDTH - 1; count += 10) {
+		display.drawingPixel(count, 0);
+		display.drawingPixel(count, 63);
+    }
 
+    for (byte count = 0; count < SCR_WIDTH - 1; count++) {
+		display.drawingLine(SCR_WIDTH - 1 - count, 63, SCR_WIDTH - 1 - count, 63 - sensorArray[count]);
+    }
 
-	display.setCursor(12, 12);
-	display.printString("[" + String(norm) + "]");
-	display.sendDisplay();
+    display.setCursor(12, 12);
+    display.printString("[" + String(norm) + "]");
+
+    display.sendDisplay();
 }        
 
 void nrfScanner() {
 	if (selPress) {
 		return;
 	}
+
 	nrf.scanChannel();
 
 	if (selPress) {
 		return;
 	}
+
 	nrfOutputScanChannel();
 
 	if (selPress) {
 		return;
 	}
-	if (millis() - lastSaveTime > saveInterval) {
+	static unsigned long lastSaveTime = 0;
+	if (millis() - lastSaveTime > 5000) {
 		nrf.saveGraphtoEEPROM();
 		lastSaveTime = millis();
 	} 

@@ -8,8 +8,12 @@
     * Licensed under the MIT License.
 */
 
-RF24 NRFRadio(NRF24_CE_PIN, NRF24_CSN_PIN, 16000000);
+RF24 NRFRadio(NRF24_CE_PIN, NRF24_CSN_PIN);
 SPIClass *NRFSPI;
+
+uint8_t scan_channel[SCAN_CHANNELS];
+byte sensorArray[SCR_WIDTH + 1];
+uint8_t values[SCR_WIDTH];
 
 byte NRF24Modules::getRegister(SPIClass &SPIIN, byte r) {
     byte c;
@@ -29,16 +33,16 @@ void NRF24Modules::setRegister(SPIClass &SPIIN, byte r, byte v) {
     digitalWrite(NRF24_CSN_PIN, HIGH);
 }
 
-void NRF24Modules::initNRF() {
-    this->setRegister(*NRFSPI, NRF24_CONFIG, this->getRegister(*NRFSPI, NRF24_CONFIG) | 0x02);
-    vTaskDelay(5 / portTICK_PERIOD_MS);
+void NRF24Modules::initNRF(SPIClass &SPIIN) {
+    this->setRegister(SPIIN, NRF24_CONFIG, this->getRegister(SPIIN, NRF24_CONFIG) | 0x02);
+    delayMicroseconds(130);
 }
 
-void NRF24Modules::shutdownNRF() {
-    this->setRegister(*NRFSPI, NRF24_CONFIG, getRegister(*NRFSPI, NRF24_CONFIG) * ~0x02);
+void NRF24Modules::shutdownNRF(SPIClass &SPIIN) {
+    this->setRegister(SPIIN, NRF24_CONFIG, getRegister(SPIIN, NRF24_CONFIG) * ~0x02);
 }
-void NRF24Modules::setRX() {
-    this->setRegister(*NRFSPI, NRF24_CONFIG, getRegister(*NRFSPI, NRF24_CONFIG) | 0x01);
+void NRF24Modules::setRX(SPIClass &SPIIN) {
+    this->setRegister(SPIIN, NRF24_CONFIG, getRegister(SPIIN, NRF24_CONFIG) | 0x01);
     digitalWrite(NRF24_CE_PIN, HIGH);
     delayMicroseconds(100);
 }
@@ -47,10 +51,9 @@ void NRF24Modules::analyzerScanChannels() {
     digitalWrite(NRF24_CE_PIN, LOW);
     for (int i = 0; i < ANA_CHANNELS; i++) {
         NRFRadio.setChannel((128 * i) / ANA_CHANNELS);
-        this->setRX();
+        this->setRX(*NRFSPI);
         delayMicroseconds(40);
         digitalWrite(NRF24_CE_PIN, LOW);
-        if (this->getRegister(*NRFSPI, NRF24_RPD) > 0) ana_channel[i]++;
     }
 }
 
@@ -69,12 +72,12 @@ uint8_t NRF24Modules::readRegister(SPIClass &SPIIN, uint8_t reg) {
     return res;
 }
 
-void NRF24Modules::setChannel(uint8_t channel) {
-    this->setRegister(*NRFSPI, NRF24_RF_CH, channel);
+void NRF24Modules::setChannel(SPIClass &SPIIN, uint8_t channel) {
+    this->setRegister(SPIIN, NRF24_RF_CH, channel);
 }
 
-bool NRF24Modules::carrierDetected() {
-    return this->readRegister(*NRFSPI, NRF24_RPD) & 0x01;
+bool NRF24Modules::carrierDetected(SPIClass &SPIIN) {
+    return this->readRegister(SPIIN, NRF24_RPD) & 0x01;
 }
 
 void NRF24Modules::analyzerSetup() {
@@ -82,22 +85,22 @@ void NRF24Modules::analyzerSetup() {
     pinMode(NRF24_CSN_PIN, OUTPUT);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN, NRF24_CSN_PIN);
+    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
     NRFSPI->setDataMode(SPI_MODE0);
-    NRFSPI->setFrequency(16000000);
+    NRFSPI->setFrequency(10000000);
     NRFSPI->setBitOrder(MSBFIRST);
 
     digitalWrite(NRF24_CSN_PIN, HIGH);
     digitalWrite(NRF24_CE_PIN, LOW);
 
-    if (!NRFRadio.begin(NRFSPI, rf24_gpio_pin_t(NRF24_CE_PIN), rf24_gpio_pin_t(NRF24_CSN_PIN))) {
+    if (!NRFRadio.begin(NRFSPI)) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
 
     digitalWrite(NRF24_CE_PIN, LOW);
 
-    this->initNRF();
+    this->initNRF(*NRFSPI);
     writeRegister(*NRFSPI, NRF24_EN_AA, 0x00);
     writeRegister(*NRFSPI, NRF24_RF_SETUP, 0x03);  
 }
@@ -109,16 +112,17 @@ void NRF24Modules::jammerNRFRadioSetup() {
     digitalWrite(NRF24_CSN_PIN, HIGH);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN, NRF24_CSN_PIN);
+    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(16000000);
     NRFSPI->setBitOrder(MSBFIRST);
     // Initialize the NRF24 radio
-    if (!NRFRadio.begin(NRFSPI, rf24_gpio_pin_t(NRF24_CE_PIN), rf24_gpio_pin_t(NRF24_CSN_PIN))) {
+    if (!NRFRadio.begin(NRFSPI)) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
     NRFRadio.setAutoAck(false);
+    NRFRadio.openWritingPipe(0xFFFFFFFFFF);
     NRFRadio.stopListening();
     NRFRadio.setRetries(0, 0);
     NRFRadio.setPALevel(RF24_PA_MAX);
@@ -129,44 +133,65 @@ void NRF24Modules::jammerNRFRadioSetup() {
     NRFRadio.startConstCarrier(RF24_PA_MAX, 45);
 }
 
-int jammer_chan_hop = 0;
-
 void NRF24Modules::jammerNRFRadioMain(NRFJammerMode mode) {
-    jammer_chan_hop++;
     if (mode == Wifi) {
-        if (jammer_chan_hop >= (sizeof(WiFi_channels) / sizeof(WiFi_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(WiFi_channels[jammer_chan_hop]);
-        NRFRadio.writeFast(&write_text, sizeof(write_text));
+        //if (jammer_chan_hop >= (sizeof(WiFi_channels) / sizeof(WiFi_channels[0]))) jammer_chan_hop = 0;
+        for (int i = 0; i < sizeof(WiFi_channels) / sizeof(WiFi_channels[0]); i++) { // This way is more effective than using jammer_chan_hop
+            NRFRadio.setChannel(WiFi_channels[i]);
+        }
+        //NRFRadio.setChannel(WiFi_channels[jammer_chan_hop]);
     } else if (mode == BLE) {
-        if (jammer_chan_hop >= (sizeof(ble_channels) / sizeof(ble_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(ble_channels[jammer_chan_hop]);
-        NRFRadio.writeFast(&write_text, sizeof(write_text));
+        //if (jammer_chan_hop >= (sizeof(ble_channels) / sizeof(ble_channels[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(ble_channels[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(ble_channels) / sizeof(ble_channels[0]); i++) {
+            NRFRadio.setChannel(ble_channels[i]);
+        }
     } else if (mode == Bluetooth) {
-        if (jammer_chan_hop >= (sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(bluetooth_channels[jammer_chan_hop]);
-        NRFRadio.writeFast(&write_text, sizeof(write_text));
+        //if (jammer_chan_hop >= (sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(bluetooth_channels[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]); i++) {
+            NRFRadio.setChannel(bluetooth_channels[i]);
+        }
     } else if (mode == Zigbee) {
-        if (jammer_chan_hop >= (sizeof(zigbee_channels) / sizeof(zigbee_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(zigbee_channels[jammer_chan_hop]);
-        NRFRadio.writeFast(&write_text, sizeof(write_text));
+        //if (jammer_chan_hop >= (sizeof(zigbee_channels) / sizeof(zigbee_channels[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(zigbee_channels[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(zigbee_channels) / sizeof(zigbee_channels[0]); i++) {
+            NRFRadio.setChannel(zigbee_channels[i]);
+        }
     } else if (mode == RC) {
-        if (jammer_chan_hop >= (sizeof(rc_channels) / sizeof(rc_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(rc_channels[jammer_chan_hop]);
+        //if (jammer_chan_hop >= (sizeof(rc_channels) / sizeof(rc_channels[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(rc_channels[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(rc_channels) / sizeof(rc_channels[0]); i++) {
+            NRFRadio.setChannel(rc_channels[i]);
+        }
     } else if (mode == Video_Transmitter) {
-        if (jammer_chan_hop >= (sizeof(videoTransmitter_channels) / sizeof(videoTransmitter_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(videoTransmitter_channels[jammer_chan_hop]);
+        //if (jammer_chan_hop >= (sizeof(videoTransmitter_channels) / sizeof(videoTransmitter_channels[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(videoTransmitter_channels[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(videoTransmitter_channels) / sizeof(videoTransmitter_channels[0]); i++) {
+            NRFRadio.setChannel(videoTransmitter_channels[i]);
+        }
     } else if (mode == Usb_Wireless) {
-        if (jammer_chan_hop >= (sizeof(usbWireless_channels) / sizeof(usbWireless_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(usbWireless_channels[jammer_chan_hop]);
+        //if (jammer_chan_hop >= (sizeof(usbWireless_channels) / sizeof(usbWireless_channels[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(usbWireless_channels[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(usbWireless_channels) / sizeof(usbWireless_channels[0]); i++) {
+            NRFRadio.setChannel(usbWireless_channels[i]);
+        }
     } else if (mode == Drone) {
-        if (jammer_chan_hop >= (sizeof(drone) / sizeof(drone[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(drone[jammer_chan_hop]);
+        //if (jammer_chan_hop >= (sizeof(drone) / sizeof(drone[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(drone[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(drone) / sizeof(drone[0]); i++) {
+            NRFRadio.setChannel(drone[i]);
+        }
     } else if (mode == Full_Channel) {
-        if (jammer_chan_hop >= (sizeof(full_channels) / sizeof(full_channels[0]))) jammer_chan_hop = 0;
-        NRFRadio.setChannel(full_channels[jammer_chan_hop]);
+        //if (jammer_chan_hop >= (sizeof(full_channels) / sizeof(full_channels[0]))) jammer_chan_hop = 0;
+        //NRFRadio.setChannel(full_channels[jammer_chan_hop]);
+        for (int i = 0; i < sizeof(full_channels) / sizeof(full_channels[0]); i++) {
+            NRFRadio.setChannel(full_channels[i]);
+        }
     }
+    //jammer_chan_hop++;
+    //Serial.println("[INFO] Jamming Channel: " + String(jammer_chan_hop));
     if (selPress) {
-        Serial.println("[INFO] Jammer Stopped by user");
         return;
     }
 }
@@ -176,39 +201,40 @@ void NRF24Modules::shutdownNRFJammer() {
 }
 
 void NRF24Modules::scanChannel() {
-    digitalWrite(NRF24_CE_PIN, LOW);
+   digitalWrite(NRF24_CE_PIN, LOW);
 
     memset(scan_channel, 0, sizeof(scan_channel));
 
     const int samplesPerChannel = 50;
 
     for (int i = 0; i < SCAN_CHANNELS; i++) {
-        NRFRadio.setChannel((128 * i) / SCAN_CHANNELS);
+      NRFRadio.setChannel((128 * i) / SCAN_CHANNELS); // Use RF24 setChannel
 
-        for (int j = 0; j < samplesPerChannel; j++) {
-            if (selPress) {
-                return;
-            }
-            this->setRX();
-            
-            delayMicroseconds(100);
-            digitalWrite(NRF24_CE_PIN, LOW);
-            scan_channel[i] += getRegister(*NRFSPI, NRF24_RPD);
+      for (int j = 0; j < samplesPerChannel; j++) {
+        // Check Select button in inner loop
+        if (selPress) {
+          return;
         }
-        scan_channel[i] = (scan_channel[i] * 100) / samplesPerChannel;
+        setRX(*NRFSPI);
+        delayMicroseconds(100);
+        digitalWrite(NRF24_CE_PIN, LOW);
+        scan_channel[i] += getRegister(*NRFSPI, NRF24_RPD);
+      }
+
+      scan_channel[i] = (scan_channel[i] * 100) / samplesPerChannel;
     }
 }
 
 void NRF24Modules::loadPreviousGraph() {
-    EEPROM.begin(128);
-    for (byte i = 0; i < 128; i++) {
+    EEPROM.begin(SCR_WIDTH);
+    for (byte i = 0; i < SCR_WIDTH; i++) {
       sensorArray[i] = EEPROM.read(EEPROM_ADDRESS_SENSOR_ARRAY + i);
     }
     EEPROM.end();
 }
 void NRF24Modules::saveGraphtoEEPROM() {
-    EEPROM.begin(128);
-    for (byte i = 0; i < 128; i++) {
+    EEPROM.begin(SCR_WIDTH);
+    for (byte i = 0; i < SCR_WIDTH; i++) {
       EEPROM.write(EEPROM_ADDRESS_SENSOR_ARRAY + i, sensorArray[i]);
     }
     EEPROM.commit();
@@ -216,28 +242,29 @@ void NRF24Modules::saveGraphtoEEPROM() {
 }
 
 void NRF24Modules::scannerSetup() {
-    for (byte count = 0; count <= 128; count++) {
+    for (byte count = 0; count <= SCR_WIDTH; count++) {
       sensorArray[count] = 0;
     }
-
     pinMode(NRF24_CE_PIN, OUTPUT);
     pinMode(NRF24_CSN_PIN, OUTPUT);
+    digitalWrite(NRF24_CE_PIN, LOW);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN, NRF24_CSN_PIN);
+    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(16000000);
     NRFSPI->setBitOrder(MSBFIRST);
 
-    if (!NRFRadio.begin(NRFSPI, rf24_gpio_pin_t(NRF24_CE_PIN), rf24_gpio_pin_t(NRF24_CSN_PIN))) {
+    if (!NRFRadio.begin(NRFSPI)) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
 
     digitalWrite(NRF24_CE_PIN, LOW);
 
-    this->initNRF();
-    this->setRegister(*NRFSPI, NRF24_EN_AA, 0x0);
+    this->initNRF(*NRFSPI);
+    this->setRegister(*NRFSPI, NRF24_EN_AA, 0x00);
     this->setRegister(*NRFSPI, NRF24_RF_SETUP, 0x0F);
 
     this->loadPreviousGraph();

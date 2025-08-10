@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef CONFIGS_H
 #define CONFIGS_H
 
@@ -102,4 +104,4 @@
     #define IR_PIN 20 // RX PIN in Esp32-C3-MINI
     #define IR_RX_PIN 21 // TX PIN in Esp32-C3-MINI
 #endif
-#endif
+#endif // CONFIGS_H

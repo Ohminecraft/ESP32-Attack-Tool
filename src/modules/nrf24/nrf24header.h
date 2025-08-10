@@ -20,26 +20,19 @@
 #define NRF24_RF_SETUP    0x06
 #define NRF24_RPD         0x09
 
-#define N 128
-uint8_t values[N];
+extern uint8_t values[SCR_WIDTH];
 
 #define ANA_CHANNELS  64
-int ana_channel[ANA_CHANNELS];
-
 #define SCAN_CHANNELS 64
-int scan_channel[SCAN_CHANNELS];
 
-int line;
-char grey[] = " .:-=+*aRW";
+
+extern uint8_t scan_channel[SCAN_CHANNELS];
 
 #define EEPROM_ADDRESS_SENSOR_ARRAY 2
 
-unsigned long lastSaveTime = 0;
-const unsigned long saveInterval = 5000;
+extern byte sensorArray[SCR_WIDTH + 1];
 
-byte sensorArray[129];
-
-const char write_text[] = "xxxxxxxxxxxxxxxx";
+extern SPIClass *NRFSPI;
 
 const byte bluetooth_channels[] =        {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
 const byte ble_channels[] =              {2, 26, 80};
@@ -66,9 +59,7 @@ const byte full_channels[] = {
         85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100
         //, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
         // 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124
-    };
-
-extern SPIClass *NRFSPI;
+};
 
 enum NRFJammerMode {
     Wifi,
@@ -80,22 +71,24 @@ enum NRFJammerMode {
     Usb_Wireless,
     Drone,
     Full_Channel
-};  
+}; 
 
 class NRF24Modules
 {
     private:
+        //uint8_t jammer_chan_hop = 0;
+
         byte getRegister(SPIClass &SPIIN, byte r);
         void setRegister(SPIClass &SPIIN, byte r, byte v);
-        void setRX();
+        void setRX(SPIClass &SPIIN);
         void writeRegister(SPIClass &SPIIN, uint8_t reg, uint8_t value);
         uint8_t readRegister(SPIClass &SPIIN, uint8_t reg);
     public:
-        void initNRF();
-        void shutdownNRF();
+        void initNRF(SPIClass &SPIIN);
+        void shutdownNRF(SPIClass &SPIIN);
         void analyzerScanChannels();
-        void setChannel(uint8_t channel);
-        bool carrierDetected();
+        void setChannel(SPIClass &SPIIN, uint8_t channel);
+        bool carrierDetected(SPIClass &SPIIN);
         void analyzerSetup();
 
         void jammerNRFRadioSetup();
