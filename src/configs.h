@@ -22,6 +22,7 @@
 
 #define SCR_WIDTH 128
 #define SCR_HEIGHT 64
+#define GRAPH_VERTICAL_LINE_LIM (SCR_HEIGHT / 2) + 15
 #define _I2C_SCREEN
 
 #ifdef _SPI_SCREEN
@@ -79,20 +80,35 @@
     #define SEL_BTN 0
 #endif
 
+// SPI Global Configuration //
+
+#ifdef BOARD_ESP32
+    #define SPI_MOSI_PIN 23
+    #define SPI_MISO_PIN 19
+    #define SPI_SCK_PIN 18
+#elif defined(BOARD_ESP32_C3_MINI)
+    #define SPI_MOSI_PIN 6
+    #define SPI_MISO_PIN 5
+    #define SPI_SCK_PIN 4
+#endif
+// SD Card Configuration //
+
+#define USING_SD
+
+#ifdef BOARD_ESP32
+    #define SD_CS_PIN 5
+#elif defined(BOARD_ESP32_C3_MINI)
+    #define SD_CS_PIN 10
+#endif
+
 // NRF24 CONFIGURATION //
 
 #if defined(BOARD_ESP32)
     #define NRF24_CE_PIN 8
     #define NRF24_CSN_PIN 17
-    #define NRF24_MOSI_PIN 23
-    #define NRF24_MISO_PIN 19
-    #define NRF24_SCK_PIN 18
 #elif defined(BOARD_ESP32_C3_MINI)
     #define NRF24_CE_PIN 3
     #define NRF24_CSN_PIN 7
-    #define NRF24_MOSI_PIN 6
-    #define NRF24_MISO_PIN 5
-    #define NRF24_SCK_PIN 4
 #endif
 
 // IR Configuration //

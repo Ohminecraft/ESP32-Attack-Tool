@@ -31,6 +31,7 @@ enum WiFiScanState {
     WIFI_SCAN_BEACON,
     WIFI_SCAN_EAPOL,
     WIFI_SCAN_EAPOL_DEAUTH,
+    WIFI_SCAN_CH_ANALYZER,
     WIFI_ATTACK_RND_BEACON,
     WIFI_ATTACK_STA_BEACON, // ATTACK STABLE SSID
     WIFI_ATTACK_RIC_BEACON,
@@ -308,6 +309,7 @@ class WiFiModules
         void StartBeaconScan();
         void StartDeauthScan();
         void StartEapolScan();
+        void StartAnalyzerScan();
         void StartWiFiAttack(WiFiScanState attack_mode);
 
         void sendCustomBeacon(AccessPoint custom_ssid);
@@ -333,6 +335,11 @@ class WiFiModules
         uint8_t sta_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
         uint8_t packet_sent = 0;
         uint8_t set_channel = 1;
+        int16_t wifi_analyzer_frames[SCR_WIDTH];
+        uint8_t wifi_analyzer_frames_recvd = 0;
+        int16_t wifi_analyzer_value = 0;
+        int8_t wifi_analyzer_rssi = 0;
+        String wifi_analyzer_ssid = "";
         const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 
         bool deauth_flood_redraw = false;
@@ -396,6 +403,7 @@ class WiFiModules
         static void beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
 
 };
 

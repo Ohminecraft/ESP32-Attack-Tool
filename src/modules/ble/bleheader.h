@@ -39,11 +39,19 @@ DisplayModules ble_display_obj;
 
 enum BLEScanState {
     BLE_SCAN_OFF,
-    BLE_ATTACK_SOUR_APPLE,
-    BLE_ATTACK_APPLE_JUICE,
-    BLE_ATTACK_MICROSOFT,
-    BLE_ATTACK_SAMSUNG,
-    BLE_ATTACK_GOOGLE
+    BLE_SCAN_DEVICE,
+    BLE_SCAN_ANALYZER,
+    BLE_ATTACK_SPOOFER_INIT,
+    BLE_ATTACK_SPOOFER_APPLE,
+    BLE_ATTACK_SPOOFER_SAMSUNG,
+    BLE_ATTACK_SPOOFER_GOOGLE,
+    BLE_ATTACK_SPOOFER_STOP,
+    BLE_ATTACK_EXPLOIT_INIT,
+    BLE_ATTACK_EXPLOIT_SOUR_APPLE,
+    BLE_ATTACK_EXPLOIT_APPLE_JUICE,
+    BLE_ATTACK_EXPLOIT_MICROSOFT,
+    BLE_ATTACK_EXPLOIT_SAMSUNG,
+    BLE_ATTACK_EXPLOIT_GOOGLE
 };
 
 #define SERVICE_UUID "1bc68b2a-f3e3-11e9-81b4-2a2ae2dbcce4"
@@ -367,33 +375,35 @@ const WatchModel watch_models[26] = {
 int android_models_count = (sizeof(android_models) / sizeof(android_models[0]));
 
 extern bool bleScanRedraw;
+extern uint8_t spooferDeviceIndex;
+extern uint8_t spooferAdTypeIndex;
 
 class BLEModules {
     private:
         BLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
         static void scanCompleteCB(BLEScanResults scanResults);
+        void executeSwiftpair(EBLEPayloadType type);
+        void bleScan();
+        BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
+        void startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
+        void stopSpoofer();
+        void initSpoofer();
+        void initSpam();
+        bool ShutdownBLE();
     public:
         
         ~BLEModules() {
             ShutdownBLE();
         }
 
+        int16_t ble_analyzer_frames[SCR_WIDTH];
+        uint8_t ble_analyzer_frames_recvd = 0;
+        int16_t ble_analyzer_value = 0;
+        int8_t ble_analyzer_rssi = 0;
+        String ble_analyzer_device = "";
         // Main BLE
         void main();
-        bool ShutdownBLE();
-        void initSpoofer();
-        void initSpam();
-
-        BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
-        void startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
-        void stopSpoofer();
-
-        // Execute Spam
-        void executeSwiftpair(EBLEPayloadType type);
-        void executeAppleSpam(EBLEPayloadType apple_mode);
-
-        // BLE Scan
-        void bleScan();
+        void StartMode(BLEScanState mode);
 };
 
 #endif // BLEHEADER_H

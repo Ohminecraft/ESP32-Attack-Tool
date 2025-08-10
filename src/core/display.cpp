@@ -74,6 +74,72 @@ void DisplayModules::drawBipmap(int x, int y, int w, int h, const uint8_t* icon,
     if (senddisplay) u8g2.sendBuffer();
 }
 
+float DisplayModules::calculateGraphScale(int16_t value) {
+    if (value <= 0) return graph_scale;
+
+    float targetScale = (float)(GRAPH_VERTICAL_LINE_LIM * 0.9f) / (float)value;
+
+    if (targetScale > 1.0f) targetScale = 1.0f;
+    if (targetScale < 0.1f) targetScale = 0.1f;
+
+    return (graph_scale * 0.8f) + (targetScale * 0.2f);
+}
+
+void DisplayModules::addValueToGraph(int16_t value, int16_t* graph_array, int graph_array_size) {
+    // Shift the array to the left
+    for (int i = graph_array_size - 1; i > 0; i--) {
+        graph_array[i] = graph_array[i - 1];
+    }
+    // Add the new value at the end
+    graph_array[0] = value;
+}
+
+void DisplayModules::drawingGraph(int16_t* array, bool senddisplay) {
+    drawingLine(0, 0, 0, 63);
+    drawingLine(SCR_WIDTH - 1, 0, SCR_WIDTH - 1, 63);
+
+    for (int count = 10; count < SCR_WIDTH - 1; count += 10) {
+		drawingPixel(count, 0);
+		drawingPixel(count, 63);
+    }
+
+    for (int i = 0; i < SCR_WIDTH; i++) {
+        int yValue = (int)(array[i] * graph_scale);
+        if (yValue < 1) yValue = 1;
+        if (yValue > GRAPH_VERTICAL_LINE_LIM) yValue = GRAPH_VERTICAL_LINE_LIM;
+
+        int yStart = SCR_HEIGHT - 1;
+        int yEnd = SCR_HEIGHT - 1 - yValue;
+
+        this->drawingLine(i - 1, yStart, i - 1, yEnd);
+    }
+    if (senddisplay) {
+        u8g2.sendBuffer();
+    }
+}
+
+float DisplayModules::graphScaleCheck(const int16_t array[SCR_WIDTH]) {
+    int16_t maxValue = 0;
+  
+    // Iterate through the array to find the highest value
+    for (int16_t i = 0; i < SCR_WIDTH; i++) {
+      if (array[i] > maxValue) {
+        maxValue = array[i];
+      }
+    }
+  
+
+    return this->calculateGraphScale(maxValue);
+
+}
+
+void DisplayModules::clearGraph(int16_t *array) {
+    for (int i = 0; i < SCR_WIDTH; i++) {
+        array[i] = 0;
+    }
+}
+
+
 void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int color)
 {
     if (!screenInitialized) {

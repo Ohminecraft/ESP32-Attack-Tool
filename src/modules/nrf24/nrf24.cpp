@@ -12,7 +12,7 @@ RF24 NRFRadio(NRF24_CE_PIN, NRF24_CSN_PIN);
 SPIClass *NRFSPI;
 
 uint8_t scan_channel[SCAN_CHANNELS];
-byte sensorArray[SCR_WIDTH + 1];
+int16_t sensorArray[SCR_WIDTH];
 uint8_t values[SCR_WIDTH];
 
 byte NRF24Modules::getRegister(SPIClass &SPIIN, byte r) {
@@ -85,7 +85,7 @@ void NRF24Modules::analyzerSetup() {
     pinMode(NRF24_CSN_PIN, OUTPUT);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
+    NRFSPI->begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(10000000);
     NRFSPI->setBitOrder(MSBFIRST);
@@ -112,7 +112,7 @@ void NRF24Modules::jammerNRFRadioSetup() {
     digitalWrite(NRF24_CSN_PIN, HIGH);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
+    NRFSPI->begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(16000000);
     NRFSPI->setBitOrder(MSBFIRST);
@@ -225,33 +225,14 @@ void NRF24Modules::scanChannel() {
     }
 }
 
-void NRF24Modules::loadPreviousGraph() {
-    EEPROM.begin(SCR_WIDTH);
-    for (byte i = 0; i < SCR_WIDTH; i++) {
-      sensorArray[i] = EEPROM.read(EEPROM_ADDRESS_SENSOR_ARRAY + i);
-    }
-    EEPROM.end();
-}
-void NRF24Modules::saveGraphtoEEPROM() {
-    EEPROM.begin(SCR_WIDTH);
-    for (byte i = 0; i < SCR_WIDTH; i++) {
-      EEPROM.write(EEPROM_ADDRESS_SENSOR_ARRAY + i, sensorArray[i]);
-    }
-    EEPROM.commit();
-    EEPROM.end();
-}
-
 void NRF24Modules::scannerSetup() {
-    for (byte count = 0; count <= SCR_WIDTH; count++) {
-      sensorArray[count] = 0;
-    }
     pinMode(NRF24_CE_PIN, OUTPUT);
     pinMode(NRF24_CSN_PIN, OUTPUT);
     digitalWrite(NRF24_CE_PIN, LOW);
     digitalWrite(NRF24_CSN_PIN, HIGH);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(NRF24_SCK_PIN, NRF24_MISO_PIN, NRF24_MOSI_PIN);
+        
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(16000000);
     NRFSPI->setBitOrder(MSBFIRST);
@@ -267,5 +248,4 @@ void NRF24Modules::scannerSetup() {
     this->setRegister(*NRFSPI, NRF24_EN_AA, 0x00);
     this->setRegister(*NRFSPI, NRF24_RF_SETUP, 0x0F);
 
-    this->loadPreviousGraph();
 }

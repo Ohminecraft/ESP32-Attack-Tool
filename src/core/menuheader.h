@@ -16,6 +16,7 @@
 #include "core/assets.h"
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
+#include "core/sdcardmountheader.h"
 #include "modules/ble/bleheader.h"
 #include "modules/wifi/wifiheader.h"
 #include "modules/wifi/evilportalheader.h"
@@ -65,6 +66,7 @@ enum MenuState {
     BLE_SPOOFER_GOOGLE_MENU,
     BLE_SPOOFER_AD_TYPE_MENU,
     BLE_SPOOFER_RUNNING,
+    BLE_ANALYZER_RUNNING,
     BLE_EXPLOIT_ATTACK_MENU,
     BLE_ATTACK_RUNNING,
     WIFI_ATTACK_RUNNING
@@ -84,6 +86,7 @@ enum MainMenuItem {
 // BLE menu items
 enum BLEMenuItem {
     BLE_SCAN,
+    BLE_ANALYZER,
     BLE_INFO,
     BLE_SPOOFER,
     BLE_EXPLOIT_ATTACK,
@@ -284,6 +287,7 @@ enum WiFiGeneralItem {
     WIFI_GENERAL_BEACON_SCAN,
     WIFI_GENERAL_EAPOL_SCAN,
     WIFI_GENERAL_EAPOL_DEAUTH_SCAN,
+    WIFI_GENERAL_CH_ANALYZER,
     WIFI_GENERAL_BACK,
     WIFI_GENERAL_MENU_COUNT
 };
@@ -359,8 +363,6 @@ bool bleScanInProgress = false;
 bool bleScanDisplay = false;
 
 // BLE Spoofer State
-uint8_t ble_spoofer_device = 0;
-uint8_t ble_spoofer_ad_type = 0;
 bool bleSpooferDone = false;
 BLESpooferBrandType bleSpooferBrandType = NONE;
 
@@ -372,6 +374,7 @@ bool wifiScanDisplay = false;
 
 bool wifiSnifferInProgress = false;
 uint8_t wifiSnifferMode;
+bool analyzerChangedChannel = false;
 
 int ap_index = 0;
 bool set_mac = false;

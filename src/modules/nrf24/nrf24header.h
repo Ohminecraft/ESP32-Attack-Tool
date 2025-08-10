@@ -28,9 +28,7 @@ extern uint8_t values[SCR_WIDTH];
 
 extern uint8_t scan_channel[SCAN_CHANNELS];
 
-#define EEPROM_ADDRESS_SENSOR_ARRAY 2
-
-extern byte sensorArray[SCR_WIDTH + 1];
+extern int16_t sensorArray[SCR_WIDTH];
 
 extern SPIClass *NRFSPI;
 
@@ -96,8 +94,6 @@ class NRF24Modules
         void shutdownNRFJammer();
 
         void scanChannel();
-        void loadPreviousGraph();
-        void saveGraphtoEEPROM();
         void scannerSetup();
 
 };

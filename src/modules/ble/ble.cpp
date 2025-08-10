@@ -15,6 +15,9 @@ BLEScan *pBLEScan;
 
 LinkedList<BLEScanResult>* blescanres;
 bool bleScanRedraw = false;
+bool bleAnalyzerMode = false;
+uint8_t spooferDeviceIndex = -1;
+uint8_t spooferAdTypeIndex = -1;
 
 BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
 {
@@ -212,6 +215,44 @@ bool BLEModules::ShutdownBLE()
     return false;
 }
 
+void BLEModules::StartMode(BLEScanState mode) {
+    if (mode == BLE_SCAN_OFF) {
+        if (ble_initialized) {
+            this->ShutdownBLE();
+        }
+        if (bleAnalyzerMode) bleAnalyzerMode = false;
+    } else if (mode == BLE_SCAN_DEVICE) {
+        bleScan();
+    } else if (mode == BLE_SCAN_ANALYZER) {
+        bleAnalyzerMode = true;
+        bleScan();
+    } else if (mode == BLE_ATTACK_SPOOFER_APPLE)
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_APPLE, spooferAdTypeIndex);
+    else if (mode == BLE_ATTACK_SPOOFER_SAMSUNG)
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_SAMSUNG, spooferAdTypeIndex);
+    else if (mode == BLE_ATTACK_SPOOFER_GOOGLE)
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_GOOGLE, spooferAdTypeIndex);
+    else if (mode == BLE_ATTACK_EXPLOIT_SOUR_APPLE) 
+        executeSwiftpair(SourApple);
+    else if (mode == BLE_ATTACK_EXPLOIT_APPLE_JUICE) 
+        executeSwiftpair(AppleJuice);
+    else if (mode == BLE_ATTACK_EXPLOIT_MICROSOFT)
+        executeSwiftpair(Microsoft);
+    else if (mode == BLE_ATTACK_EXPLOIT_SAMSUNG)
+        executeSwiftpair(Samsung);
+    else if (mode == BLE_ATTACK_EXPLOIT_GOOGLE)
+        executeSwiftpair(Google);
+    else if (mode == BLE_ATTACK_SPOOFER_INIT)
+        initSpoofer();
+    else if (mode == BLE_ATTACK_EXPLOIT_INIT)
+        initSpam(); // Initialize BLE for exploit attacks
+    else if (mode == BLE_ATTACK_SPOOFER_STOP)
+        stopSpoofer();
+    else {
+        Serial.println("[ERROR] Invalid BLE Scan Mode Selected");
+    }
+}
+
 BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type) {
     BLEAdvertisementData AdvData = BLEAdvertisementData();
     if (device_brand == BLE_SPOOFER_DEVICE_BRAND_APPLE) {
@@ -397,44 +438,86 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
 class BLEScanDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     #ifdef USE_NIMBLE
     void onResult(BLEAdvertisedDevice *advertisedDevice) {
-        bleScanRedraw = true;
-        BLEScanResult bleres;
-        String ble_name;
-        ble_name = advertisedDevice->getName().c_str();
-        if (ble_name.isEmpty()) bleres.name = "<no name>";
-        else bleres.name = ble_name;
-        bleres.rssi = advertisedDevice->getRSSI();
-        bleres.addr = advertisedDevice->getAddress();
-        if (!low_memory_warning)
-            blescanres->add(bleres);
-        String add_to_buffer;
-        if (!low_memory_warning) {
-            if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr.toString().c_str());
-            else add_to_buffer = ble_name;
-        } else add_to_buffer = String("Low Mem! Ignore!");
+        extern BLEModules ble;
+
+        if (!bleAnalyzerMode) {
+            bleScanRedraw = true;
+            BLEScanResult bleres;
+            String ble_name;
+            ble_name = advertisedDevice->getName().c_str();
+            if (ble_name.isEmpty()) bleres.name = "<no name>";
+            else bleres.name = ble_name;
+            bleres.rssi = advertisedDevice->getRSSI();
+            bleres.addr = advertisedDevice->getAddress();
+            if (!low_memory_warning)
+                blescanres->add(bleres);
+            String add_to_buffer;
+            if (!low_memory_warning) {
+                if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr.toString().c_str());
+                else add_to_buffer = ble_name;
+            } else add_to_buffer = String("Low Mem! Ignore!");
+            
+            //if (display_buffer->size() > 4)
+            //    display_buffer->shift();
+            display_buffer->add(add_to_buffer);
+            if (!low_memory_warning) Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+            else Serial.println("[INFO] Low Memory Warning! Ignore: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+        } else {
+            for (int i = 0; i < 5; i++) ble.ble_analyzer_value++;
+
+            if (ble.ble_analyzer_frames_recvd < 254) 
+                ble.ble_analyzer_frames_recvd++;
+
+            if (ble.ble_analyzer_frames_recvd >= 100) {
+                ble.ble_analyzer_rssi = advertisedDevice->getRSSI();
+                if (advertisedDevice->getName().length() != 0) {
+                    ble.ble_analyzer_device = advertisedDevice->getName().c_str();
+                } else {
+                    ble.ble_analyzer_device = advertisedDevice->getAddress().toString().c_str();
+                }
+                ble.ble_analyzer_frames_recvd = 0;
+            }
+        }
         
-        //if (display_buffer->size() > 4)
-        //    display_buffer->shift();
-        display_buffer->add(add_to_buffer);
-        if (!low_memory_warning) Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
-        else Serial.println("[INFO] Low Memory Warning! Ignore: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
     }
     #else
     void onResult(BLEAdvertisedDevice advertisedDevice) override {
-        bleScanRedraw = true;
-        BLEScanResult bleres;
-        String ble_name;
-        ble_name = advertisedDevice.getName().c_str();
-        if (ble_name.isEmpty()) bleres.name = "<no name>";
-        else bleres.name = ble_name;
-        bleres.rssi = advertisedDevice.getRSSI();
-        bleres.addr = advertisedDevice.getAddress().toString().c_str();
-        blescanres->add(bleres);
-        String add_to_buffer;
-        if (ble_name.isEmpty()) add_to_buffer = bleres.addr;
-        else add_to_buffer = ble_name;
-        display_buffer->add(add_to_buffer);
-        Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + bleres.addr + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+        extern BLEModules ble;
+        if (!bleAnalyzerMode) {
+            bleScanRedraw = true;
+            BLEScanResult bleres;
+            String ble_name;
+            ble_name = advertisedDevice.getName().c_str();
+            if (ble_name.isEmpty()) bleres.name = "<no name>";
+            else bleres.name = ble_name;
+            bleres.rssi = advertisedDevice.getRSSI();
+            bleres.addr = advertisedDevice.getAddress().toString().c_str();
+            if (!low_memory_warning)
+                blescanres->add(bleres);
+            String add_to_buffer;
+            if (!low_memory_warning) {
+                if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr);
+                else add_to_buffer = ble_name;
+            } else add_to_buffer = String("Low Mem! Ignore!");
+            display_buffer->add(add_to_buffer);
+            f (!low_memory_warning) Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + bleres.addr + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+            else Serial.println("[INFO] Low Memory Warning! Ignore: " + bleres.name + " (Addr: " + bleres.addr + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+        } else {
+            ble.ble_analyzer_value++;
+
+            if (ble.ble_analyzer_frames_recvd < 254) 
+                ble.ble_analyzer_frames_recvd++;
+
+            if (ble.ble_analyzer_frames_recvd >= 100) {
+                ble.ble_analyzer_rssi = advertisedDevice.getRSSI();
+                if (advertisedDevice.getName().length() != 0) {
+                    ble.ble_analyzer_device = advertisedDevice.getName().c_str();
+                } else {
+                    ble.ble_analyzer_device = advertisedDevice.getAddress().toString().c_str();
+                }
+                ble.ble_analyzer_frames_recvd = 0;
+            }
+        }
     }
     #endif
 };

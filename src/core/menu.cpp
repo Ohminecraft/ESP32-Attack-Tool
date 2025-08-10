@@ -18,6 +18,7 @@ EvilPortalAddtional eportal;
 NRF24Modules nrf;
 IRSendModules irtx;
 IRReadModules irrx;
+SDCardModules sdcard;
 
 
 // https://github.com/pr3y/Bruce/blob/main/src/main.cpp
@@ -53,6 +54,13 @@ void menuinit() {
 		digitalWrite(CS_PIN, HIGH);
 		digitalWrite(NRF24_CSN_PIN, HIGH);
 	#endif
+	#ifdef USING_SD
+	pinMode(NRF24_CSN_PIN, OUTPUT);
+	digitalWrite(NRF24_CSN_PIN, HIGH);
+	pinMode(SD_CS_PIN, OUTPUT);
+	digitalWrite(SD_CS_PIN, HIGH);
+	#endif
+
 
 	if (!display.main()) {
 		Serial.println("[ERROR] Failed to initialize display!");
@@ -62,6 +70,7 @@ void menuinit() {
 	irrx.main();
 	wifi.main();
 	ble.main();
+	sdcard.main();
 	eportal.setup();
 	Serial.println("[INFO] Menu system initialized");
 	Serial.printf("[INFO] Total heap: %d bytes\n", String(getHeap(GET_TOTAL_HEAP)).toInt());
@@ -267,6 +276,7 @@ void displayBLEScanMenu() {
 void displayBLEMenu() {
 	String items[BLE_MENU_COUNT] = {
 		"BLE Scan",
+		"BLE Analyzer",
 		"BLE Info",
 		"BLE Spoofer",
 		"BLE Exploit Atk",
@@ -563,6 +573,7 @@ void displayWiFiGeneralMenu() {
 		"Beacon Scan",
 		"EAPOL/PMKID Scan",
 		"EAPOL.. Deauth Scan",
+		"Channel Analyzer",
 		"< Back"
 	};
 
@@ -948,19 +959,19 @@ void displayAttackStatus() {
 	String attackName = "";
 	if (currentState == BLE_ATTACK_RUNNING) {
 	   switch(currentBLEAttackType) {
-			case BLE_ATTACK_SOUR_APPLE:
+			case BLE_ATTACK_EXPLOIT_SOUR_APPLE:
 				attackName = "Sour Apple";
 				break;
-			case BLE_ATTACK_APPLE_JUICE:
+			case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
 				attackName = "Apple Juice";
 				break;
-			case BLE_ATTACK_MICROSOFT:
+			case BLE_ATTACK_EXPLOIT_MICROSOFT:
 				attackName = "Swiftpair MS";
 				break;
-			case BLE_ATTACK_SAMSUNG:
+			case BLE_ATTACK_EXPLOIT_SAMSUNG:
 				attackName = "Samsung Spam";
 				break;
-			case BLE_ATTACK_GOOGLE:
+			case BLE_ATTACK_EXPLOIT_GOOGLE:
 				attackName = "Google Spam";
 				break;
 		}
@@ -1286,8 +1297,11 @@ void selectCurrentItem() {
 					currentState = BLE_EXPLOIT_ATTACK_MENU;
 					currentSelection = 0;
 					maxSelections = BLE_ATK_MENU_COUNT;
-					ble.initSpam();
+					ble.StartMode(BLE_ATTACK_EXPLOIT_INIT);
 					displayExploitAttackBLEMenu();
+				} else if (currentSelection == BLE_ANALYZER) {
+					currentState = BLE_ANALYZER_RUNNING;
+					ble.StartMode(BLE_SCAN_ANALYZER);
 				} else if (currentSelection == BLE_INFO) {
 					currentState = BLE_INFO_MENU_LIST;
 					currentSelection = 0;
@@ -1297,7 +1311,7 @@ void selectCurrentItem() {
 					currentState = BLE_SPOOFER_MAIN_MENU;
 					currentSelection = 0;
 					maxSelections = BLE_SPOOFER_COUNT;
-					ble.initSpoofer();
+					ble.StartMode(BLE_ATTACK_SPOOFER_INIT);
 					displayMainSpooferMenu();
 				} else if (currentSelection == BLE_SCAN) {
 					currentState = BLE_SCAN_RUNNING;
@@ -1355,7 +1369,7 @@ void selectCurrentItem() {
 			if (currentSelection == BLE_SPO_APPLE_BACK) {
 				goBack();
 			} else {
-				ble_spoofer_device = currentSelection;
+				spooferDeviceIndex = currentSelection;
 				currentState = BLE_SPOOFER_AD_TYPE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_AD_TYPE_COUNT;
@@ -1367,7 +1381,7 @@ void selectCurrentItem() {
 			if (currentSelection == BLE_SPO_SAMSUNG_BACK) {
 				goBack();
 			} else {
-				ble_spoofer_device = currentSelection;
+				spooferDeviceIndex = currentSelection;
 				currentState = BLE_SPOOFER_AD_TYPE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_AD_TYPE_COUNT;
@@ -1379,7 +1393,7 @@ void selectCurrentItem() {
 			if (currentSelection == BLE_SPO_GOOGLE_BACK) {
 				goBack();
 			} else {
-				ble_spoofer_device = currentSelection;
+				spooferDeviceIndex = currentSelection;
 				currentState = BLE_SPOOFER_AD_TYPE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_AD_TYPE_COUNT;
@@ -1391,7 +1405,7 @@ void selectCurrentItem() {
 			if (currentSelection == BLE_SPO_AD_TYPE_BACK) {
 				goBack();
 			} else {
-				ble_spoofer_ad_type = currentSelection;
+				spooferAdTypeIndex = currentSelection;
 				currentState = BLE_SPOOFER_RUNNING;
 			}
 			break;
@@ -1412,8 +1426,8 @@ void selectCurrentItem() {
 				}
 				
 				// Start BLE attack
-				BLEScanState attackTypes[] = {BLE_ATTACK_SOUR_APPLE, BLE_ATTACK_APPLE_JUICE, BLE_ATTACK_MICROSOFT, 
-									   BLE_ATTACK_SAMSUNG, BLE_ATTACK_GOOGLE};
+				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
+									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE};
 				startBLEAttack(attackTypes[currentSelection]);
 				}
 			break;
@@ -1561,6 +1575,9 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
 				displayStatusBar(true);
 				startSnifferScan(WIFI_GENERAL_EAPOL_DEAUTH_SCAN);
+			} else if (currentSelection == WIFI_GENERAL_CH_ANALYZER) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				startSnifferScan(WIFI_GENERAL_CH_ANALYZER);
 			}
 			wifiSnifferMode = currentSelection;
 			break;
@@ -1871,6 +1888,8 @@ void goBack() {
 			currentState = WIFI_GENERAL_MENU;
 			currentSelection = 0;
 			maxSelections = WIFI_GENERAL_MENU_COUNT;
+			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) display.clearGraph(wifi.wifi_analyzer_frames);
+			wifi.wifi_analyzer_ssid = "";
 			wifiSnifferMode = -1;
 			wifi.StartMode(WIFI_SCAN_OFF);
 			displayWiFiGeneralMenu();
@@ -1914,7 +1933,7 @@ void goBack() {
 		case BLE_SCAN_RUNNING:
 			if (bleScanRunning && bleScanInProgress) {
 				bleScanInProgress = false;
-				ble.ShutdownBLE();
+				ble.StartMode(BLE_SCAN_OFF);
 				Serial.println("[INFO] BLE Scan completed successfully! Devices in list: " + String(blescanres->size()));
 				displayBLEScanMenu();
 				display.clearBuffer();
@@ -1935,11 +1954,20 @@ void goBack() {
 				displayBLEMenu();
 			}
 			break;
+		case BLE_ANALYZER_RUNNING:
+			currentState = BLE_MENU;
+			currentSelection = 0;
+			maxSelections = BLE_MENU_COUNT;
+			ble.StartMode(BLE_SCAN_OFF);
+			display.clearGraph(ble.ble_analyzer_frames);
+			ble.ble_analyzer_device = "";
+			displayBLEMenu();
+			break;
 		case BLE_EXPLOIT_ATTACK_MENU:
 			currentState = BLE_MENU;
 			currentSelection = 0;
 			maxSelections = BLE_MENU_COUNT;
-			ble.ShutdownBLE();
+			ble.StartMode(BLE_SCAN_OFF);
 			displayBLEMenu();
 			break;
 		case BLE_INFO_MENU_DETAIL:
@@ -1959,7 +1987,7 @@ void goBack() {
 			currentState = BLE_MENU;
 			currentSelection = 0;
 			maxSelections = BLE_MENU_COUNT;
-			ble.ShutdownBLE();
+			ble.StartMode(BLE_SCAN_OFF);
 			displayBLEMenu();
 			break;
 		case BLE_SPOOFER_APPLE_MENU:
@@ -1988,28 +2016,28 @@ void goBack() {
 				currentState = BLE_SPOOFER_APPLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_APPLE_COUNT;
-				ble_spoofer_device = 0;
+				spooferDeviceIndex = -1;
 				displayAppleSpooferMenu();
 			} 
 			else if (bleSpooferBrandType == BLE_SPO_BRAND_SAMSUNG) {
 				currentState = BLE_SPOOFER_SAMSUNG_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_SAMSUNG_COUNT;
-				ble_spoofer_device = 0;
+				spooferDeviceIndex = -1;
 				displaySamsungSpooferMenu();
 			} 
 			else if (bleSpooferBrandType == BLE_SPO_BRAND_GOOGLE) {
 				currentState = BLE_SPOOFER_GOOGLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_GOOGLE_COUNT;
-				ble_spoofer_device = 0;
+				spooferDeviceIndex = -1;
 				displayGoogleSpooferMenu();
 			} 
 			break;
 		case BLE_SPOOFER_RUNNING:
 			bleSpooferDone = false;
-			ble_spoofer_device = 0;
-			ble_spoofer_ad_type = 0;
+			spooferDeviceIndex = -1;
+			spooferAdTypeIndex = -1;
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
 				currentState = BLE_SPOOFER_APPLE_MENU;
 				currentSelection = 0;
@@ -2028,7 +2056,7 @@ void goBack() {
 				maxSelections = BLE_SPO_GOOGLE_COUNT;
 				displayGoogleSpooferMenu();
 			}
-			ble.stopSpoofer();
+			ble.StartMode(BLE_ATTACK_SPOOFER_STOP);
 			break;
 		case WIFI_ATTACK_RUNNING:
 			stopCurrentAttack();
@@ -2167,31 +2195,12 @@ void nrfOutputScanChannel() {
 
 	Serial.println("[INFO] NRF24 Scanner | Data: " + String(norm));
 
-    byte drawHeight = (norm > SCR_HEIGHT) ? SCR_HEIGHT - 1 : norm;
-
-    for (byte count = 126; count > 0; count--) {
-      sensorArray[count] = sensorArray[count - 1];
-    }
-    sensorArray[0] = drawHeight;
+    display.addValueToGraph(norm, sensorArray);
 
     display.clearScreen();
 
-    display.drawingLine(0, 0, 0, 63);
-    display.drawingLine(SCR_WIDTH - 1, 0, SCR_WIDTH - 1, 63);
-
-    for (byte count = 0; count < 64; count += 10) {
-		display.drawingLine(SCR_WIDTH - 1, count, 122, count);
-		display.drawingLine(0, count, 5, count);
-    }
-
-    for (byte count = 10; count < SCR_WIDTH - 1; count += 10) {
-		display.drawingPixel(count, 0);
-		display.drawingPixel(count, 63);
-    }
-
-    for (byte count = 0; count < SCR_WIDTH - 1; count++) {
-		display.drawingLine(SCR_WIDTH - 1 - count, 63, SCR_WIDTH - 1 - count, 63 - sensorArray[count]);
-    }
+	display.setGraphScale(display.graphScaleCheck(sensorArray));
+    display.drawingGraph(sensorArray);
 
     display.setCursor(12, 12);
     display.printString("[" + String(norm) + "]");
@@ -2215,20 +2224,15 @@ void nrfScanner() {
 	if (selPress) {
 		return;
 	}
-	static unsigned long lastSaveTime = 0;
-	if (millis() - lastSaveTime > 5000) {
-		nrf.saveGraphtoEEPROM();
-		lastSaveTime = millis();
-	} 
 }
 
 void startBLEAttack(BLEScanState attackType) {
 	String strmode = "";
-	if (attackType == BLE_ATTACK_SOUR_APPLE) strmode = "Sour Apple";
-	else if (attackType == BLE_ATTACK_APPLE_JUICE) strmode = "Apple Juice";
-	else if (attackType == BLE_ATTACK_MICROSOFT) strmode = "Swiftpair";
-	else if (attackType == BLE_ATTACK_GOOGLE) strmode = "Android (Google)";
-	else if (attackType == BLE_ATTACK_SAMSUNG) strmode = "Samsung";
+	if (attackType == BLE_ATTACK_EXPLOIT_SOUR_APPLE) strmode = "Sour Apple";
+	else if (attackType == BLE_ATTACK_EXPLOIT_APPLE_JUICE) strmode = "Apple Juice";
+	else if (attackType == BLE_ATTACK_EXPLOIT_MICROSOFT) strmode = "Swiftpair";
+	else if (attackType == BLE_ATTACK_EXPLOIT_GOOGLE) strmode = "Android (Google)";
+	else if (attackType == BLE_ATTACK_EXPLOIT_SAMSUNG) strmode = "Samsung";
 	Serial.println("[INFO] Starting BLE attack: " + strmode);
 	
 	currentBLEAttackType = attackType;
@@ -2322,7 +2326,7 @@ void startBLEScan() {
 	displayBLEScanMenu();
 	bleScanOneShot = true;
 	display.clearBuffer();
-	ble.bleScan();
+	ble.StartMode(BLE_SCAN_DEVICE);
 	//displayStatusBar(true);
 	//ble.ShutdownBLE();
 	//bleScanInProgress = false;
@@ -2376,14 +2380,19 @@ void startSnifferScan(WiFiGeneralItem sniffer_mode) {
 	else if (sniffer_mode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
 		wifi.StartMode(WIFI_SCAN_EAPOL_DEAUTH);
 	}
-
+	else if (sniffer_mode == WIFI_GENERAL_CH_ANALYZER) {
+		wifi.StartMode(WIFI_SCAN_CH_ANALYZER);
+	} else {
+		Serial.println("[ERROR] Invalid sniffer mode selected: " + String(sniffer_mode));
+		return;
+	}
 }
 
 void stopCurrentAttack() {
 	Serial.println("[INFO] Stopping current attack");
 	 
 	if (currentState == BLE_ATTACK_RUNNING) {
-		ble.ShutdownBLE();
+		ble.StartMode(BLE_SCAN_OFF);
 	} else if (currentState == WIFI_ATTACK_RUNNING) {
 		if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL ||
 			currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH ||
@@ -2482,7 +2491,7 @@ void performReboot() {
 	
 	// Shutdown BLE
 	if (ble_initialized) {
-		ble.ShutdownBLE();
+		ble.StartMode(BLE_SCAN_OFF);
 
 	}
 	
@@ -2490,8 +2499,8 @@ void performReboot() {
 	if (wifi_initialized) {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
-	
-	currentState = MAIN_MENU;
+
+	nrf.shutdownNRF(*NRFSPI);
 
 	// Display reboot message
 	display.clearScreen();
@@ -2521,13 +2530,15 @@ void performDeepSleep() {
 	
 	// Shutdown BLE
 	if (ble_initialized) {
-		ble.ShutdownBLE();
+		ble.StartMode(BLE_SCAN_OFF);
 	}
 	
 	// Shutdown WiFi
 	if (wifi_initialized) {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
+
+	nrf.shutdownNRF(*NRFSPI);
 
 	currentState = MAIN_MENU;
 	
@@ -2553,6 +2564,7 @@ void handleInput(MenuState handle_state) {
 		if ((wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) ||
 			handle_state == WIFI_SCAN_SNIFFER_RUNNING ||
 			(bleScanRunning && handle_state == BLE_SCAN_RUNNING) ||
+			handle_state == BLE_ANALYZER_RUNNING ||
 			handle_state == NRF24_ANALYZER_RUNNING ||
 			handle_state == NRF24_JAMMER_RUNNING ||
 			handle_state == NRF24_SCANNER_RUNNING ||
@@ -2574,11 +2586,16 @@ void handleInput(MenuState handle_state) {
 		{
 			goBack();
 		}
-		else if (wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN || wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+		else if ((wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN ||
+				 wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN ||
+				 wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) && currentState == WIFI_SCAN_SNIFFER_RUNNING) {
 			if (wifi.set_channel < 2) wifi.set_channel = 14;
 			else wifi.set_channel = wifi.set_channel - 1;
 			wifi.changeChannel();
-			display_buffer->add("Change Ch to: " + String(wifi.set_channel));
+			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) {
+				analyzerChangedChannel = true;
+			}
+			else display_buffer->add("Change Ch to: " + String(wifi.set_channel));
 			Serial.println("[INFO] Manually change channel to " + String(wifi.set_channel));
 			wifiScanRedraw = true;
 		}
@@ -2588,11 +2605,16 @@ void handleInput(MenuState handle_state) {
 	}
 
 	if (check(nextPress)) {
-		if (wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN || wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+		if ((wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN ||
+			wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN ||
+			wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) && currentState == WIFI_SCAN_SNIFFER_RUNNING) {
 			if (wifi.set_channel > 13) wifi.set_channel = 1;
 			else wifi.set_channel = wifi.set_channel + 1;
 			wifi.changeChannel();
-			display_buffer->add("Change Ch to: " + String(wifi.set_channel));
+			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) {
+				analyzerChangedChannel = true;
+			}
+			else display_buffer->add("Change Ch to: " + String(wifi.set_channel));
 			Serial.println("[INFO] Manually change channel to " + String(wifi.set_channel));
 			wifiScanRedraw = true;
 		}
@@ -2643,17 +2665,47 @@ void handleTasks(MenuState handle_state) {
 
 	else if (handle_state == WIFI_SCAN_SNIFFER_RUNNING) {
 		if (wifiScanRedraw) {
-			wifiScanRedraw = false;
-			display.clearScreen();
-			displayStatusBar();
-			display.displayBuffer();
+			if (wifiSnifferMode != WIFI_GENERAL_CH_ANALYZER) {
+				wifiScanRedraw = false;
+				display.clearScreen();
+				displayStatusBar();
+				display.displayBuffer();
+			} else {
+				if (analyzerChangedChannel) {
+					display.clearScreen();
+					display.drawingGraph(wifi.wifi_analyzer_frames);
+					display.displayStringwithCoordinates("Change CH to " + String(wifi.set_channel), 6, 12, true);
+					vTaskDelay(200 / portTICK_PERIOD_MS);
+					analyzerChangedChannel = false;
+				}
+			}
+			
 		}
 
-		if (wifiSnifferMode != WIFI_GENERAL_EAPOL_SCAN && wifiSnifferMode != WIFI_GENERAL_EAPOL_DEAUTH_SCAN) {
+		if (wifiSnifferMode != WIFI_GENERAL_EAPOL_SCAN &&
+			wifiSnifferMode != WIFI_GENERAL_EAPOL_DEAUTH_SCAN &&
+			wifiSnifferMode != WIFI_GENERAL_CH_ANALYZER) {
 			static unsigned long channelhoptimer = 0;
 			if (millis() - channelhoptimer > 500) {
 				wifi.channelHop();
 				channelhoptimer = millis();
+			}
+		}
+
+		if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) {
+			static unsigned long redrawgraph = 0;
+			if (millis() - redrawgraph > 100) {
+				redrawgraph = millis();
+				display.addValueToGraph(wifi.wifi_analyzer_value, wifi.wifi_analyzer_frames);
+				wifi.wifi_analyzer_value = 0; // Reset value after adding to graph
+				display.clearScreen();
+				display.setGraphScale(display.graphScaleCheck(wifi.wifi_analyzer_frames));
+				if (wifi.wifi_analyzer_rssi == 0) {
+					display.displayStringwithCoordinates(wifi.wifi_analyzer_ssid, 6, 12);
+				} else {
+					display.displayStringwithCoordinates(String(wifi.wifi_analyzer_rssi) + " " + wifi.wifi_analyzer_ssid, 6, 12);
+				}
+				display.drawingGraph(wifi.wifi_analyzer_frames, true);
 			}
 		}
 	}
@@ -2672,6 +2724,23 @@ void handleTasks(MenuState handle_state) {
 				display.displayBuffer();
 			}
 		}
+	}
+	
+	else if (handle_state == BLE_ANALYZER_RUNNING) {
+		static unsigned long redrawgraph = 0;
+			if (millis() - redrawgraph > 100) {
+				redrawgraph = millis();
+				display.addValueToGraph(ble.ble_analyzer_value, ble.ble_analyzer_frames);
+				ble.ble_analyzer_value = 0; // Reset value after adding to graph
+				display.clearScreen();
+				display.setGraphScale(display.graphScaleCheck(ble.ble_analyzer_frames));
+				if (ble.ble_analyzer_rssi == 0) {
+					display.displayStringwithCoordinates(ble.ble_analyzer_device, 6, 12);
+				} else {
+					display.displayStringwithCoordinates(String(ble.ble_analyzer_rssi) + " " + ble.ble_analyzer_device, 6, 12);
+				}
+				display.drawingGraph(ble.ble_analyzer_frames, true);
+			}
 	}
 
 	else if (handle_state == NRF24_ANALYZER_RUNNING) {
@@ -2705,6 +2774,7 @@ void handleTasks(MenuState handle_state) {
 			Serial.println("[INFO] Starting NRF Scanner");
 			display.clearScreen();
 			display.sendDisplay();
+			display.clearGraph(sensorArray);
 			nrf.scannerSetup();
 			nrfScannerSetupOneShot = true;
 		}
@@ -2752,11 +2822,11 @@ void handleTasks(MenuState handle_state) {
 	else if (handle_state == BLE_SPOOFER_RUNNING) {
 		if (!bleSpooferDone) {
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE)
-				ble.startSpoofer(ble_spoofer_device, BLE_SPOOFER_DEVICE_BRAND_APPLE, ble_spoofer_ad_type);
+				ble.StartMode(BLE_ATTACK_SPOOFER_APPLE);
 			else if (bleSpooferBrandType == BLE_SPO_BRAND_SAMSUNG)
-				ble.startSpoofer(ble_spoofer_device, BLE_SPOOFER_DEVICE_BRAND_SAMSUNG, ble_spoofer_ad_type);
+				ble.StartMode(BLE_ATTACK_SPOOFER_SAMSUNG);
 			else if (bleSpooferBrandType == BLE_SPO_BRAND_GOOGLE)
-				ble.startSpoofer(ble_spoofer_device, BLE_SPOOFER_DEVICE_BRAND_GOOGLE, ble_spoofer_ad_type);
+				ble.StartMode(BLE_ATTACK_SPOOFER_GOOGLE);
 			displaySpooferRunning();
 			bleSpooferDone = true;
 		}
@@ -2770,20 +2840,20 @@ void handleTasks(MenuState handle_state) {
 		if (handle_state == BLE_ATTACK_RUNNING) {
 			// BLE attack handling...
 			switch(currentBLEAttackType) {
-				case BLE_ATTACK_SOUR_APPLE:
-					ble.executeSwiftpair(SourApple);
+				case BLE_ATTACK_EXPLOIT_SOUR_APPLE:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_SOUR_APPLE);
 					break;
-				case BLE_ATTACK_APPLE_JUICE:
-					ble.executeSwiftpair(AppleJuice);
+				case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_JUICE);
 					break;
-				case BLE_ATTACK_MICROSOFT:
-					ble.executeSwiftpair(Microsoft);
+				case BLE_ATTACK_EXPLOIT_MICROSOFT:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_MICROSOFT);
 					break;
-				case BLE_ATTACK_SAMSUNG:
-					ble.executeSwiftpair(Samsung);
+				case BLE_ATTACK_EXPLOIT_SAMSUNG:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_SAMSUNG);
 					break;
-				case BLE_ATTACK_GOOGLE:
-					ble.executeSwiftpair(Google);
+				case BLE_ATTACK_EXPLOIT_GOOGLE:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_GOOGLE);
 					break;
 			}
 		} 
@@ -2975,6 +3045,7 @@ void menuloop() {
 	handleStateRunningCheck = !(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep mode when in attack mode 
 							!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
 							!(currentState == BLE_SCAN_RUNNING) &&
+							!(currentState == BLE_ANALYZER_RUNNING) &&
 							!(currentState == NRF24_ANALYZER_RUNNING) &&
 							!(currentState == NRF24_JAMMER_RUNNING) &&
 							!(currentState == NRF24_SCANNER_RUNNING) &&

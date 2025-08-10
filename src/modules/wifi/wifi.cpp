@@ -189,6 +189,9 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 		eapol_scan_send_deauth = true;
 		this->StartEapolScan();
 	}
+	else if (mode == WIFI_SCAN_CH_ANALYZER) {
+		this->StartAnalyzerScan();
+	}
 	else if (mode == WIFI_ATTACK_DEAUTH) {
 		this->StartWiFiAttack(mode);
 		Serial.println("[INFO] Starting [Deauth] Attack!");
@@ -943,6 +946,59 @@ void WiFiModules::eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 		display_buffer->add(addr);
 		wifiScanRedraw = true;
 	}
+}
+
+void WiFiModules::analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
+	extern WiFiModules wifi;
+	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
+	WifiMgmtHdr *frameControl = (WifiMgmtHdr*)snifferPacket->payload;
+	int len = snifferPacket->rx_ctrl.sig_len;
+
+	for (int i = 0; i < 3; i++) wifi.wifi_analyzer_value++;
+	if (wifi.wifi_analyzer_frames_recvd < 254) {
+		wifi.wifi_analyzer_frames_recvd++;
+	}
+	if (wifi.wifi_analyzer_frames_recvd >= 100) { // Analyzer Name Refresh (ESP32 Marauder)
+		if (type == WIFI_PKT_MGMT) {
+			len -= 4;
+			if (snifferPacket->payload[0] == 0x80) {
+				String _temp_ssid = "";
+				char addr[] = "00:00:00:00:00:00";
+				getMAC(addr, snifferPacket->payload, 10);
+
+				wifi.wifi_analyzer_rssi = snifferPacket->rx_ctrl.rssi;
+
+				// Get ESSID if exists else give BSSID to display string
+				if (snifferPacket->payload[37] <= 0) // There is no ESSID. Just add BSSID
+					_temp_ssid = String(addr);
+				else { // There is an ESSID. Add it
+					for (int i = 0; i < snifferPacket->payload[37]; i++)
+					{
+						_temp_ssid.concat((char)snifferPacket->payload[i + 38]);
+					}
+				}
+				wifi.wifi_analyzer_ssid = _temp_ssid;
+			}
+			wifi.wifi_analyzer_frames_recvd = 0;
+		}
+	}
+}
+
+void WiFiModules::StartAnalyzerScan() {
+
+	Serial.println("[INFO] Starting Analyzer scan...");
+
+	esp_wifi_init(&cfg2);
+	esp_wifi_set_storage(WIFI_STORAGE_RAM);
+	esp_wifi_set_mode(WIFI_MODE_NULL);
+	esp_wifi_start();
+	this->setMac();
+	esp_wifi_set_promiscuous(true);
+	esp_wifi_set_promiscuous_filter(&filt);
+	esp_wifi_set_promiscuous_rx_cb(&analyzerWiFiSnifferCallback);
+	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
+	wifi_initialized = true;
+	vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
 void WiFiModules::StartBeaconScan() {
