@@ -15,6 +15,28 @@ uint8_t scan_channel[SCAN_CHANNELS];
 int16_t sensorArray[SCR_WIDTH];
 uint8_t values[SCR_WIDTH];
 
+void NRF24Modules::main() {
+    // Initialize the NRF24 radio
+    NRFSPI = &SPI;
+    NRFSPI->begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN);
+    NRFSPI->setDataMode(SPI_MODE0);
+    NRFSPI->setFrequency(10000000);
+    NRFSPI->setBitOrder(MSBFIRST);
+
+    pinMode(NRF24_CSN_PIN, OUTPUT);
+    pinMode(NRF24_CE_PIN, OUTPUT);
+    digitalWrite(NRF24_CSN_PIN, HIGH);
+    digitalWrite(NRF24_CE_PIN, LOW);
+
+    if (!NRFRadio.begin(NRFSPI)) {
+        Serial.println("[ERROR] NRF Radio Initialization Failed!");
+        return;
+    }
+    Serial.println("[INFO] NRF Radio Initialized Successfully!");
+
+    this->initNRF(*NRFSPI);
+}
+
 byte NRF24Modules::getRegister(SPIClass &SPIIN, byte r) {
     byte c;
     

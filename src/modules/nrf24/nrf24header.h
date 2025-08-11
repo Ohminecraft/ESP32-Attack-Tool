@@ -31,6 +31,7 @@ extern uint8_t scan_channel[SCAN_CHANNELS];
 extern int16_t sensorArray[SCR_WIDTH];
 
 extern SPIClass *NRFSPI;
+extern RF24 NRFRadio;
 
 const byte bluetooth_channels[] =        {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
 const byte ble_channels[] =              {2, 26, 80};
@@ -82,6 +83,7 @@ class NRF24Modules
         void writeRegister(SPIClass &SPIIN, uint8_t reg, uint8_t value);
         uint8_t readRegister(SPIClass &SPIIN, uint8_t reg);
     public:
+        void main();
         void initNRF(SPIClass &SPIIN);
         void shutdownNRF(SPIClass &SPIIN);
         void analyzerScanChannels();

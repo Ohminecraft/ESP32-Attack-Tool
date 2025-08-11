@@ -13,6 +13,7 @@
 
 WiFiModules wifi;
 BLEModules ble;
+BadUSBModules badusb;
 DisplayModules display;
 EvilPortalAddtional eportal;
 NRF24Modules nrf;
@@ -71,6 +72,7 @@ void menuinit() {
 	wifi.main();
 	ble.main();
 	sdcard.main();
+	nrf.main();
 	eportal.setup();
 	Serial.println("[INFO] Menu system initialized");
 	Serial.printf("[INFO] Total heap: %d bytes\n", String(getHeap(GET_TOTAL_HEAP)).toInt());
@@ -180,6 +182,16 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("IR Tv-B-Gone", 0, 12);
 	else if (currentState == IR_SEND_RUNNING)
 		display.displayStringwithCoordinates("IR Send", 0, 12);
+	else if (currentState == SD_MENU)
+		display.displayStringwithCoordinates("SD Menu", 0, 12);
+	else if (currentState == SD_UPDATE_MENU)
+		display.displayStringwithCoordinates("SD Update", 0, 12);
+	else if (currentState == SD_DELETE_MENU)
+		display.displayStringwithCoordinates("SD Delete", 0, 12);
+	else if (currentState == BADUSB_KEY_LAYOUT_MENU)
+		display.displayStringwithCoordinates("BadUSB Layout", 0, 12);
+	else if (currentState == BADUSB_RUNNING)
+		display.displayStringwithCoordinates("BadUSB Deploy", 0, 12);
 	else
 		display.displayStringwithCoordinates("Unknown State", 0, 12);
 	
@@ -250,6 +262,7 @@ void displayMainMenu() {
 		"WiFi",
 		"NRF24",
 		"IR",
+		"SD",
 		"Deep Sleep",
 		"Reboot"
 	};
@@ -278,6 +291,7 @@ void displayBLEMenu() {
 		"BLE Scan",
 		"BLE Analyzer",
 		"BLE Info",
+		"BLE BadUSB",
 		"BLE Spoofer",
 		"BLE Exploit Atk",
 		"< Back"
@@ -955,6 +969,77 @@ void displayIRTvBGoneRegionMenu() {
 	menuNode(items, IR_TV_B_GONE_REGION_COUNT);
 }
 
+void displaySDMenu() {
+	displayStatusBar();
+
+	String items[SD_MENU_COUNT] = {
+		"SD Card Update",
+		"SD Card Delete",
+		"< Back"
+	};
+
+	menuNode(items, SD_MENU_COUNT);
+}
+
+void displayUpdateSDCard(int8_t error_code) { // 0 for fail open file, -1 for fail begin update, -2 for fail write stream, -3 for fail end update
+	display.clearScreen();
+	displayStatusBar();
+	if (error_code == 0) {
+		display.displayStringwithCoordinates("Failed to open file!", 0, 12);
+		display.displayStringwithCoordinates("Please check SD card", 0, 24, true);
+	} else if (error_code == -1) {
+		display.displayStringwithCoordinates("Failed to begin update!", 0, 12, true);
+	} else if (error_code == -2) {
+		display.displayStringwithCoordinates("Failed to write stream!", 0, 12, true);
+	} else if (error_code == -3) {
+		display.displayStringwithCoordinates("Failed to end update!", 0, 12, true);
+	} else {
+		display.displayStringwithCoordinates("Update successful!", 0, 12);
+		display.displayStringwithCoordinates("Please reboot device", 0, 24, true);
+	}
+	
+}
+
+void displayDeleteSDCard() {
+	display.clearScreen();
+	displayStatusBar();
+	String items[1];
+	if (currentSelection < sdcard_buffer->size()) {
+		String fileName = sdcard_buffer->get(currentSelection);
+		items[0] = ">" + fileName;
+	}
+
+	String error_text[2] = {
+		"No Files Found!",
+		"Or Smth Went Wrong!"
+	};
+
+	menuNode(items, sizeof(items) / sizeof(items[0]), "Files: ", error_text, sdcard_buffer->size());
+}
+
+void displayBadUSBKeyboardLayout() {
+	displayStatusBar();
+	
+	String items[BADUSB_LAYOUT_COUNT] = {
+		"EN-US",
+		"PT-BR",
+		"PT-PT",
+		"FR-FR",
+		"ES-ES",
+		"IT-IT",
+		"EN-UK",
+		"DE-DE",
+		"SV-SE",
+		"DA-DK",
+		"HU-HU",
+		"TR-TR",
+		"SI-SI",
+		"< Back"
+	};
+
+	menuNode(items, BADUSB_LAYOUT_COUNT);
+}
+
 void displayAttackStatus() {
 	String attackName = "";
 	if (currentState == BLE_ATTACK_RUNNING) {
@@ -1132,6 +1217,17 @@ void navigateUp() {
 		case IR_TV_B_GONE_REGION:
 			displayIRTvBGoneRegionMenu();
 			break;
+		case SD_MENU:
+			displaySDMenu();
+			break;
+		case SD_UPDATE_MENU:
+			break;
+		case SD_DELETE_MENU:
+			displayDeleteSDCard();
+			break;
+		case BADUSB_KEY_LAYOUT_MENU:
+			displayBadUSBKeyboardLayout();
+			break;
 	}
 }
 
@@ -1211,6 +1307,17 @@ void navigateDown() {
 		case IR_TV_B_GONE_REGION:
 			displayIRTvBGoneRegionMenu();
 			break;
+		case SD_MENU:
+			displaySDMenu();
+			break;
+		case SD_UPDATE_MENU:
+			break;
+		case SD_DELETE_MENU:
+			displayDeleteSDCard();
+			break;
+		case BADUSB_KEY_LAYOUT_MENU:
+			displayBadUSBKeyboardLayout();
+			break;
 	}
 	
 }
@@ -1238,6 +1345,11 @@ void selectCurrentItem() {
 				currentSelection = 0;
 				maxSelections = IR_MENU_COUNT;
 				displayIRMenu();
+			} else if (currentSelection == MAIN_SD) {
+				currentState = SD_MENU;
+				currentSelection = 0;
+				maxSelections = SD_MENU_COUNT;
+				displaySDMenu();
 			} else if (currentSelection == MAIN_REBOOT) {
 				displayRebootConfirm();
 				//delay(1000); // Give user time to see the message
@@ -1316,6 +1428,16 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_SCAN) {
 					currentState = BLE_SCAN_RUNNING;
 					displayBLEScanMenu();
+				} else if (currentSelection == BLE_BADUSB) {
+					selectforbadusb = true;
+					badble = true;
+					delete sdcard_buffer;
+					sdcard_buffer = new LinkedList<String>();
+					sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".txt");
+					currentState = SD_DELETE_MENU;
+					currentSelection = 0;
+					maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
+					displayDeleteSDCard();
 				}
 			}
 			break;
@@ -1816,6 +1938,139 @@ void selectCurrentItem() {
 				starttvbgone = true;
 			}
 			break;
+		case SD_MENU:
+			if (currentSelection == SD_BACK) {
+				goBack();
+			} else if (currentSelection == SD_UPDATE) {
+				displayStatusBar();
+				display.displayStringwithCoordinates("WIP", 0, 24, true);
+				vTaskDelay(1000 / portTICK_PERIOD_MS);
+				goBack();
+			} else if (currentSelection == SD_DELETE) {
+				delete sdcard_buffer;
+				sdcard_buffer = new LinkedList<String>();
+				sdcard.addListFileToLinkedList(sdcard_buffer);
+				currentState = SD_DELETE_MENU;
+				currentSelection = 0;
+				maxSelections = sdcard_buffer->size() + 1;
+				displayDeleteSDCard();
+			}
+			break;
+		case SD_DELETE_MENU:
+			if (!sdcard_buffer || sdcard_buffer->size() == 0) {
+				goBack();
+			} else {
+				if (currentSelection < sdcard_buffer->size()) {
+					if (!selectforbadusb) {
+						String fileName = sdcard_buffer->get(currentSelection);
+						display.clearScreen();
+						display.displayStringwithCoordinates("Delete file:", 0, 12);
+						display.displayStringwithCoordinates(fileName, 0, 24);
+						display.displayStringwithCoordinates("Press SELECT to", 0, 36);
+						display.displayStringwithCoordinates("confirm", 0, 48, true);
+							
+						bool confirmed = false;
+						while (!confirmed) {
+							if (check(selPress)) {
+								sdcard.deleteFile("/" + fileName);
+								sdcard_buffer->remove(currentSelection);
+								confirmed = true;
+							} else if (check(prevPress)) {
+								confirmed = true;
+							}
+							vTaskDelay(10 / portTICK_PERIOD_MS);
+						}
+						displayDeleteSDCard();
+					} else {
+						String fileName = sdcard_buffer->get(currentSelection);
+						display.clearScreen();
+						display.displayStringwithCoordinates("Select file for", 0, 12);
+						display.displayStringwithCoordinates("BadUSB:", 0, 24);
+						display.displayStringwithCoordinates(fileName, 0, 36);
+						display.displayStringwithCoordinates("Press SELECT to", 0, 48);
+						display.displayStringwithCoordinates("confirm", 0, 60, true);
+							
+						bool confirmed = false;
+						while (!confirmed) {
+							if (check(selPress)) {
+								File checkisnotempty = sdcard.getFile("/" + fileName, "r");
+								if (checkisnotempty.readString() == "") {
+									display.clearScreen();
+									display.displayStringwithCoordinates("File is empty!", 0, 12);
+									display.displayStringwithCoordinates("Select another", 0, 24);
+									display.displayStringwithCoordinates("file", 0, 36, true);
+									vTaskDelay(1000 / portTICK_PERIOD_MS);
+									displayDeleteSDCard();
+									return;
+								}
+								selectforbadusb = false;
+								confirmed = true;
+								badusbFile = "/" + fileName;
+							} else if (check(prevPress)) {
+								confirmed = true;
+							}
+							vTaskDelay(10 / portTICK_PERIOD_MS);
+						}
+						currentState = BADUSB_KEY_LAYOUT_MENU;
+						currentSelection = 0;
+						maxSelections = BADUSB_LAYOUT_COUNT;
+						displayBadUSBKeyboardLayout();
+					}
+				} else {
+					goBack();
+				}
+			}
+			break;
+		case BADUSB_KEY_LAYOUT_MENU:
+			if (currentSelection == BADUSB_LAYOUT_BACK) {
+				goBack();
+				break;
+			} else {
+				keyboardLayout = currentSelection;
+				currentState = BADUSB_RUNNING;
+				display.clearScreen();
+			}
+		case BADUSB_RUNNING:
+			if (badble) {
+				badusb.beginBadUSB(hid_ble, badble);
+				displayStatusBar();
+				display.displayStringwithCoordinates("Waiting Victim", 0, 24, true);
+				while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
+				if (badusb.isConnected(hid_ble)) {
+					display.clearScreen();
+					displayStatusBar();
+					display.displayStringwithCoordinates("Preparing", 0, 24, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					display.clearScreen();
+					displayStatusBar();
+					display.displayStringwithCoordinates("Press SELECT to", 0, 24);
+					display.displayStringwithCoordinates("Deploy", 0, 36, true);
+					while (!check(selPress)) yield();
+					display.clearScreen();
+					displayStatusBar();
+					display.displayStringwithCoordinates("Deploying BadUSB", 0, 24, true);
+					badusb.launchBadUSB(badusbFile, hid_ble);
+					display.clearScreen();
+					displayStatusBar();
+					display.displayStringwithCoordinates("BadUSB Launched", 0, 24);
+					display.displayStringwithCoordinates("Press SELECT to", 0, 36);
+					display.displayStringwithCoordinates("go Back", 0, 48, true);
+					while (!check(selPress)) yield();
+					goBack();
+				} else {
+					display.clearScreen();
+					displayStatusBar();
+					display.displayStringwithCoordinates("Cancelled", 0, 24, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					if (badble) {
+						goBack();
+						badble = false;
+					}
+					return;
+				}
+
+			}
+			break;
 	}
 	
 }
@@ -2116,6 +2371,51 @@ void goBack() {
 			currentSelection = 0;
 			maxSelections = IR_MENU_COUNT;
 			displayIRMenu();
+			break;
+		case SD_MENU:
+			currentState = MAIN_MENU;
+			currentSelection = 0;
+			maxSelections = MAIN_MENU_COUNT;
+			displayMainMenu();
+			break;
+		case SD_DELETE_MENU:
+		if (!selectforbadusb) {
+			currentState = SD_MENU;
+			currentSelection = 0;
+			maxSelections = SD_MENU_COUNT;
+			displaySDMenu();
+		} else {
+			if (badble) {
+				currentState = BLE_MENU;
+				currentSelection = 0;
+				maxSelections = BLE_MENU_COUNT;
+				displayBLEMenu();
+			}
+		}
+		break;
+		case SD_UPDATE_MENU:
+			currentState = SD_MENU;
+			currentSelection = 0;
+			maxSelections = SD_MENU_COUNT;
+			displaySDMenu();
+			break;
+		case BADUSB_KEY_LAYOUT_MENU:
+			if (selectforbadusb) {
+				if (badble) {
+					currentState = BLE_MENU;
+					currentSelection = 0;
+					maxSelections = BLE_MENU_COUNT;
+					displayBLEMenu();
+				}
+			}
+			break;
+		case BADUSB_RUNNING:
+			if (badble) {
+				currentState = BLE_MENU;
+				currentSelection = 0;
+				maxSelections = BLE_MENU_COUNT;
+				displayBLEMenu();
+			}
 			break;
 	}
 	
@@ -2500,7 +2800,7 @@ void performReboot() {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
 
-	nrf.shutdownNRF(*NRFSPI);
+	NRFRadio.powerDown();
 
 	// Display reboot message
 	display.clearScreen();
@@ -2538,7 +2838,7 @@ void performDeepSleep() {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
 
-	nrf.shutdownNRF(*NRFSPI);
+	NRFRadio.powerDown();
 
 	currentState = MAIN_MENU;
 	
@@ -3014,6 +3314,12 @@ void redrawTasks() {
 			break;
 		case IR_TV_B_GONE_REGION:
 			displayIRTvBGoneRegionMenu();
+			break;
+		case SD_MENU:
+			displaySDMenu();
+			break;
+		case SD_DELETE_MENU:
+			displayDeleteSDCard();
 			break;
 	}
 }

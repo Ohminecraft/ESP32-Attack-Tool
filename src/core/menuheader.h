@@ -23,6 +23,7 @@
 #include "modules/nrf24/nrf24header.h"
 #include "modules/ir/irsend_header.h"
 #include "modules/ir/irread_header.h"
+#include "modules/badusb/ducky_usb_header.h"
 
 #include "configs.h"
 
@@ -41,6 +42,11 @@ enum MenuState {
     WIFI_MENU,
     NRF24_MENU,
     IR_MENU,
+    SD_MENU,
+    SD_UPDATE_MENU,
+    SD_DELETE_MENU,
+    BADUSB_KEY_LAYOUT_MENU,
+    BADUSB_RUNNING,
     IR_TV_B_GONE_REGION,
     IR_SEND_RUNNING,
     NRF24_ANALYZER_RUNNING,
@@ -78,6 +84,7 @@ enum MainMenuItem {
     MAIN_WIFI,
     MAIN_NRF24,
     MAIN_IR,
+    MAIN_SD,
     MAIN_DEEP_SLEEP,
     MAIN_REBOOT,
     MAIN_MENU_COUNT
@@ -88,6 +95,7 @@ enum BLEMenuItem {
     BLE_SCAN,
     BLE_ANALYZER,
     BLE_INFO,
+    BLE_BADUSB,
     BLE_SPOOFER,
     BLE_EXPLOIT_ATTACK,
     BLE_BACK,
@@ -346,6 +354,31 @@ enum IRTVBGoneRegion {
     IR_TV_B_GONE_REGION_COUNT
 };
 
+enum SDMenuItem {
+    SD_UPDATE,
+    SD_DELETE,
+    SD_BACK,
+    SD_MENU_COUNT
+};
+
+enum BadUSBKeyLayout {
+    BADUSB_LAYOUT_EN_US,
+    BADUSB_LAYOUT_PT_BR,
+    BADUSB_LAYOUT_PT_PT,
+    BADUSB_LAYOUT_FR_FR,
+    BADUSB_LAYOUT_ES_ES,
+    BADUSB_LAYOUT_IT_IT,
+    BADUSB_LAYOUT_EN_UK,
+    BADUSB_LAYOUT_DE_DE,
+    BADUSB_LAYOUT_SV_SE,
+    BADUSB_LAYOUT_DA_DK,
+    BADUSB_LAYOUT_HU_HU,
+    BADUSB_LAYOUT_TR_TR,
+    BADUSB_LAYOUT_SI_SI,
+    BADUSB_LAYOUT_BACK,
+    BADUSB_LAYOUT_COUNT
+};
+
 MenuState currentState = MAIN_MENU;
 uint16_t currentSelection = 0;
 uint16_t maxSelections = MAIN_MENU_COUNT;
@@ -395,6 +428,11 @@ bool nrfScannerSetupOneShot = false;
 
 TvBeGoneRegion irTvBGoneRegion;
 bool starttvbgone = false;
+
+// BadUSB
+bool selectforbadusb = false;
+bool badble = false;
+String badusbFile;
 
 // System
 bool autoSleep = false;
