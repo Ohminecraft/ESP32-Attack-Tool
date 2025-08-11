@@ -27,10 +27,6 @@
 
 #include "configs.h"
 
-#define ATTACK_TOOL_VERSION "2.4.1"
-
-#define MAX_SHOW_SECLECTION 4
-
 #ifdef WIFI_SCAN_RUNNING
 #undef WIFI_SCAN_RUNNING
 #endif
