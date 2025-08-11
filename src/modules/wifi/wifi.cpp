@@ -12,6 +12,7 @@
 LinkedList<AccessPoint>* access_points;
 LinkedList<AccessPoint>* deauth_flood_ap;
 LinkedList<Station>* device_station;
+LinkedList<ProbeReqSsid>* probe_req_ssids;
 
 bool wifiScanRedraw = false;
 bool eapol_scan_send_deauth = false;
@@ -37,12 +38,13 @@ void WiFiModules::main() {
     access_points = new LinkedList<AccessPoint>();
 	deauth_flood_ap = new LinkedList<AccessPoint>();
 	device_station = new LinkedList<Station>();
+	probe_req_ssids = new LinkedList<ProbeReqSsid>();
 
 	esp_wifi_init(&cfg);
 	esp_wifi_set_mode(WIFI_AP_STA);
 	esp_wifi_start();
 	//WiFi.mode(WIFI_AP_STA);
-	this->wifi_initialized = true;
+	wifi_initialized = true;
 	Serial.println("[INFO] WiFi initialized successfully");
 	esp_wifi_get_mac(WIFI_IF_AP, this->ap_mac);
 	esp_wifi_get_mac(WIFI_IF_STA, this->sta_mac);
@@ -57,7 +59,7 @@ void WiFiModules::main() {
 }
 
 bool WiFiModules::ShutdownWiFi() {
-	if (this->wifi_initialized) {
+	if (wifi_initialized) {
 
 		if (eapol_scan_send_deauth) eapol_scan_send_deauth = false;
 
@@ -72,7 +74,7 @@ bool WiFiModules::ShutdownWiFi() {
 		esp_wifi_restore();
 		esp_wifi_deinit();
 		esp_netif_deinit();
-		this->wifi_initialized = false;
+		wifi_initialized = false;
 
 		Serial.println("[INFO] WiFi shutdown successfully");
 		return true;
@@ -158,7 +160,7 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 
 void WiFiModules::StartMode(WiFiScanState mode) {
 	if (mode == WIFI_SCAN_OFF) {
-		if (this->wifi_initialized) this->ShutdownWiFi();
+		if (wifi_initialized) this->ShutdownWiFi();
 		this->packet_sent = 0;
 		Serial.println("[INFO] WiFi scan mode is OFF, WiFi shutdown.");
 	}
@@ -186,6 +188,9 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 	else if (mode == WIFI_SCAN_EAPOL_DEAUTH) {
 		eapol_scan_send_deauth = true;
 		this->StartEapolScan();
+	}
+	else if (mode == WIFI_SCAN_CH_ANALYZER) {
+		this->StartAnalyzerScan();
 	}
 	else if (mode == WIFI_ATTACK_DEAUTH) {
 		this->StartWiFiAttack(mode);
@@ -252,7 +257,7 @@ void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
 	//esp_wifi_set_promiscuous(true);
 	esp_wifi_set_max_tx_power(82);
 	this->packet_sent = 0;
-	this->wifi_initialized = true;
+	wifi_initialized = true;
 	Serial.println("[INFO] WiFi re-initialized successfully");
 	Serial.println("[INFO] Ready to attack!");
 }
@@ -489,7 +494,10 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					essid = bssid;
 				}
 
+				if (!low_memory_warning)
 				display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+				else
+				display_buffer->add("Low Mem! Ignore!");
 				wifiScanRedraw = true;
 
 				String wpastr = "";
@@ -519,9 +527,14 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
-				access_points->add(_temp_ap);
-				Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
-				+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				if (!low_memory_warning) {
+					access_points->add(_temp_ap);
+					Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				} else {
+					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ") - Not added to list");
+				}
 			}
 		}
 	}
@@ -577,7 +590,10 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					essid = bssid;
 				}
 
+				if (!low_memory_warning)
 				display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+				else
+				display_buffer->add("Low Mem! Ignore!");
 				wifiScanRedraw = true;
 
 				String wpastr = "";
@@ -607,9 +623,15 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
-				access_points->add(_temp_ap);
-				Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
-				+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				if (!low_memory_warning) {
+					access_points->add(_temp_ap);
+					Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				} else {
+					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
+				}
+				
 			}
 		}
 	}
@@ -697,8 +719,8 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 						snifferPacket->payload[frame_offset + 5]},
 						false
 						};
-
-		device_station->add(sta);
+		
+		if (!low_memory_warning) device_station->add(sta);
 			
 		char sta_addr[] = "00:00:00:00:00:00";
 			
@@ -709,13 +731,23 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 			getMAC(sta_addr, snifferPacket->payload, 10);
 		}
 
-		Serial.println("[INFO] Added Station " + String(sta_addr)  +" -> Ap:" + access_points->get(ap_index).essid);
-		display_buffer->add(String(sta_addr));
-		display_buffer->add("->" + access_points->get(ap_index).essid);
+		if (!low_memory_warning) {
+			Serial.println("[INFO] Added Station " + String(sta_addr)  +" -> Ap:" + access_points->get(ap_index).essid);
+			display_buffer->add(String(sta_addr));
+			display_buffer->add("->" + access_points->get(ap_index).essid);
+		} else {
+			Serial.println("[WARN] Low Memory! Ignore Station " + String(sta_addr) + " -> Ap:" + access_points->get(ap_index).essid + " not added to display buffer!");
+			display_buffer->add("Low Mem! Ignore!");
+		}
+		
 		wifiScanRedraw = true;
 
 		AccessPoint ap = access_points->get(ap_index);
-		ap.stations->add(device_station->size() - 1);
+
+		if (!low_memory_warning) {
+			ap.stations->add(device_station->size() - 1);
+		}
+		
 
 		access_points->set(ap_index, ap);
 	}
@@ -769,11 +801,37 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 			getMAC(addr, snifferPacket->payload, 10);
 			for (int i = 0; i < snifferPacket->payload[25]; i++)
 			{
-			Serial.print((char)snifferPacket->payload[26 + i]);
-			probe_req_essid.concat((char)snifferPacket->payload[26 + i]);
+				probe_req_essid.concat((char)snifferPacket->payload[26 + i]);
 			}
-			display_buffer->add(addr);
-			display_buffer->add("->" + probe_req_essid);
+
+			if (probe_req_essid.length() > 0) {
+				bool essidExist = false;
+				for (int i = 0; i < probe_req_ssids->size(); i++) {
+					ProbeReqSsid cur_probe_ssid = probe_req_ssids->get(i);
+					if (cur_probe_ssid.essid == probe_req_essid) {
+						cur_probe_ssid.requests++;
+					  	probe_req_ssids->set(i, cur_probe_ssid);
+						essidExist = true;
+						break;
+					}
+				}
+				if (!essidExist) {
+					ProbeReqSsid probeReqSsid;
+					probeReqSsid.essid = probe_req_essid;
+				  	probeReqSsid.requests = 1;
+					probeReqSsid.selected = false;
+					probeReqSsid.channel = snifferPacket->rx_ctrl.channel;
+					probeReqSsid.rssi = snifferPacket->rx_ctrl.rssi;
+					if (!low_memory_warning) {
+				  		probe_req_ssids->add(probeReqSsid);
+					}
+				}
+			}
+
+			if (!low_memory_warning) {
+				display_buffer->add(addr);
+				display_buffer->add("->" + probe_req_essid);
+			} else display_buffer->add("Low Mem! Ignore!");
 			wifiScanRedraw = true;
 			Serial.println("[INFO] Probe Detected! Client:" + String(addr) + " Requesting: (CH:" + String(snifferPacket->rx_ctrl.channel) \
 			+ ") " + probe_req_essid + " RSSI: " + String(snifferPacket->rx_ctrl.rssi));
@@ -890,6 +948,59 @@ void WiFiModules::eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 	}
 }
 
+void WiFiModules::analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
+	extern WiFiModules wifi;
+	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
+	WifiMgmtHdr *frameControl = (WifiMgmtHdr*)snifferPacket->payload;
+	int len = snifferPacket->rx_ctrl.sig_len;
+
+	for (int i = 0; i < 3; i++) wifi.wifi_analyzer_value++;
+	if (wifi.wifi_analyzer_frames_recvd < 254) {
+		wifi.wifi_analyzer_frames_recvd++;
+	}
+	if (wifi.wifi_analyzer_frames_recvd >= 100) { // Analyzer Name Refresh (ESP32 Marauder)
+		if (type == WIFI_PKT_MGMT) {
+			len -= 4;
+			if (snifferPacket->payload[0] == 0x80) {
+				String _temp_ssid = "";
+				char addr[] = "00:00:00:00:00:00";
+				getMAC(addr, snifferPacket->payload, 10);
+
+				wifi.wifi_analyzer_rssi = snifferPacket->rx_ctrl.rssi;
+
+				// Get ESSID if exists else give BSSID to display string
+				if (snifferPacket->payload[37] <= 0) // There is no ESSID. Just add BSSID
+					_temp_ssid = String(addr);
+				else { // There is an ESSID. Add it
+					for (int i = 0; i < snifferPacket->payload[37]; i++)
+					{
+						_temp_ssid.concat((char)snifferPacket->payload[i + 38]);
+					}
+				}
+				wifi.wifi_analyzer_ssid = _temp_ssid;
+			}
+			wifi.wifi_analyzer_frames_recvd = 0;
+		}
+	}
+}
+
+void WiFiModules::StartAnalyzerScan() {
+
+	Serial.println("[INFO] Starting Analyzer scan...");
+
+	esp_wifi_init(&cfg2);
+	esp_wifi_set_storage(WIFI_STORAGE_RAM);
+	esp_wifi_set_mode(WIFI_MODE_NULL);
+	esp_wifi_start();
+	this->setMac();
+	esp_wifi_set_promiscuous(true);
+	esp_wifi_set_promiscuous_filter(&filt);
+	esp_wifi_set_promiscuous_rx_cb(&analyzerWiFiSnifferCallback);
+	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
+	wifi_initialized = true;
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+}
+
 void WiFiModules::StartBeaconScan() {
 	Serial.println("[INFO] Starting Beacon scan...");
 
@@ -907,6 +1018,8 @@ void WiFiModules::StartBeaconScan() {
 }
 
 void WiFiModules::StartProbeReqScan() {
+	delete probe_req_ssids;
+	probe_req_ssids = new LinkedList<ProbeReqSsid>();
 	
 	Serial.println("[INFO] Starting Probe Request scan...");
 
@@ -978,7 +1091,7 @@ void WiFiModules::StartEapolScan() {
 	esp_wifi_set_promiscuous_filter(&filt);
 	esp_wifi_set_promiscuous_rx_cb(&eapolSnifferCallback);
 	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
-	this->wifi_initialized = true;
+	wifi_initialized = true;
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
@@ -1099,7 +1212,7 @@ void WiFiModules::StartAPWiFiScanOld() { // using old scan to scan wifi
 
 // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp
 void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
 		return;
 	}
@@ -1156,7 +1269,7 @@ void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
 }
 
 void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
 		return;
 	}
@@ -1207,7 +1320,7 @@ void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 }
 
 void WiFiModules::sendBeaconRandomSSID() {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send beacon frame.");
 		return;
 	}
@@ -1252,7 +1365,7 @@ void WiFiModules::sendBeaconRandomSSID() {
 }
 
 void WiFiModules::sendDeauthAttack() {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send deauth frame.");
 		return;
 	}
@@ -1298,7 +1411,7 @@ void WiFiModules::sendDeauthAttack() {
 }
 
 void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]) {
-	if (!this->wifi_initialized) {
+	if (!wifi_initialized) {
 		Serial.println("[ERROR] WiFi is not initialized, cannot send deauth frame.");
 		return;
 	}

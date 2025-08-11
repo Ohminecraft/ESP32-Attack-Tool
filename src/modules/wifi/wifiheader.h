@@ -31,6 +31,7 @@ enum WiFiScanState {
     WIFI_SCAN_BEACON,
     WIFI_SCAN_EAPOL,
     WIFI_SCAN_EAPOL_DEAUTH,
+    WIFI_SCAN_CH_ANALYZER,
     WIFI_ATTACK_RND_BEACON,
     WIFI_ATTACK_STA_BEACON, // ATTACK STABLE SSID
     WIFI_ATTACK_RIC_BEACON,
@@ -41,6 +42,7 @@ enum WiFiScanState {
     WIFI_ATTACK_AUTH,// ATTACK PROBE
     WIFI_ATTACK_EVIL_PORTAL,
     WIFI_ATTACK_EVIL_PORTAL_DEAUTH,
+    WIFI_ATTACK_KARMA,
     WIFI_ATTACK_BAD_MSG,
     WIFI_ATTACK_BAD_MSG_ALL
 };
@@ -85,11 +87,20 @@ struct Station {
     uint8_t mac[6];
     bool selected;
     uint16_t ap;
-  };
+};
+
+struct ProbeReqSsid {
+    String essid;
+    bool selected;
+    uint8_t requests;
+    uint8_t channel;
+    int8_t rssi;
+};
 
 extern LinkedList<AccessPoint>* access_points;
 extern LinkedList<AccessPoint>* deauth_flood_ap;
 extern LinkedList<Station>* device_station;
+extern LinkedList<ProbeReqSsid>* probe_req_ssids;
 
 extern bool wifiScanRedraw;
 
@@ -298,6 +309,7 @@ class WiFiModules
         void StartBeaconScan();
         void StartDeauthScan();
         void StartEapolScan();
+        void StartAnalyzerScan();
         void StartWiFiAttack(WiFiScanState attack_mode);
 
         void sendCustomBeacon(AccessPoint custom_ssid);
@@ -309,9 +321,6 @@ class WiFiModules
         void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);;
 
     public:
-        bool wifi_initialized = false;  
-
-        WiFiModules() : wifi_initialized(false) {}
 
         ~WiFiModules() {
             //setMac();
@@ -326,6 +335,11 @@ class WiFiModules
         uint8_t sta_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
         uint8_t packet_sent = 0;
         uint8_t set_channel = 1;
+        int16_t wifi_analyzer_frames[SCR_WIDTH];
+        uint8_t wifi_analyzer_frames_recvd = 0;
+        int16_t wifi_analyzer_value = 0;
+        int8_t wifi_analyzer_rssi = 0;
+        String wifi_analyzer_ssid = "";
         const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 
         bool deauth_flood_redraw = false;
@@ -389,6 +403,7 @@ class WiFiModules
         static void beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
 
 };
 

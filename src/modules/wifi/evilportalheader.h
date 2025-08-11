@@ -347,7 +347,7 @@ class EvilPortalAddtional
         void shutdownServer();
         void serverSetup();
         void apStart();
-        bool apSetup(bool _deauth);
+        bool apSetup(String essid, bool _deauth);
         bool htmlSetup();
         void setup();
         void loop();

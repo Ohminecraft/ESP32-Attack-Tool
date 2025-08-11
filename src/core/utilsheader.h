@@ -36,6 +36,9 @@ void setBaseMacAddress(uint8_t macAddr[6]);
 extern volatile bool nextPress;
 extern volatile bool prevPress; 
 extern volatile bool selPress;
+extern bool ble_initialized;
+extern bool wifi_initialized;
+extern bool low_memory_warning;
 
 #if defined(USING_ENCODER)
 extern RotaryEncoder *encoder;

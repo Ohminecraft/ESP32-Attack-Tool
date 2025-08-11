@@ -96,6 +96,9 @@ void setBaseMacAddress(uint8_t macAddr[6]) {
 volatile bool nextPress = false;
 volatile bool prevPress = false;
 volatile bool selPress = false;
+bool ble_initialized = false; // BLE Initialized Flag
+bool wifi_initialized = false; // WiFi Initialized Flag
+bool low_memory_warning = false; // Low Memory Warning Flag
 
 #ifdef USING_ENCODER
 // Encoder Object

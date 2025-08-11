@@ -16,18 +16,16 @@
 #include "core/assets.h"
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
+#include "core/sdcardmountheader.h"
 #include "modules/ble/bleheader.h"
 #include "modules/wifi/wifiheader.h"
 #include "modules/wifi/evilportalheader.h"
-#include "modules/nrf24header.h"
+#include "modules/nrf24/nrf24header.h"
 #include "modules/ir/irsend_header.h"
 #include "modules/ir/irread_header.h"
+#include "modules/badusb/ducky_usb_header.h"
 
 #include "configs.h"
-
-#define ATTACK_TOOL_VERSION "2.4.1"
-
-#define MAX_SHOW_SECLECTION 4
 
 #ifdef WIFI_SCAN_RUNNING
 #undef WIFI_SCAN_RUNNING
@@ -40,6 +38,11 @@ enum MenuState {
     WIFI_MENU,
     NRF24_MENU,
     IR_MENU,
+    SD_MENU,
+    SD_UPDATE_MENU,
+    SD_DELETE_MENU,
+    BADUSB_KEY_LAYOUT_MENU,
+    BADUSB_RUNNING,
     IR_TV_B_GONE_REGION,
     IR_SEND_RUNNING,
     NRF24_ANALYZER_RUNNING,
@@ -52,6 +55,7 @@ enum MenuState {
     WIFI_SCAN_RUNNING,
     WIFI_SCAN_SNIFFER_RUNNING,
     WIFI_SELECT_MENU,
+    WIFI_SELECT_PROBE_REQ_SSIDS_MENU,
     WIFI_SELECT_STA_AP_MENU,
     WIFI_SELECT_STA_MENU,
     WIFI_ATTACK_MENU,
@@ -64,6 +68,7 @@ enum MenuState {
     BLE_SPOOFER_GOOGLE_MENU,
     BLE_SPOOFER_AD_TYPE_MENU,
     BLE_SPOOFER_RUNNING,
+    BLE_ANALYZER_RUNNING,
     BLE_EXPLOIT_ATTACK_MENU,
     BLE_ATTACK_RUNNING,
     WIFI_ATTACK_RUNNING
@@ -75,6 +80,7 @@ enum MainMenuItem {
     MAIN_WIFI,
     MAIN_NRF24,
     MAIN_IR,
+    MAIN_SD,
     MAIN_DEEP_SLEEP,
     MAIN_REBOOT,
     MAIN_MENU_COUNT
@@ -83,7 +89,9 @@ enum MainMenuItem {
 // BLE menu items
 enum BLEMenuItem {
     BLE_SCAN,
+    BLE_ANALYZER,
     BLE_INFO,
+    BLE_BADUSB,
     BLE_SPOOFER,
     BLE_EXPLOIT_ATTACK,
     BLE_BACK,
@@ -92,8 +100,8 @@ enum BLEMenuItem {
 
 enum BLESpooferAdType {
     BLE_SPO_AD_TYPE_NON,
-    BLE_SPO_AD_TYPE_DIR,
-    BLE_SPO_AD_TYPE_UND,
+    BLE_SPO_AD_TYPE_IND, // in NimBLE this is define for DIR Ad Type
+    BLE_SPO_AD_TYPE_SCAN, // in NimBLE this is define for UND Ad Type
     BLE_SPO_AD_TYPE_BACK,
     BLE_SPO_AD_TYPE_COUNT
 };
@@ -258,6 +266,7 @@ enum WiFiMenuItem {
     WIFI_GENERAL,
     WIFI_SELECT,
     WIFI_STA_SELECT,
+    WIFI_PROBE_REQ_SSIDS_SELECT,
     WIFI_UTILS,
     WIFI_ATTACK,
     WIFI_BACK,
@@ -282,6 +291,7 @@ enum WiFiGeneralItem {
     WIFI_GENERAL_BEACON_SCAN,
     WIFI_GENERAL_EAPOL_SCAN,
     WIFI_GENERAL_EAPOL_DEAUTH_SCAN,
+    WIFI_GENERAL_CH_ANALYZER,
     WIFI_GENERAL_BACK,
     WIFI_GENERAL_MENU_COUNT
 };
@@ -298,6 +308,7 @@ enum WiFiAttackMenuItem {
     WIFI_ATK_AP_BEACON,
     WIFI_ATK_EVIL_PORTAL,
     WIFI_ATK_EVIL_PORTAL_DEAUTH,
+    WIFI_ATK_KARMA,
     WIFI_ATK_BAD_MSG,
     WIFI_ATK_BAD_MSG_ALL,
     WIFI_ATK_BACK,
@@ -320,6 +331,7 @@ enum NRFJammerItem {
     NRF24_JAM_RC,
     NRF24_JAM_VIDEO_TRANS,
     NRF24_JAM_USB_WIRELESS,
+    NRF24_JAM_DRONE,
     NRF24_JAM_FULL_CHAN,
     NRF24_JAM_BACK,
     NRF24_JAM_MENU_COUNT
@@ -336,6 +348,31 @@ enum IRTVBGoneRegion {
     IR_TV_B_GONE_EU,
     IR_TV_B_GONE_BACK,
     IR_TV_B_GONE_REGION_COUNT
+};
+
+enum SDMenuItem {
+    SD_UPDATE,
+    SD_DELETE,
+    SD_BACK,
+    SD_MENU_COUNT
+};
+
+enum BadUSBKeyLayout {
+    BADUSB_LAYOUT_EN_US,
+    BADUSB_LAYOUT_PT_BR,
+    BADUSB_LAYOUT_PT_PT,
+    BADUSB_LAYOUT_FR_FR,
+    BADUSB_LAYOUT_ES_ES,
+    BADUSB_LAYOUT_IT_IT,
+    BADUSB_LAYOUT_EN_UK,
+    BADUSB_LAYOUT_DE_DE,
+    BADUSB_LAYOUT_SV_SE,
+    BADUSB_LAYOUT_DA_DK,
+    BADUSB_LAYOUT_HU_HU,
+    BADUSB_LAYOUT_TR_TR,
+    BADUSB_LAYOUT_SI_SI,
+    BADUSB_LAYOUT_BACK,
+    BADUSB_LAYOUT_COUNT
 };
 
 MenuState currentState = MAIN_MENU;
@@ -355,8 +392,6 @@ bool bleScanInProgress = false;
 bool bleScanDisplay = false;
 
 // BLE Spoofer State
-uint8_t ble_spoofer_device = 0;
-uint8_t ble_spoofer_ad_type = 0;
 bool bleSpooferDone = false;
 BLESpooferBrandType bleSpooferBrandType = NONE;
 
@@ -368,6 +403,7 @@ bool wifiScanDisplay = false;
 
 bool wifiSnifferInProgress = false;
 uint8_t wifiSnifferMode;
+bool analyzerChangedChannel = false;
 
 int ap_index = 0;
 bool set_mac = false;
@@ -389,9 +425,15 @@ bool nrfScannerSetupOneShot = false;
 TvBeGoneRegion irTvBGoneRegion;
 bool starttvbgone = false;
 
+// BadUSB
+bool selectforbadusb = false;
+bool badble = false;
+String badusbFile;
+
 // System
 bool autoSleep = false;
 bool standby = false;
+bool handleStateRunningCheck = false; // Used to check if the handle state is running
 
 // Menu display functions
 void displayWelcome();
@@ -448,6 +490,7 @@ void nrfScanner();
 // Helper functions
 bool hasSelectedAPs();
 bool hasSelectedSTAs();
+bool hasSelectedProbeReqSSID();
         
 // System functions
 void performReboot();

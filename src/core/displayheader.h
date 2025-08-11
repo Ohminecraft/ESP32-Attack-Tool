@@ -37,7 +37,8 @@ class DisplayModules
         U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
     #endif
         bool screenInitialized = false;
-        
+
+        float graph_scale = 1.0;
     public:
         DisplayModules();
         ~DisplayModules();
@@ -62,6 +63,15 @@ class DisplayModules
         void sendDisplay();
         //void addToBuffer(String msg);
         void drawBipmap(int x, int y, int w, int h, const uint8_t* icon, bool senddisplay = false);
+
+        // For Graphs
+        void setGraphScale(float scale) { graph_scale = scale; }
+        float getGraphScale() const { return graph_scale; }
+        float calculateGraphScale(int16_t value);
+        float graphScaleCheck(const int16_t array[SCR_WIDTH]);
+        void drawingGraph(int16_t* array, bool senddisplay = false);
+        void addValueToGraph(int16_t value, int16_t* graph_array, int graph_array_size = SCR_WIDTH);
+        void clearGraph(int16_t* array);
         
         // Additional U8g2 specific methods you might want to add
         void setCursor(int x, int y);

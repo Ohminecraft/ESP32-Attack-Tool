@@ -21,7 +21,11 @@
         "functional": "cpp",
         "tuple": "cpp",
         "unordered_map": "cpp",
-        "unordered_set": "cpp"
+        "unordered_set": "cpp",
+        "ostream": "cpp",
+        "ratio": "cpp",
+        "type_traits": "cpp",
+        "fstream": "cpp"
     },
     "git.useEditorAsCommitInput": false,
     "cmake.sourceDirectory": "C:/Users/Administrator/Desktop/ESP32-Attack-Tool/lib/AsyncTCP-esphome"
