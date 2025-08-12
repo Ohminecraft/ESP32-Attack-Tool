@@ -318,7 +318,7 @@ class WiFiModules
         void sendDeauthAttack();
         void sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]);
         void sendProbeAttack();
-        void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);;
+        void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);
 
     public:
 

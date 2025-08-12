@@ -4,9 +4,8 @@
 #ifndef ESP32_BLE_KEYBOARD_H
 #define ESP32_BLE_KEYBOARD_H
 #include "sdkconfig.h"
-#include "configs.h"
 #if defined(CONFIG_BT_ENABLED)
-
+#define USE_NIMBLE
 #if defined(USE_NIMBLE)
 
 #include "NimBLECharacteristic.h"

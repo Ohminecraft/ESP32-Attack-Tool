@@ -7,6 +7,7 @@
 #include <IRrecv.h>
 #include <IRutils.h>
 #include "core/sdcardmountheader.h"
+#include "core/settingheader.h"
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
 #include "configs.h"
@@ -14,10 +15,11 @@
 extern bool irrecvRedraw;
 extern SDCardModules sdcard;
 extern DisplayModules display;
+extern ESP32ATSetting espatsettings;
 
 class IRReadModules {
     private:
-        IRrecv irrecv = IRrecv(IR_RX_PIN, 4096 / 2, 50);
+        IRrecv irrecv = IRrecv(espatsettings.irRxPin, 4096 / 2, 50);
         decode_results results;
         bool _read = false;
         bool raw_data = false;

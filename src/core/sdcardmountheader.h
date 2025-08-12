@@ -10,9 +10,11 @@
 
 #include <LinkedList.h>
 
+#include "core/settingheader.h"
 #include "core/utilsheader.h"
 #include "configs.h"
 
+extern ESP32ATSetting espatsettings;
 extern LinkedList<String> *sdcard_buffer;
 
 class SDCardModules {

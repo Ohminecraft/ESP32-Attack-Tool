@@ -14,8 +14,11 @@
 
 #include <Arduino.h>
 #include <RotaryEncoder.h>
+#include <SPI.h>
 
 #include "configs.h"
+
+extern SPIClass *SDCardSPI;
 
 #define MEM_LOWER_LIM 20000
 

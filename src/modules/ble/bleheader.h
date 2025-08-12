@@ -13,12 +13,9 @@
 
 #include <Arduino.h>
 #include "configs.h"
-#ifdef USE_NIMBLE
+
 #include <NimBLEDevice.h>
 #include "esp_gap_ble_api.h"
-#else
-#include <BLEDevice.h>
-#endif
 
 #include <LinkedList.h>
 
@@ -65,15 +62,10 @@ enum EBLEPayloadType
     Google
 };
 
-#ifndef USE_NIMBLE
-#define ADV_MODE_NON 0
-#define ADV_MODE_IND 1
-#define ADV_MODE_SCAN 2
-#else
 #define ADV_MODE_NON 0
 #define ADV_MODE_DIR 1
 #define ADV_MODE_UND 2
-#endif
+
 
 #define BLE_SPOOFER_DEVICE_BRAND_APPLE 0
 #define BLE_SPOOFER_DEVICE_BRAND_SAMSUNG 1
@@ -82,11 +74,7 @@ enum EBLEPayloadType
 struct BLEScanResult {
     String name;
     int rssi;
-    #ifdef USE_NIMBLE
     BLEAddress addr;
-    #else
-    String addr;
-    #endif
 };
 
 extern LinkedList<BLEScanResult>* blescanres;

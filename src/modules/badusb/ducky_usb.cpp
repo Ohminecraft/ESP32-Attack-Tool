@@ -115,7 +115,7 @@ const DuckyCommand duckyCmds[]{
 
 void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble) {
     if (usingble) {
-        hid = new BleKeyboard("ESP32AttackTool", "ESP32AttackTool", 100);
+        hid = new BleKeyboard(espatsettings.bleName.c_str(), "ESP32AttackTool", 100);
     } else {
         #if !defined(BOARD_ESP32_C3_MINI)
         hid = new USBHIDKeyboard();

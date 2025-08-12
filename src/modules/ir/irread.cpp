@@ -15,7 +15,7 @@ bool irrecvRedraw = false;
 
 void IRReadModules::main(bool startup) {
     irrecv.enableIRIn(); // Start the IR receiver
-    pinMode(IR_RX_PIN, INPUT); // Set the IR RX pin as input
+    pinMode(espatsettings.irRxPin, INPUT); // Set the IR RX pin as input
     if (startup) irrecv.disableIRIn();
     _read = false;
     Serial.println("[INFO] IR Read Module Initialized");

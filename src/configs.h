@@ -8,12 +8,7 @@
 #define BOARD_ESP32_C3_MINI
 
 // BLE Configuration //
-/*
-    Using NimBLE Arduino Library For Better Battery Life Time And Efficiency
-    If You Want To Use ESP32 BLE Library, Just Comment This Line
-    Use Original ESP32 BLE Library For Better Spoofer Experience
-*/
-#define USE_NIMBLE
+
 #define SOUR_APPLE_SPAM_DELAY 20
 #define APPLE_JUICE_SPAM_DELAY 400
 #define SWIFTPAIR_SPAM_DELAY 10
@@ -26,34 +21,16 @@
 #define SCR_WIDTH 128
 #define SCR_HEIGHT 64
 #define GRAPH_VERTICAL_LINE_LIM (SCR_HEIGHT / 2) + 15
-#define _I2C_SCREEN
 
-#ifdef _SPI_SCREEN
-    #if defined(BOARD_ESP32)
-        #define SPI_MOSI 23
-        #define SPI_MISO 19
-        #define SPI_SCK 18
-        #define CS_PIN 5
-        #define DC_PIN 4
-        #define RST_PIN 16
-    #elif defined(BOARD_ESP32_C3_MINI)
-        #define SPI_MOSI 6
-        #define SPI_MISO 5
-        #define SPI_SCK 4
-        #define CS_PIN 10
-        #define DC_PIN 8
-        #define RST_PIN 9
-    #endif
-#elif defined(_I2C_SCREEN)
-    #if defined(BOARD_ESP32)
-        #define SDA_PIN 21
-        #define SCL_PIN 22
-        #define RST_PIN -1
-    #elif defined(BOARD_ESP32_C3_MINI)
-        #define SDA_PIN 8
-        #define SCL_PIN 9
-        #define RST_PIN -1
-    #endif
+#if defined(BOARD_ESP32)
+    #define SDA_PIN 21
+    #define SCL_PIN 22
+    #define RST_PIN -1
+#elif defined(BOARD_ESP32_C3_MINI)
+    #define SDA_PIN 8
+    #define SCL_PIN 9
+    #define RST_PIN -1
+
 #endif
 
 // LED CONFIGURATION //
@@ -95,8 +72,6 @@
     #define SPI_SCK_PIN 4
 #endif
 // SD Card Configuration //
-
-#define USING_SD
 
 #ifdef BOARD_ESP32
     #define SD_CS_PIN 5

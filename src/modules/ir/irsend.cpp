@@ -8,7 +8,7 @@
     * Licensed under the MIT License.
 */
 
-IRSendModules::IRSendModules() : irsend(IR_PIN)
+IRSendModules::IRSendModules() : irsend(espatsettings.irTxPin)
 {
     // Constructor for IR send module
     // Initialize IR send object with default parameters
@@ -27,7 +27,7 @@ bool ending_early = false;
 void IRSendModules::main() {
     // Initialize IR send module
     irsend.begin();
-    pinMode(IR_PIN, OUTPUT); // Set the IR pin as output
+    pinMode(espatsettings.irTxPin, OUTPUT); // Set the IR pin as output
     Serial.println("[INFO] IR Send Module Initialized");
 }
 
@@ -98,30 +98,30 @@ void IRSendModules::startTVBGone() {
         yield(); // Allow other tasks to run
         begone_code_sended += 1;
         bitsleft_r = 0;
-        digitalWrite(IR_PIN, LOW);
+        digitalWrite(espatsettings.irTxPin, LOW);
         delay_ten_us(3000);
-        digitalWrite(IR_PIN, HIGH);
+        digitalWrite(espatsettings.irTxPin, HIGH);
         delay_ten_us(20500);
     }
     if (ending_early) {
         delay_ten_us(50000); //500ms delay 
         for (int i = 0; i < 4; i++) {
-            digitalWrite(IR_PIN, LOW);
+            digitalWrite(espatsettings.irTxPin, LOW);
             delay_ten_us(3000);
-            digitalWrite(IR_PIN, HIGH);
+            digitalWrite(espatsettings.irTxPin, HIGH);
         }
-        digitalWrite(IR_PIN, LOW);
+        digitalWrite(espatsettings.irTxPin, LOW);
         delay_ten_us(65535);
         delay_ten_us(65535);
         ending_early = false; // Reset the flag
         Serial.println("[INFO] TV-B-Gone Stopped by user");
     } else {
         for (int i = 0; i < 8; i++) {
-            digitalWrite(IR_PIN, LOW);
+            digitalWrite(espatsettings.irTxPin, LOW);
             delay_ten_us(3000);
-            digitalWrite(IR_PIN, HIGH);
+            digitalWrite(espatsettings.irTxPin, HIGH);
         }
-        digitalWrite(IR_PIN, LOW);
+        digitalWrite(espatsettings.irTxPin, LOW);
         Serial.println("[INFO] TV-B-Gone Codes Sended: " + String(begone_code_sended));
         if (begone_code_sended == num_NAcodes || begone_code_sended == num_EUcodes) {
             Serial.println("[INFO] TV-B-Gone All Code Sended Successfully");
@@ -137,7 +137,7 @@ void IRSendModules::sendIRTx(String filename) {
 
     File databaseFile = sdcard.getFile(filename, FILE_READ);
 
-    pinMode(IR_PIN, OUTPUT);
+    pinMode(espatsettings.irTxPin, OUTPUT);
 
     if (!databaseFile) {
         Serial.println("[ERROR] Failed to open database file: " + filename);
@@ -234,7 +234,7 @@ void IRSendModules::sendIRTx(String filename) {
         }
     } // end while file has lines to process
     databaseFile.close();
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
     return;
 }
 
@@ -258,7 +258,7 @@ void IRSendModules::sendIRCommand(IRCode *code) {
 }
 
 void IRSendModules::sendNECCommand(String address, String command) {
-    IRsend irsend(IR_PIN); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
     irsend.begin();
     uint16_t addressValue = strtoul(address.substring(0, 2).c_str(), nullptr, 16);
     uint16_t commandValue = strtoul(command.substring(0, 2).c_str(), nullptr, 16);
@@ -274,11 +274,11 @@ void IRSendModules::sendNECCommand(String address, String command) {
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
 
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendNECextCommand(String address, String command) {
-    IRsend irsend(IR_PIN); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
     irsend.begin();
 
     int first_zero_byte_pos = address.indexOf("00", 2);
@@ -311,11 +311,11 @@ void IRSendModules::sendNECextCommand(String address, String command) {
         "[INFO] Ir Sent NECext Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendRC5Command(String address, String command) {
-    IRsend irsend(IR_PIN, true); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin, true); // Set the GPIO to be used to sending the message.
     irsend.begin();
 
     uint8_t addressValue = strtoul(address.substring(0, 2).c_str(), nullptr, 16);
@@ -330,11 +330,11 @@ void IRSendModules::sendRC5Command(String address, String command) {
         "[INFO] Ir Sent RC5 Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendRC6Command(String address, String command) {
-    IRsend irsend(IR_PIN, true); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin, true); // Set the GPIO to be used to sending the message.
     irsend.begin();
 
     address.replace(" ", "");
@@ -353,11 +353,11 @@ void IRSendModules::sendRC6Command(String address, String command) {
         "[INFO] Ir Sent RC6 Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendSamsungCommand(String address, String command) {
-    IRsend irsend(IR_PIN); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
     irsend.begin();;
     uint8_t addressValue = strtoul(address.substring(0, 2).c_str(), nullptr, 16);
     uint8_t commandValue = strtoul(command.substring(0, 2).c_str(), nullptr, 16);
@@ -373,11 +373,11 @@ void IRSendModules::sendSamsungCommand(String address, String command) {
         "[INFO] Ir Sent Samsung Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendSonyCommand(String address, String command, uint8_t nbits) {
-    IRsend irsend(IR_PIN); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
     irsend.begin();
 
     address.replace(" ", "");
@@ -419,11 +419,11 @@ void IRSendModules::sendSonyCommand(String address, String command, uint8_t nbit
         "[INFO] Ir Sent Sony Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendKaseikyoCommand(String address, String command) {
-    IRsend irsend(IR_PIN); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
     irsend.begin();
 
     address.replace(" ", "");
@@ -471,14 +471,14 @@ void IRSendModules::sendKaseikyoCommand(String address, String command) {
         "[INFO] Ir Sent Kaseikyo Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 bool IRSendModules::sendDecodedCommand(String protocol, String value, uint8_t bits) {
     decode_type_t type = strToDecodeType(protocol.c_str());
     if (type == decode_type_t::UNKNOWN) return false;
 
-    IRsend irsend(IR_PIN); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
     irsend.begin();
     bool success = false;
 
@@ -518,12 +518,12 @@ bool IRSendModules::sendDecodedCommand(String protocol, String value, uint8_t bi
         "[INFO] Ir Sent Decoded Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
     return success;
 }
 
 void IRSendModules::sendRawCommand(uint16_t frequency, String rawData) {
-    IRsend irsend(IR_PIN); // Set the GPIO to be used to sending the message.
+    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
     irsend.begin();
 
     uint16_t dataBufferSize = 1;
@@ -562,5 +562,5 @@ void IRSendModules::sendRawCommand(uint16_t frequency, String rawData) {
         "[INFO] Ir Sent Raw Command" +
         (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
     );
-    digitalWrite(IR_PIN, LOW);
+    digitalWrite(espatsettings.irTxPin, LOW);
 }

@@ -13,11 +13,7 @@
 LinkedList<String>* display_buffer;
 
 DisplayModules::DisplayModules() :
-    #if defined(_SPI_SCREEN)
-        u8g2(U8G2_R0, /* reset=*/ RST_PIN, CS_PIN, DC_PIN),
-    #elif defined(_I2C_SCREEN)
-        u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, SCL_PIN, SDA_PIN),
-    #endif
+    u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, espatsettings.displaySclPin, espatsettings.displaySdaPin),
     screenInitialized(false)
 {
 }
@@ -31,14 +27,6 @@ bool DisplayModules::main()
     display_buffer = new LinkedList<String>();
 
     Serial.println("[INFO] Initializing Display...");
-
-    #if defined(_SPI_SCREEN)
-        // Initialize SPI display
-        // Initialize U8g2 with SPI for SSD1306 display
-        digitalWrite(CS_PIN, LOW);
-        SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI, CS_PIN);
-        u8g2.setBusClock(16000000); // Set SPI clock speed
-    #endif
     // Initialize U8g2 display
     u8g2.begin();
     u8g2.enableUTF8Print();  // Enable UTF8 support if needed
@@ -77,7 +65,7 @@ void DisplayModules::drawBipmap(int x, int y, int w, int h, const uint8_t* icon,
 float DisplayModules::calculateGraphScale(int16_t value) {
     if (value <= 0) return graph_scale;
 
-    float targetScale = (float)(GRAPH_VERTICAL_LINE_LIM * 0.9f) / (float)value;
+    float targetScale = (float)(espatsettings.graphLineLimit * 0.9f) / (float)value;
 
     if (targetScale > 1.0f) targetScale = 1.0f;
     if (targetScale < 0.1f) targetScale = 0.1f;
@@ -96,20 +84,20 @@ void DisplayModules::addValueToGraph(int16_t value, int16_t* graph_array, int gr
 
 void DisplayModules::drawingGraph(int16_t* array, bool senddisplay) {
     drawingLine(0, 0, 0, 63);
-    drawingLine(SCR_WIDTH - 1, 0, SCR_WIDTH - 1, 63);
+    drawingLine(espatsettings.displayWidth - 1, 0, espatsettings.displayWidth - 1, 63);
 
-    for (int count = 10; count < SCR_WIDTH - 1; count += 10) {
+    for (int count = 10; count < espatsettings.displayWidth - 1; count += 10) {
 		drawingPixel(count, 0);
 		drawingPixel(count, 63);
     }
 
-    for (int i = 0; i < SCR_WIDTH; i++) {
+    for (int i = 0; i < espatsettings.displayWidth; i++) {
         int yValue = (int)(array[i] * graph_scale);
         if (yValue < 1) yValue = 1;
-        if (yValue > GRAPH_VERTICAL_LINE_LIM) yValue = GRAPH_VERTICAL_LINE_LIM;
+        if (yValue > espatsettings.graphLineLimit) yValue = espatsettings.graphLineLimit;
 
-        int yStart = SCR_HEIGHT - 1;
-        int yEnd = SCR_HEIGHT - 1 - yValue;
+        int yStart = espatsettings.displayHeight - 1;
+        int yEnd = espatsettings.displayHeight - 1 - yValue;
 
         this->drawingLine(i - 1, yStart, i - 1, yEnd);
     }
@@ -118,11 +106,11 @@ void DisplayModules::drawingGraph(int16_t* array, bool senddisplay) {
     }
 }
 
-float DisplayModules::graphScaleCheck(const int16_t array[SCR_WIDTH]) {
+float DisplayModules::graphScaleCheck(const int16_t array[]) {
     int16_t maxValue = 0;
   
     // Iterate through the array to find the highest value
-    for (int16_t i = 0; i < SCR_WIDTH; i++) {
+    for (int16_t i = 0; i < espatsettings.displayWidth; i++) {
       if (array[i] > maxValue) {
         maxValue = array[i];
       }
@@ -134,7 +122,7 @@ float DisplayModules::graphScaleCheck(const int16_t array[SCR_WIDTH]) {
 }
 
 void DisplayModules::clearGraph(int16_t *array) {
-    for (int i = 0; i < SCR_WIDTH; i++) {
+    for (int i = 0; i < espatsettings.displayWidth; i++) {
         array[i] = 0;
     }
 }
@@ -169,7 +157,7 @@ void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int co
         
         currentX = 0; // Reset X position for new line
         
-        if (currentY > SCR_HEIGHT - 12) {
+        if (currentY > espatsettings.displayHeight - 12) {
             currentY = 12; // Reset if we reach bottom
         }
     } else {
@@ -178,10 +166,10 @@ void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int co
         currentX += u8g2.getStrWidth(msg.c_str());
         
         // Wrap to next line if needed
-        if (currentX >= SCR_WIDTH - 10) {
+        if (currentX >= espatsettings.displayWidth - 10) {
             currentX = 0;
             currentY += 12;
-            if (currentY > SCR_HEIGHT - 12) {
+            if (currentY > espatsettings.displayHeight - 12) {
                 currentY = 12;
             }
         }
@@ -200,7 +188,7 @@ void DisplayModules::drawingCenterString(String msg, int y, bool senddisplay, in
     }
     
     // Calculate X position to center the text
-    int x = (SCR_WIDTH - (msg.length() * 6)) / 2;
+    int x = (espatsettings.displayWidth - (msg.length() * 6)) / 2;
     
     u8g2.drawStr(x, y, msg.c_str());
     
@@ -285,7 +273,7 @@ void DisplayModules::displayBuffer()
                 y += 12;
             }
             
-            //if (y > SCR_HEIGHT - 12) break; // Prevent overflow
+            //if (y > espatsettings.displayHeight - 12) break; // Prevent overflow
         }
         else {
             Serial.println("[INFO] Empty message in display buffer, skipping...");
@@ -381,7 +369,7 @@ int DisplayModules::drawWrappedText(String text, int x, int y, int charsPerLine)
         currentY += 12; // Move to next line
         
         // Prevent overflow
-        if (currentY > SCR_HEIGHT - 12) break;
+        if (currentY > espatsettings.displayHeight - 12) break;
     }
     
     return currentY; // Return next available Y position
@@ -425,7 +413,7 @@ void DisplayModules::drawMultiLineText(String text, int x, int y, int lineHeight
         currentY += lineHeight;
         
         // Prevent overflow
-        if (currentY > SCR_HEIGHT - lineHeight) break;
+        if (currentY > espatsettings.displayHeight - lineHeight) break;
         
         startPos = endPos + 1;
     }

@@ -11,6 +11,8 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch"
 
+ESP32ATSetting espatsettings;
+
 WiFiModules wifi;
 BLEModules ble;
 BadUSBModules badusb;
@@ -25,12 +27,16 @@ SDCardModules sdcard;
 // https://github.com/pr3y/Bruce/blob/main/src/main.cpp
 void __attribute__((weak)) taskHandleInput(void *parameter) {
 	auto timer = millis();
+	auto timer2 = millis();
 	while (true) {
 		if (millis() - timer > 20) {
 			handleInputs();
-			//nextPress = false;
-			//prevPress = false;
-			//selPress = false;
+			if (millis() - timer2 > 400) {
+				nextPress = false;
+				prevPress = false;
+				selPress = false;
+				timer2 = millis();
+			}
 			timer = millis();
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));
@@ -38,38 +44,23 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 }
 
 void menuinit() {
-	#if defined(USING_ENCODER)
-	encoder = new RotaryEncoder(ENC_PIN_A, ENC_PIN_B, RotaryEncoder::LatchMode::FOUR3);
+	if (espatsettings.usingEncoder) {
+		encoder = new RotaryEncoder(espatsettings.encPinA, espatsettings.encPinB, RotaryEncoder::LatchMode::FOUR3);
 
-    // register interrupt routine
-    attachInterrupt(digitalPinToInterrupt(ENC_PIN_A), checkPosition, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ENC_PIN_B), checkPosition, CHANGE);
-	#elif defined(USING_BUTTON)
-	pinMode(LEFT_BTN, INPUT_PULLUP);
-	pinMode(RIGHT_BTN, INPUT_PULLUP);
-	#endif
-	pinMode(SEL_BTN, INPUT_PULLUP);
-	#ifdef USING_SD
-		#if defined(_SPI_SCREEN)
-			pinMode(CS_PIN, OUTPUT);
-			pinMode(NRF24_CSN_PIN, OUTPUT);
-			digitalWrite(CS_PIN, HIGH);
-			digitalWrite(NRF24_CSN_PIN, HIGH);
-			pinMode(SD_CS_PIN, OUTPUT);
-			digitalWrite(SD_CS_PIN, HIGH);
-		#else
-			pinMode(NRF24_CSN_PIN, OUTPUT);
-			digitalWrite(NRF24_CSN_PIN, HIGH);
-			pinMode(SD_CS_PIN, OUTPUT);
-			digitalWrite(SD_CS_PIN, HIGH);
-		#endif
-	#endif
-
-
+		// register interrupt routine
+		attachInterrupt(digitalPinToInterrupt(espatsettings.encPinA), checkPosition, CHANGE);
+		attachInterrupt(digitalPinToInterrupt(espatsettings.encPinB), checkPosition, CHANGE);
+	} else {
+		pinMode(espatsettings.leftBtnPin, INPUT_PULLUP);
+		pinMode(espatsettings.rightBtnPin, INPUT_PULLUP);
+	}
+	pinMode(espatsettings.selectBtnPin, INPUT_PULLUP);
+	
 	if (!display.main()) {
 		Serial.println("[ERROR] Failed to initialize display!");
 		while(1); // Halt if display fails
 	}
+	if (espatsettings.displayInvert) display.displayInvert(true);
 	irtx.main();
 	irrx.main(true); // prevent ir rx get signal from unknown source
 	wifi.main();
@@ -82,9 +73,8 @@ void menuinit() {
 	Serial.printf("[INFO] Free heap: %d bytes\n", String(getHeap(GET_FREE_HEAP)).toInt());
 	Serial.printf("[INFO] Used heap: %d bytes\n", String(getHeap(GET_USED_HEAP)).toInt());
 	Serial.printf("[INFO] Used: %d%%\n", String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
-	#if defined(_I2C_SCREEN) || defined(_SPI_SCREEN) // For CLI (Future)
+	if (espatsettings.displaySclPin > 0 && espatsettings.displaySdaPin > 0)
 		xTaskCreate(taskHandleInput, "HandleInput", 4096, NULL, 2, &xHandle);
-	#endif
 	displayWelcome();
 	displayMainMenu();
 }
@@ -92,10 +82,10 @@ void menuinit() {
 void displayWelcome() {
 	display.clearScreen();
 	String title = "ESP32 Attack Tool";
-	int yTitle = SCR_HEIGHT / 2 - 5;
-	int yVersion = SCR_HEIGHT / 2 + 5;
+	int yTitle = espatsettings.displayHeight / 2 - 5;
+	int yVersion = espatsettings.displayHeight / 2 + 5;
 	display.drawingCenterString(title, yTitle);
-	display.drawBipmap((SCR_WIDTH / 2) - 12, yVersion - 4, 22, 22, bitmapicon[0], true);
+	display.drawBipmap((espatsettings.displayWidth / 2) - 12, yVersion - 4, 22, 22, bitmapicon[0], true);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
 	display.clearScreen();
 	String footer1 = "Code By";
@@ -104,15 +94,17 @@ void displayWelcome() {
 	display.drawingCenterString(footer1, yTitle);
 	display.drawingCenterString(footer2, yVersion);
 	display.drawingCenterString(version_num, yVersion + 12, true);	
-	display.displayInvert(true);
+	if (!espatsettings.displayInvert) display.displayInvert(true);
+	else display.displayInvert(false);
 	vTaskDelay(1300 / portTICK_PERIOD_MS);
-	display.displayInvert(false);
+	if (espatsettings.displayInvert) display.displayInvert(true);
+	else display.displayInvert(false);
 	//display.clearScreen();
 	for (int i = 0; i < 9; i++) {
 		for (int x = 0; x < startup_bitmap_allArray_LEN; x++) {
 			if (selPress) break;
 			display.clearScreen();
-			display.drawBipmap(0, 0, 128, 64, startup_bitmap_allArray[x], true);
+			display.drawBipmap(0, 0, espatsettings.displayWidth, espatsettings.displayHeight, startup_bitmap_allArray[x], true);
 			vTaskDelay(1 / portTICK_PERIOD_MS);
 		}
 		if (check(selPress)) break;
@@ -210,7 +202,7 @@ void displayStatusBar(bool sendDisplay = false) {
 
 	heapInfo.concat(String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
 	heapInfo.concat("%");
-	display.displayStringwithCoordinates(heapInfo, SCR_WIDTH - 38, 12);
+	display.displayStringwithCoordinates(heapInfo, espatsettings.displayWidth - 38, 12);
 	if (sendDisplay) display.sendDisplay();
 }
 
@@ -218,9 +210,9 @@ void menuNode(String items[], int itemCount) {
 	displayStatusBar();
 	
 	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= MAX_SHOW_SECLECTION) ? currentSelection - 1 : 0;
+	uint8_t startIndex = (currentSelection >= espatsettings.maxShowSelection) ? currentSelection - 1 : 0;
 		
-	for(int i = 0; i < MAX_SHOW_SECLECTION && (startIndex + i) < itemCount; i++) {
+	for(int i = 0; i < espatsettings.maxShowSelection && (startIndex + i) < itemCount; i++) {
 		String itemText = ((startIndex + i) == currentSelection) ? 
 			"> " + items[startIndex + i] : "  " + items[startIndex + i];
 		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
@@ -318,11 +310,7 @@ void displayBLEInfoListMenu() {
 	if (currentSelection < blescanres->size()) {
 		BLEScanResult bledevice = blescanres->get(currentSelection);
 		ble_title = bledevice.name;
-		#ifdef USE_NIMBLE
 		if (ble_title == "<no name>") ble_title = bledevice.addr.toString().c_str();
-		#else
-		if (ble_title == "<no name>") ble_title = bledevice.addr;
-		#endif
 		// Truncate if too long
 		if (ble_title.length() > 17)
 			ble_title = ble_title.substring(0, 18) + "...";
@@ -344,11 +332,7 @@ void displayBLEInfoDetail() {
 
 	BLEScanResult res = blescanres->get(currentSelection);
 	String nameStr = res.name;
-	#ifdef USE_NIMBLE
 	String addrStr = res.addr.toString().c_str();
-	#else
-	String addrStr = res.addr;
-	#endif
 	String rssiStr = "RSSI: " + String(res.rssi);
 
 	display.displayStringwithCoordinates(nameStr, 0, 24);
@@ -357,7 +341,7 @@ void displayBLEInfoDetail() {
 }
 
 void displayMainSpooferMenu() {
-	digitalWrite(STA_LED, LOW);
+	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPOOFER_COUNT] = {
@@ -371,7 +355,7 @@ void displayMainSpooferMenu() {
 }
 
 void displayAppleSpooferMenu() {
-	digitalWrite(STA_LED, LOW);
+	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPO_APPLE_COUNT] = {
@@ -399,7 +383,7 @@ void displayAppleSpooferMenu() {
 }
 
 void displaySamsungSpooferMenu() {
-	digitalWrite(STA_LED, LOW);
+	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPO_SAMSUNG_COUNT] = {
@@ -437,7 +421,7 @@ void displaySamsungSpooferMenu() {
 
 
 void displayGoogleSpooferMenu() {
-	digitalWrite(STA_LED, LOW);
+	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPO_GOOGLE_COUNT] = {
@@ -516,19 +500,13 @@ void displayGoogleSpooferMenu() {
 
 
 void displayAdTypeSpooferMenu() {
-	digitalWrite(STA_LED, LOW);
+	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPO_AD_TYPE_COUNT] = {
-		#ifndef USE_NIMBLE
-		"Type NON",
-		"Type IND",
-		"Type SCAN",
-		#else
 		"Type NON",
 		"Type DIR",
 		"Type UND",
-		#endif
 		"< Back"
 	};
 
@@ -536,13 +514,13 @@ void displayAdTypeSpooferMenu() {
 }
 
 void displaySpooferRunning() {
-	digitalWrite(STA_LED, HIGH);
+	digitalWrite(espatsettings.statusLedPin, HIGH);
 	display.clearScreen();
 	display.displayStringwithCoordinates("ADVERTISING...", 0, 12, true);
 }
 
 void displayExploitAttackBLEMenu() {
-	digitalWrite(STA_LED, LOW);
+	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 	
 	String items[BLE_ATK_MENU_COUNT] = {
@@ -1161,7 +1139,7 @@ void nrfAnalyzer() {
 		return;
 	}
 
-	memset(values, 0, sizeof(uint8_t)*SCR_WIDTH);
+	memset(values, 0, sizeof(uint8_t)*espatsettings.displayWidth);
 
 	int n = 200;
 	while (n--) {
@@ -1170,7 +1148,7 @@ void nrfAnalyzer() {
 			goBack();
 			break;
 		} 
-		int i = SCR_WIDTH;
+		int i = espatsettings.displayWidth;
 		while (i--) {
 			if (check(selPress)) {
 				Serial.println("[INFO] NRF24 Analyzer stopped by user.");
@@ -1178,9 +1156,9 @@ void nrfAnalyzer() {
 				return;
 			}
 			nrf.setChannel(*NRFSPI, i);
-			digitalWrite(NRF24_CE_PIN, HIGH);
+			digitalWrite(espatsettings.nrfCePin, HIGH);
 			delayMicroseconds(128);
-			digitalWrite(NRF24_CE_PIN, LOW);
+			digitalWrite(espatsettings.nrfCePin, LOW);
 			if (nrf.carrierDetected(*NRFSPI))
 			{
 				++values[i];
@@ -1197,7 +1175,7 @@ void nrfAnalyzer() {
 	display.clearScreen();
 	int x = 0;
 	int peak = 0;
-	for (int i = 0; i < SCR_WIDTH; i++) {
+	for (int i = 0; i < espatsettings.displayWidth; i++) {
 		if (values[i] > peak) {
 			peak = values[i];
 		}
@@ -1269,7 +1247,7 @@ void startBLEAttack(BLEScanState attackType) {
 	attackStartTime = millis();
 	currentState = BLE_ATTACK_RUNNING;
 	
-	digitalWrite(STA_LED, HIGH);
+	digitalWrite(espatsettings.statusLedPin, HIGH);
 	displayAttackStatus();
 }
 
@@ -1319,7 +1297,7 @@ void startWiFiAttack(WiFiScanState attackType) {
 	currentWiFiAttackType = attackType;
 	currentState = WIFI_ATTACK_RUNNING;
 	
-	digitalWrite(STA_LED, HIGH);
+	digitalWrite(espatsettings.statusLedPin, HIGH);
 
 	if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL ||
 		currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH ||
@@ -1345,7 +1323,7 @@ void startNRFJammer(NRFJammerMode jammer_mode) {
 	nrfJammerSetupOneShot = false;
 	currentState = NRF24_JAMMER_RUNNING;
 
-	digitalWrite(STA_LED, HIGH); 
+	digitalWrite(espatsettings.statusLedPin, HIGH); 
 }
 
 void startBLEScan() {
@@ -1446,7 +1424,7 @@ void stopCurrentAttack() {
 		wifi.StartMode(WIFI_SCAN_OFF);
 	}
 		
-	digitalWrite(STA_LED, LOW);
+	digitalWrite(espatsettings.statusLedPin, LOW);
 		
 	// Add delay to ensure proper cleanup
 	vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -1584,7 +1562,7 @@ void performDeepSleep() {
 	display.clearScreen();
 	display.sendDisplay();
 	// Restart ESP32
-	esp_deep_sleep_enable_gpio_wakeup(1 << ENC_BTN, ESP_GPIO_WAKEUP_GPIO_LOW);
+	esp_deep_sleep_enable_gpio_wakeup(1 << espatsettings.selectBtnPin, ESP_GPIO_WAKEUP_GPIO_LOW);
 	esp_deep_sleep_start();
 }
 
@@ -3502,29 +3480,19 @@ void menuloop() {
 				break;
 			}
 			display.clearScreen();
-			display.drawBipmap(0, 0, 128, 64, standby_bitmap_allArray[i], true);
+			display.drawBipmap(0, 0, espatsettings.displayWidth, espatsettings.displayHeight, standby_bitmap_allArray[i], true);
 			vTaskDelay(20 / portTICK_PERIOD_MS);
 		}
 	}
 	// Check for critical low memory and auto-reboot
 	if (getHeap(GET_FREE_HEAP) < MEM_LOWER_LIM) { // Critical low memory threshold
-		if (!low_memory_warning)
-		Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Stop add to buffer...");
-		low_memory_warning = true;
-			//display.clearScreen();
-			//display.displayStringwithCoordinates("CRITICAL LOW MEM!", 0, 12);
-			//display.displayStringwithCoordinates("AUTO REBOOTING...", 0, 21, true);
-			//vTaskDelay(2000 / portTICK_PERIOD_MS);
-			//wifi.StartMode(WIFI_SCAN_OFF);
-			//ble.ShutdownBLE();
-			//nrf.shutdownNRFJammer();
-			//nrf.shutdownNRF();
-			// Ensure all tasks are stopped before rebooting
-			//ESP.restart();
+		if (!low_memory_warning) {
+			Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Stop add to buffer...");
+			low_memory_warning = true;
+		}
 	} else {
 		low_memory_warning = false;
 	}
-	
 }
 
 #pragma GCC diagnostic pop

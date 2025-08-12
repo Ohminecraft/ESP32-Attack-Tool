@@ -18,8 +18,11 @@
 #include "configs.h"
 #include "WORLD_IR_CODES.h"
 
+#include "core/settingheader.h"
 #include "core/sdcardmountheader.h"
 #include "core/utilsheader.h"
+
+extern ESP32ATSetting espatsettings;
 
 #define NOPP __asm__ __volatile__("nop")
 

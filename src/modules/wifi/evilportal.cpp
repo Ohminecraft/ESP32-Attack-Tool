@@ -167,7 +167,7 @@ bool EvilPortalAddtional::apSetup(String essid, bool _deauth) {
     
     if (ap_name == "") {
         Serial.println("[WARN] Cannot get selected AP Name, using default name instead");
-        ap_name = "ESP32 Attack Tool";
+        ap_name = espatsettings.evilportalSSID;
     }
 
     if (ap_name.length() > MAX_AP_NAME_SIZE) {

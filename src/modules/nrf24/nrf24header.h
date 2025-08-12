@@ -11,8 +11,11 @@
 #include <RF24.h>
 #include <EEPROM.h>
 
+#include "core/settingheader.h"
 #include "core/utilsheader.h"
 #include "configs.h"
+
+extern ESP32ATSetting espatsettings;
 
 #define NRF24_CONFIG      0x00
 #define NRF24_EN_AA       0x01

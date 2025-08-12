@@ -14,6 +14,7 @@
 
 #include <Arduino.h>
 #include "core/assets.h"
+#include "core/settingheader.h"
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
 #include "core/sdcardmountheader.h"

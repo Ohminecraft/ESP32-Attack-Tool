@@ -144,6 +144,8 @@ bool ble_initialized = false; // BLE Initialized Flag
 bool wifi_initialized = false; // WiFi Initialized Flag
 bool low_memory_warning = false; // Low Memory Warning Flag
 
+SPIClass *SDCardSPI;
+
 #ifdef USING_ENCODER
 // Encoder Object
 RotaryEncoder *encoder = nullptr;

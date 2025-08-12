@@ -7,11 +7,14 @@
 #include <USB.h>
 
 #include <USBHIDKeyboard.h>
-#include "libs/Bad_Usb_Lib/BleKeyboard.h"
+#include <BleKeyboard.h>
 
 #include "core/utilsheader.h"
 #include "core/sdcardmountheader.h"
+#include "core/settingheader.h"
 #include "configs.h"
+
+extern ESP32ATSetting espatsettings;
 
 #define DEF_DELAY 100
 
