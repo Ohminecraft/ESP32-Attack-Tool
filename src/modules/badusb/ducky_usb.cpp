@@ -206,9 +206,11 @@ void BadUSBModules::launchBadUSB(String badusbScript, HIDInterface *&hid) {
                 RepeatTmp = lineContent.substring(lineContent.indexOf(' ') + 1);
                 if (RepeatTmp.toInt() == 0) {
                     RepeatTmp = "1";
+                    Serial.println("[INFO] Do 'REPEAT' command argument NaN, repeating once");
                 }
             } else {
                 RepeatTmp = "1";
+                Serial.println("[INFO] Do 'REPEAT' command without argument, repeating once");
             }
         } else {
             Command = lineContent.substring(0, lineContent.indexOf(' ')); // get the Command
@@ -276,10 +278,18 @@ void BadUSBModules::launchBadUSB(String badusbScript, HIDInterface *&hid) {
             hid->releaseAll();
 
             if (PriCmd == nullptr) {
+                Serial.println("[INFO] Do '" + Command + "' command, but not supported, running as STRINGLN");
                 if (Argument != "") {
                     hid->println(Command + " " + Argument);
                 } else {
                     hid->println(Command);
+                }
+            } else {
+                Serial.print("[INFO] Do '" + Command + "' command with argument: ");
+                if (Argument != "") {
+                    Serial.println(Argument);
+                } else {
+                    Serial.println();
                 }
             }
         }

@@ -32,6 +32,10 @@ void generateRandomMac(uint8_t* mac);
 void getMAC(char *addr, uint8_t* data, uint16_t offset);
 String macToString(uint8_t macAddr[6]);
 void setBaseMacAddress(uint8_t macAddr[6]);
+String uint32ToString(uint32_t value);
+String uint32ToStringInverted(uint32_t value);
+uint32_t swap32(uint32_t value);
+uint8_t hexCharToDecimal(char c);
 
 extern volatile bool nextPress;
 extern volatile bool prevPress; 

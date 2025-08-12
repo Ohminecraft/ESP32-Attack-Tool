@@ -93,6 +93,50 @@ void setBaseMacAddress(uint8_t macAddr[6]) {
 	}
 }
 
+String uint32ToString(uint32_t value) {
+    char buffer[12] = {0}; // 8 hex digits + 3 spaces + 1 null terminator
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%02X %02X %02X %02X",
+        value & 0xFF,
+        (value >> 8) & 0xFF,
+        (value >> 16) & 0xFF,
+        (value >> 24) & 0xFF
+    );
+    return String(buffer);
+}
+
+String uint32ToStringInverted(uint32_t value) {
+    char buffer[12] = {0}; // 8 hex digits + 3 spaces + 1 null terminator
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%02X %02X %02X %02X",
+        (value >> 24) & 0xFF,
+        (value >> 16) & 0xFF,
+        (value >> 8) & 0xFF,
+        value & 0xFF
+    );
+    return String(buffer);
+}
+
+uint32_t swap32(uint32_t value) {
+    return ((value & 0x000000FF) << 24) | ((value & 0x0000FF00) << 8) | ((value & 0x00FF0000) >> 8) |
+           ((value & 0xFF000000) >> 24);
+}
+
+uint8_t hexCharToDecimal(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10;
+    } else if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+    return 0;
+}
+
 volatile bool nextPress = false;
 volatile bool prevPress = false;
 volatile bool selPress = false;

@@ -44,6 +44,7 @@ enum MenuState {
     BADUSB_KEY_LAYOUT_MENU,
     BADUSB_RUNNING,
     IR_TV_B_GONE_REGION,
+    IR_READ_RUNNING,
     IR_SEND_RUNNING,
     NRF24_ANALYZER_RUNNING,
     NRF24_SCANNER_RUNNING,
@@ -338,6 +339,8 @@ enum NRFJammerItem {
 };
 
 enum IRMenuItem {
+    IR_READ,
+    IR_SEND,
     IR_TV_B_GONE,
     IR_BACK,
     IR_MENU_COUNT
@@ -420,10 +423,15 @@ bool nrfAnalyzerSetupOneShot = false;
 bool nrfJammerSetupOneShot = false;
 bool nrfScannerSetupOneShot = false;
 
-// IRSend
+// IRSend/Recv
 
 TvBeGoneRegion irTvBGoneRegion;
 bool starttvbgone = false;
+
+bool selectforirtx = false;
+String irSendFile;
+
+bool irreadOneShot = false;
 
 // BadUSB
 bool selectforbadusb = false;

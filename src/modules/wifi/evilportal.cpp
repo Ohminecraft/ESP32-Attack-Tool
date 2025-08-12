@@ -49,7 +49,7 @@ void EvilPortalAddtional::shutdownServer() {
     Serial.println("[INFO] Successfully Shutdown Portal");
 }
 
-void EvilPortalAddtional::setup() {
+void EvilPortalAddtional::main() {
     this->runServer = false;
     this->name_received = false;
     this->password_received = false;

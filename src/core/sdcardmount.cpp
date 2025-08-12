@@ -58,6 +58,10 @@ void SDCardModules::close() {
     }
 }
 
+bool SDCardModules::isMounted() {
+    return mounted;
+}
+
 bool SDCardModules::deleteFile(String path) {
     if (mounted) {
         if(!SD.remove("/ESP32AttackTool" + path)) {
@@ -73,10 +77,8 @@ bool SDCardModules::deleteFile(String path) {
 bool SDCardModules::isExists(String path) {
     if (mounted) {
         if (SD.exists("/ESP32AttackTool" + path)) {
-            Serial.println("[INFO] File exists: " + path);
             return true;
         } else {
-            Serial.println("[ERROR] File does not exist: " + path);
             return false;
         }
     } else {

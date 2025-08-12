@@ -295,8 +295,7 @@ void DisplayModules::displayBuffer()
 }
 
 void DisplayModules::clearBuffer() {
-    delete display_buffer;
-    display_buffer = new LinkedList<String>();
+    display_buffer->clear();
 }
 
 void DisplayModules::displayEvilPortalText(String username, String password) 
