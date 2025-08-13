@@ -48,7 +48,8 @@ enum BLEScanState {
     BLE_ATTACK_EXPLOIT_APPLE_JUICE,
     BLE_ATTACK_EXPLOIT_MICROSOFT,
     BLE_ATTACK_EXPLOIT_SAMSUNG,
-    BLE_ATTACK_EXPLOIT_GOOGLE
+    BLE_ATTACK_EXPLOIT_GOOGLE,
+    BLE_ATTACK_EXPLOIT_SPAM_ALL
 };
 
 #define SERVICE_UUID "1bc68b2a-f3e3-11e9-81b4-2a2ae2dbcce4"
@@ -370,7 +371,7 @@ class BLEModules {
     private:
         BLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
         static void scanCompleteCB(BLEScanResults scanResults);
-        void executeSwiftpair(EBLEPayloadType type);
+        void executeSwiftpair(EBLEPayloadType type, bool forspamall = false);
         void bleScan();
         BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
         void startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
