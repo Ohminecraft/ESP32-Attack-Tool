@@ -20,6 +20,7 @@
 
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
+#include "core/clockheader.h"
 
 enum WiFiScanState {
     WIFI_SCAN_OFF,
@@ -393,6 +394,7 @@ class WiFiModules
         void main();
         bool ShutdownWiFi();
 
+        void connectWiFi(void *pvParameters);
         void StartMode(WiFiScanState mode);
         void mainAttackLoop(WiFiScanState mode);
         void StartDeauthFlood();

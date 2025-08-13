@@ -18,6 +18,7 @@
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
 #include "core/sdcardmountheader.h"
+#include "core/clockheader.h"
 #include "modules/ble/bleheader.h"
 #include "modules/wifi/wifiheader.h"
 #include "modules/wifi/evilportalheader.h"
@@ -40,6 +41,7 @@ enum MenuState {
     NRF24_MENU,
     IR_MENU,
     SD_MENU,
+    CLOCK_MENU,
     SD_UPDATE_MENU,
     SD_DELETE_MENU,
     BADUSB_KEY_LAYOUT_MENU,
@@ -83,6 +85,7 @@ enum MainMenuItem {
     MAIN_NRF24,
     MAIN_IR,
     MAIN_SD,
+    MAIN_CLOCK,
     MAIN_DEEP_SLEEP,
     MAIN_REBOOT,
     MAIN_MENU_COUNT

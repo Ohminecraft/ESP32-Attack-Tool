@@ -395,8 +395,13 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     } else {
         vTaskDelay(espatsettings.spamAllDelay / portTICK_PERIOD_MS);
     }
-    pAdvertising->stop();
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    if (pAdvertising->isAdvertising()) {
+            pAdvertising->stop();
+        while (pAdvertising->isAdvertising()) {
+            yield();
+        }
+    }
+    vTaskDelay(40 / portTICK_PERIOD_MS);
     BLEDevice::deinit();
 }
 

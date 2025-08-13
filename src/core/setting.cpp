@@ -105,9 +105,8 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
 
     defaultSetting["evilportalSSID"] = "ESP32AttackTool"; // default evil portal SSID
 
-    JsonObject _connectWiFi = defaultSetting["wifiCred"].to<JsonObject>(); // (WIP)
-    _connectWiFi["ssid"] = ""; // default WiFi SSID is None
-    _connectWiFi["pwd"] = ""; // default WiFi password is None
+    JsonObject _wifi = defaultSetting["wifi"].to<JsonObject>();
+    for (const auto &pair : wifi) { _wifi[pair.first] = pair.second; }
 
     defaultSetting["autoConnectWiFi"] = false; // (WIP)
 
@@ -356,12 +355,9 @@ void ESP32ATSetting::loadSettings() {
         Serial.println("[WARN] Failed to get 'evilportalSSID' configuration");
         failed_count++;
     }
-    if (!_settings["wifiCred"].isNull()) {
-        JsonObject wifiCredObj = _settings["wifiCred"].as<JsonObject>();
-        wificred.ssid = wifiCredObj["ssid"].as<String>();
-        wificred.pwd = wifiCredObj["pwn"].as<String>();
-        Serial.println("wifiCred ssid: " + wificred.ssid);
-        Serial.println("wifiCred pwn: " + wificred.pwd);
+    if (!_settings["wifi"].isNull()) {
+        wifi.clear();
+        for (JsonPair kv : _settings["wifi"].as<JsonObject>()) wifi[kv.key().c_str()] = kv.value().as<String>();
     } else {
         Serial.println("[WARN] Failed to get 'wifiCred' configuration");
         failed_count++;
@@ -496,7 +492,7 @@ void ESP32ATSetting::loadSettings() {
         failed_count++;
     }
     if (!_settings["timeZone"].isNull()) {
-        timeZone = _settings["timeZone"].as<uint8_t>();
+        timeZone = _settings["timeZone"].as<int8_t>();
         Serial.println("timeZone: " + String(timeZone));
     } else {
         Serial.println("[WARN] Failed to get 'timeZone' configuration");
@@ -510,4 +506,10 @@ void ESP32ATSetting::loadSettings() {
         else
         resetSettings(false);
     }
+}
+
+String ESP32ATSetting::getApPassword(const String &ssid) const {
+    auto it = wifi.find(ssid);
+    if (it != wifi.end()) return it->second;
+    return "";
 }

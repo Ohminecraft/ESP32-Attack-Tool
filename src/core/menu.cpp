@@ -22,6 +22,7 @@ NRF24Modules nrf;
 IRSendModules irtx;
 IRReadModules irrx;
 SDCardModules sdcard;
+TimeClock timeClock;
 
 
 // https://github.com/pr3y/Bruce/blob/main/src/main.cpp
@@ -31,16 +32,39 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 	while (true) {
 		if (millis() - timer > 50) {
 			handleInputs();
-			if (millis() - timer2 > 600) {
-				nextPress = false;
-				prevPress = false;
-				selPress = false;
-				timer2 = millis();
-			}
 			timer = millis();
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}
+}
+
+void connectWiFi(void *pvParameters) {
+	if (WiFi.status() == WL_CONNECTED) return;
+
+    WiFi.mode(WIFI_STA);
+    int nets = WiFi.scanNetworks();
+    String ssid;
+    String pwd;
+
+	for (int i = 0; i < nets; i++) {
+        ssid = WiFi.SSID(i);
+        pwd = espatsettings.getApPassword(ssid);
+        if (pwd == "") continue;
+
+        WiFi.begin(ssid, pwd);
+        for (int i = 0; i < 50; i++) {
+            if (WiFi.status() == WL_CONNECTED) {
+                wifi_connected = true;
+				Serial.println("[INFO] Connected WiFi successfully!");
+                break;
+            }
+            vTaskDelay(100 / portTICK_RATE_MS);
+        }
+    }
+	vTaskDelay(500 / portTICK_RATE_MS);
+	timeClock.main();
+    vTaskDelete(NULL);
+    return;
 }
 
 void menuinit() {
@@ -68,6 +92,9 @@ void menuinit() {
 	sdcard.main();
 	nrf.main();
 	eportal.main();
+	if (espatsettings.autoConnectWiFi) {
+		xTaskCreate(connectWiFi, "wifiConnect", 4096, NULL, 2, NULL);
+	}
 	Serial.println("[INFO] Menu system initialized");
 	Serial.printf("[INFO] Total heap: %d bytes\n", String(getHeap(GET_TOTAL_HEAP)).toInt());
 	Serial.printf("[INFO] Free heap: %d bytes\n", String(getHeap(GET_FREE_HEAP)).toInt());
@@ -195,6 +222,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("BadUSB Layout", 0, 12);
 	else if (currentState == BADUSB_RUNNING)
 		display.displayStringwithCoordinates("BadUSB Deploy", 0, 12);
+	else if (currentState == CLOCK_MENU)
+		display.displayStringwithCoordinates("Clock", 0, 12);
 	else
 		display.displayStringwithCoordinates("Unknown State", 0, 12);
 	
@@ -267,6 +296,7 @@ void displayMainMenu() {
 		"NRF24",
 		"IR",
 		"SD",
+		"Clock",
 		"Deep Sleep",
 		"Reboot"
 	};
@@ -1784,6 +1814,9 @@ void selectCurrentItem() {
 				currentSelection = 0;
 				maxSelections = SD_MENU_COUNT;
 				displaySDMenu();
+			} else if (currentSelection == MAIN_CLOCK) {
+				currentState = CLOCK_MENU;
+				currentSelection = 0;
 			} else if (currentSelection == MAIN_REBOOT) {
 				displayRebootConfirm();
 				//delay(1000); // Give user time to see the message
@@ -2563,6 +2596,7 @@ void selectCurrentItem() {
 
 void goBack() {
 	switch(currentState) {
+		case CLOCK_MENU:
 		case BLE_MENU:
 		case WIFI_MENU:
 			currentState = MAIN_MENU;
@@ -2944,7 +2978,8 @@ void handleInput(MenuState handle_state) {
 			handle_state == BLE_SPOOFER_RUNNING ||
 			handle_state == IR_SEND_RUNNING ||
 			handle_state == BADUSB_RUNNING ||
-			handle_state == IR_READ_RUNNING)
+			handle_state == IR_READ_RUNNING ||
+			handle_state == CLOCK_MENU)
 		{
 			goBack();
 		}
@@ -3005,7 +3040,19 @@ void handleInput(MenuState handle_state) {
 
 void handleTasks(MenuState handle_state) {
 	// Handle WiFi scanning
-	if (wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) {
+	if (handle_state == CLOCK_MENU) {
+		static unsigned long clockRedraw = 0;
+		if (millis() - clockRedraw > 1000) {
+			timeClock.update(rtc.getTimeStruct());
+			display.clearScreen();
+			displayStatusBar();
+			display.drawingCenterString(timeClock.timechar, espatsettings.displayHeight / 2 + 5);
+			display.sendDisplay();
+			clockRedraw = millis();
+		}
+	}
+
+	else if (wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) {
 
 		if (!wifiScanOneShot) {
 			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN) {
@@ -3475,7 +3522,8 @@ void menuloop() {
 							!(currentState == BLE_SPOOFER_RUNNING) &&
 							!(currentState == IR_SEND_RUNNING) &&
 							!(currentState == BADUSB_RUNNING) &&
-							!(currentState == IR_READ_RUNNING);
+							!(currentState == IR_READ_RUNNING) &&
+							!(currentState == CLOCK_MENU);
 	autoSleepCheck();
 	handleInput(currentState);
 	handleTasks(currentState);

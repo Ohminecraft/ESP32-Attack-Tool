@@ -142,6 +142,7 @@ volatile bool prevPress = false;
 volatile bool selPress = false;
 bool ble_initialized = false; // BLE Initialized Flag
 bool wifi_initialized = false; // WiFi Initialized Flag
+bool wifi_connected = false;
 bool low_memory_warning = false; // Low Memory Warning Flag
 
 SPIClass *SDCardSPI;
@@ -181,6 +182,7 @@ void handleInputs() {
 		encoderDir = 0;
 		selPress = true;
 		tm = millis();
+		tm2 = millis();
 	}
 }
 #elif defined(USING_BUTTON)

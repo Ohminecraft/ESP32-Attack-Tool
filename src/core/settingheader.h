@@ -7,6 +7,7 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <SD.h>
+#include <map>
 
 #include "core/utilsheader.h"
 #include "configs.h"
@@ -15,12 +16,6 @@
 
 class ESP32ATSetting {
     public:
-        class WiFiCredential {
-            public:
-                String ssid;
-                String pwd;
-        };
-
         uint8_t spiMosiPin = SPI_MOSI_PIN;
         uint8_t spiMisoPin = SPI_MISO_PIN;
         uint8_t spiSckPin = SPI_SCK_PIN;
@@ -34,9 +29,7 @@ class ESP32ATSetting {
         uint8_t displaySclPin = SCL_PIN;
         uint8_t statusLedPin = STA_LED;
         String evilportalSSID = "ESP32AttackTool";
-        String connectWiFiSSID = "";
-        String connectWiFiPassword = "";
-        WiFiCredential wificred = {"ESP32AttackTool", "ESP32ATKTOOL"};
+        std::map<String, String> wifi = {};
         bool autoConnectWiFi = false;
         String bleName = "ESP32 Attack Tool";
         uint16_t sourappleSpamDelay = SOUR_APPLE_SPAM_DELAY;
@@ -55,13 +48,13 @@ class ESP32ATSetting {
         uint8_t leftBtnPin = LEFT_BTN;
         uint8_t rightBtnPin = RIGHT_BTN;
         uint8_t selectBtnPin = SEL_BTN;
-        uint8_t timeZone = 0;
+        int8_t timeZone = 0;
 
         void loadSettings();
         void saveSettings();
         void resetSettings(bool useLittleFS);
-
         String getSetting(const String &key);
+        String getApPassword(const String &ssid) const;
 };
 
 #endif // SETTINGHEADER_H
