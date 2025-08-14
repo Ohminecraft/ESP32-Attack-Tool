@@ -20,6 +20,7 @@
 
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
+#include "core/clockheader.h"
 
 enum WiFiScanState {
     WIFI_SCAN_OFF,
@@ -318,7 +319,7 @@ class WiFiModules
         void sendDeauthAttack();
         void sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]);
         void sendProbeAttack();
-        void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);;
+        void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);
 
     public:
 
@@ -340,7 +341,6 @@ class WiFiModules
         int16_t wifi_analyzer_value = 0;
         int8_t wifi_analyzer_rssi = 0;
         String wifi_analyzer_ssid = "";
-        const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 
         bool deauth_flood_redraw = false;
         bool deauth_flood_found_ap = false;
@@ -393,6 +393,7 @@ class WiFiModules
         void main();
         bool ShutdownWiFi();
 
+        void connectWiFi(void *pvParameters);
         void StartMode(WiFiScanState mode);
         void mainAttackLoop(WiFiScanState mode);
         void StartDeauthFlood();

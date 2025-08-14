@@ -19,9 +19,11 @@
 #include <SPI.h>
 #include <Wire.h>
 
+#include "core/settingheader.h"
 #include "core/utilsheader.h"
 #include "configs.h"
 
+extern ESP32ATSetting espatsettings;
 
 // Define color constants for U8g2 compatibility
 #define WHITE 1
@@ -31,11 +33,7 @@ extern LinkedList<String>* display_buffer;
 class DisplayModules
 {
     private:
-    #ifdef _SPI_SCREEN
-        U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2;
-    #elif defined(_I2C_SCREEN)
         U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
-    #endif
         bool screenInitialized = false;
 
         float graph_scale = 1.0;
@@ -65,12 +63,13 @@ class DisplayModules
         void drawBipmap(int x, int y, int w, int h, const uint8_t* icon, bool senddisplay = false);
 
         // For Graphs
+        void drawingAvgMaxLine(int16_t value, int16_t cutout_value);
         void setGraphScale(float scale) { graph_scale = scale; }
         float getGraphScale() const { return graph_scale; }
         float calculateGraphScale(int16_t value);
-        float graphScaleCheck(const int16_t array[SCR_WIDTH]);
-        void drawingGraph(int16_t* array, bool senddisplay = false);
-        void addValueToGraph(int16_t value, int16_t* graph_array, int graph_array_size = SCR_WIDTH);
+        float graphScaleCheck(const int16_t array[]);
+        void drawingGraph(int16_t* array, int16_t cutout_value, bool senddisplay = false);
+        void addValueToGraph(int16_t value, int16_t* graph_array, int graph_array_size = espatsettings.displayWidth);
         void clearGraph(int16_t* array);
         
         // Additional U8g2 specific methods you might want to add

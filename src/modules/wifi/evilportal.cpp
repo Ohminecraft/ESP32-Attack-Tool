@@ -49,7 +49,7 @@ void EvilPortalAddtional::shutdownServer() {
     Serial.println("[INFO] Successfully Shutdown Portal");
 }
 
-void EvilPortalAddtional::setup() {
+void EvilPortalAddtional::main() {
     this->runServer = false;
     this->name_received = false;
     this->password_received = false;
@@ -124,9 +124,33 @@ void EvilPortalAddtional::serverSetup() {
     Serial.println("[INFO] Server request READY!");
 }
 
+String htmlFile;
+
 bool EvilPortalAddtional::htmlSetup() {
-    Serial.println("[WARN] No have html file exists, using default html file instead");
-    strlcpy(index_html, default_html, strlen(default_html));
+    bool usedefault = false;
+    if (htmlFile == "") {
+        Serial.println("[WARN] No have html file selected, using default html file instead");
+        usedefault = true;
+    }
+    File htmlfileselected = sdcard.getFile(htmlFile, FILE_READ);
+    if (!htmlfileselected) {
+        Serial.println("[WARN] html file selected not found or corrupted, using default html file instead");
+        usedefault = true;
+    } 
+    if (htmlfileselected.size() > MAX_HTML_SIZE) {
+        Serial.println("[WARN] HTML file selected too large, using default html file instead");
+        usedefault = true;
+    }
+    if (usedefault) strlcpy(index_html, default_html, strlen(default_html));
+    else {
+        String html = "";
+        while (htmlfileselected.available()) {
+            char c = htmlfileselected.read();
+            if (isPrintable(c))
+                html.concat(c);
+        }
+        strlcpy(index_html, html.c_str(), strlen(html.c_str()));
+    }
     this->has_html = true;
     Serial.println("[INFO] Set html file successfully");
     return true;
@@ -167,7 +191,7 @@ bool EvilPortalAddtional::apSetup(String essid, bool _deauth) {
     
     if (ap_name == "") {
         Serial.println("[WARN] Cannot get selected AP Name, using default name instead");
-        ap_name = "ESP32 Attack Tool";
+        ap_name = espatsettings.evilportalSSID;
     }
 
     if (ap_name.length() > MAX_AP_NAME_SIZE) {

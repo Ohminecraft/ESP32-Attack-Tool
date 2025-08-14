@@ -1,1 +1,0 @@
-libs Folder in src Folder contain lib can configuration in "configs.h"

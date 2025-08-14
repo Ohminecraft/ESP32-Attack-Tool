@@ -13,12 +13,9 @@
 
 #include <Arduino.h>
 #include "configs.h"
-#ifdef USE_NIMBLE
+
 #include <NimBLEDevice.h>
 #include "esp_gap_ble_api.h"
-#else
-#include <BLEDevice.h>
-#endif
 
 #include <LinkedList.h>
 
@@ -51,7 +48,8 @@ enum BLEScanState {
     BLE_ATTACK_EXPLOIT_APPLE_JUICE,
     BLE_ATTACK_EXPLOIT_MICROSOFT,
     BLE_ATTACK_EXPLOIT_SAMSUNG,
-    BLE_ATTACK_EXPLOIT_GOOGLE
+    BLE_ATTACK_EXPLOIT_GOOGLE,
+    BLE_ATTACK_EXPLOIT_SPAM_ALL
 };
 
 #define SERVICE_UUID "1bc68b2a-f3e3-11e9-81b4-2a2ae2dbcce4"
@@ -65,15 +63,10 @@ enum EBLEPayloadType
     Google
 };
 
-#ifndef USE_NIMBLE
-#define ADV_MODE_NON 0
-#define ADV_MODE_IND 1
-#define ADV_MODE_SCAN 2
-#else
 #define ADV_MODE_NON 0
 #define ADV_MODE_DIR 1
 #define ADV_MODE_UND 2
-#endif
+
 
 #define BLE_SPOOFER_DEVICE_BRAND_APPLE 0
 #define BLE_SPOOFER_DEVICE_BRAND_SAMSUNG 1
@@ -82,11 +75,7 @@ enum EBLEPayloadType
 struct BLEScanResult {
     String name;
     int rssi;
-    #ifdef USE_NIMBLE
     BLEAddress addr;
-    #else
-    String addr;
-    #endif
 };
 
 extern LinkedList<BLEScanResult>* blescanres;
@@ -382,7 +371,7 @@ class BLEModules {
     private:
         BLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
         static void scanCompleteCB(BLEScanResults scanResults);
-        void executeSwiftpair(EBLEPayloadType type);
+        void executeSwiftpair(EBLEPayloadType type, bool forspamall = false);
         void bleScan();
         BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
         void startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);

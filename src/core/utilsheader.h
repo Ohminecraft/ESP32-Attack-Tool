@@ -14,8 +14,11 @@
 
 #include <Arduino.h>
 #include <RotaryEncoder.h>
+#include <SPI.h>
 
 #include "configs.h"
+
+extern SPIClass *SDCardSPI;
 
 #define MEM_LOWER_LIM 20000
 
@@ -25,6 +28,7 @@
 #define GET_USED_HEAP_PERCENT 3
 
 uint32_t getHeap(uint8_t type);
+const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 String generateRandomName();
 bool checkLeftMemory();
 
@@ -32,12 +36,17 @@ void generateRandomMac(uint8_t* mac);
 void getMAC(char *addr, uint8_t* data, uint16_t offset);
 String macToString(uint8_t macAddr[6]);
 void setBaseMacAddress(uint8_t macAddr[6]);
+String uint32ToString(uint32_t value);
+String uint32ToStringInverted(uint32_t value);
+uint32_t swap32(uint32_t value);
+uint8_t hexCharToDecimal(char c);
 
 extern volatile bool nextPress;
 extern volatile bool prevPress; 
 extern volatile bool selPress;
 extern bool ble_initialized;
 extern bool wifi_initialized;
+extern bool wifi_connected;
 extern bool low_memory_warning;
 
 #if defined(USING_ENCODER)

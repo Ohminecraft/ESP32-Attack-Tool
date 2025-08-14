@@ -18,15 +18,24 @@ void setup() {
     Serial.println(" ");
     Serial.println("[INFO] Starting ESP32 Attack Tool v2...");
     
+    espatsettings.loadSettings();
+    
     // Initialize status LED
-    pinMode(STA_LED, OUTPUT);
-    digitalWrite(STA_LED, HIGH);
+    pinMode(espatsettings.statusLedPin, OUTPUT);
+    digitalWrite(espatsettings.statusLedPin, HIGH);
     
     // Initialize menu system
+    if (espatsettings.sdcardCsPin > 0) {
+		pinMode(espatsettings.nrfCsPin, OUTPUT);
+		digitalWrite(espatsettings.nrfCsPin, HIGH);
+		pinMode(espatsettings.sdcardCsPin, OUTPUT);
+		digitalWrite(espatsettings.sdcardCsPin, HIGH);
+	}
+    esp_log_level_set("sd_diskio", ESP_LOG_NONE);
     menuinit();
     
     Serial.println("[INFO] System ready!");
-    digitalWrite(STA_LED, LOW);
+    digitalWrite(espatsettings.statusLedPin, LOW);
     Serial.println("[SYSTEM_WELCOME] Welcome to ESP32 Attack Tool v2!");
 
 }

@@ -8,7 +8,7 @@
     * Licensed under the MIT License.
 */
 
-RF24 NRFRadio(NRF24_CE_PIN, NRF24_CSN_PIN);
+RF24 NRFRadio(rf24_gpio_pin_t(espatsettings.nrfCePin), rf24_gpio_pin_t(espatsettings.nrfCsPin));
 SPIClass *NRFSPI;
 
 uint8_t scan_channel[SCAN_CHANNELS];
@@ -18,17 +18,20 @@ uint8_t values[SCR_WIDTH];
 void NRF24Modules::main() {
     // Initialize the NRF24 radio
     NRFSPI = &SPI;
-    NRFSPI->begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN);
+    NRFSPI->begin(espatsettings.spiSckPin,
+                  espatsettings.spiMisoPin,
+                  espatsettings.spiMosiPin,
+                  espatsettings.nrfCsPin);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(10000000);
     NRFSPI->setBitOrder(MSBFIRST);
 
-    pinMode(NRF24_CSN_PIN, OUTPUT);
-    pinMode(NRF24_CE_PIN, OUTPUT);
-    digitalWrite(NRF24_CSN_PIN, HIGH);
-    digitalWrite(NRF24_CE_PIN, LOW);
+    pinMode(espatsettings.nrfCsPin, OUTPUT);
+    pinMode(espatsettings.nrfCePin, OUTPUT);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
+    digitalWrite(espatsettings.nrfCePin, LOW);
 
-    if (!NRFRadio.begin(NRFSPI)) {
+    if (!NRFRadio.begin(NRFSPI, rf24_gpio_pin_t(espatsettings.nrfCePin), rf24_gpio_pin_t(espatsettings.nrfCsPin))) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
@@ -40,19 +43,19 @@ void NRF24Modules::main() {
 byte NRF24Modules::getRegister(SPIClass &SPIIN, byte r) {
     byte c;
     
-    digitalWrite(NRF24_CSN_PIN, LOW);
+    digitalWrite(espatsettings.nrfCsPin, LOW);
     SPIIN.transfer(r & 0x1F);
     c = SPIIN.transfer(0);
-    digitalWrite(NRF24_CSN_PIN, HIGH);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
 
     return c;
 }
 
 void NRF24Modules::setRegister(SPIClass &SPIIN, byte r, byte v) {
-    digitalWrite(NRF24_CSN_PIN, LOW);
+    digitalWrite(espatsettings.nrfCsPin, LOW);
     SPIIN.transfer((r & 0x1F) | 0x20);
     SPIIN.transfer(v);
-    digitalWrite(NRF24_CSN_PIN, HIGH);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
 }
 
 void NRF24Modules::initNRF(SPIClass &SPIIN) {
@@ -65,32 +68,32 @@ void NRF24Modules::shutdownNRF(SPIClass &SPIIN) {
 }
 void NRF24Modules::setRX(SPIClass &SPIIN) {
     this->setRegister(SPIIN, NRF24_CONFIG, getRegister(SPIIN, NRF24_CONFIG) | 0x01);
-    digitalWrite(NRF24_CE_PIN, HIGH);
+    digitalWrite(espatsettings.nrfCePin, HIGH);
     delayMicroseconds(100);
 }
 
 void NRF24Modules::analyzerScanChannels() {
-    digitalWrite(NRF24_CE_PIN, LOW);
+    digitalWrite(espatsettings.nrfCePin, LOW);
     for (int i = 0; i < ANA_CHANNELS; i++) {
         NRFRadio.setChannel((128 * i) / ANA_CHANNELS);
         this->setRX(*NRFSPI);
         delayMicroseconds(40);
-        digitalWrite(NRF24_CE_PIN, LOW);
+        digitalWrite(espatsettings.nrfCePin, LOW);
     }
 }
 
 void NRF24Modules::writeRegister(SPIClass &SPIIN, uint8_t reg, uint8_t value) {
-    digitalWrite(NRF24_CSN_PIN, LOW);
+    digitalWrite(espatsettings.nrfCsPin, LOW);
     SPIIN.transfer(reg | 0x20);
     SPIIN.transfer(value);
-    digitalWrite(NRF24_CSN_PIN, HIGH);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
 }
 
 uint8_t NRF24Modules::readRegister(SPIClass &SPIIN, uint8_t reg) {
-    digitalWrite(NRF24_CSN_PIN, LOW);
+    digitalWrite(espatsettings.nrfCsPin, LOW);
     SPIIN.transfer(reg & 0x1F);
     uint8_t res = SPIIN.transfer(0x00);
-    digitalWrite(NRF24_CSN_PIN, HIGH);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
     return res;
 }
 
@@ -103,24 +106,27 @@ bool NRF24Modules::carrierDetected(SPIClass &SPIIN) {
 }
 
 void NRF24Modules::analyzerSetup() {
-    pinMode(NRF24_CE_PIN, OUTPUT);
-    pinMode(NRF24_CSN_PIN, OUTPUT);
+    pinMode(espatsettings.nrfCePin, OUTPUT);
+    pinMode(espatsettings.nrfCsPin, OUTPUT);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN);
+    NRFSPI->begin(espatsettings.spiSckPin,
+                  espatsettings.spiMisoPin,
+                  espatsettings.spiMosiPin,
+                  espatsettings.nrfCsPin);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(10000000);
     NRFSPI->setBitOrder(MSBFIRST);
 
-    digitalWrite(NRF24_CSN_PIN, HIGH);
-    digitalWrite(NRF24_CE_PIN, LOW);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
+    digitalWrite(espatsettings.nrfCePin, LOW);
 
-    if (!NRFRadio.begin(NRFSPI)) {
+    if (!NRFRadio.begin(NRFSPI, rf24_gpio_pin_t(espatsettings.nrfCePin), rf24_gpio_pin_t(espatsettings.nrfCsPin))) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
 
-    digitalWrite(NRF24_CE_PIN, LOW);
+    digitalWrite(espatsettings.nrfCePin, LOW);
 
     this->initNRF(*NRFSPI);
     writeRegister(*NRFSPI, NRF24_EN_AA, 0x00);
@@ -128,18 +134,21 @@ void NRF24Modules::analyzerSetup() {
 }
 
 void NRF24Modules::jammerNRFRadioSetup() {
-    pinMode(NRF24_CE_PIN, OUTPUT);
-    pinMode(NRF24_CSN_PIN, OUTPUT);
-    digitalWrite(NRF24_CE_PIN, LOW);
-    digitalWrite(NRF24_CSN_PIN, HIGH);
+    pinMode(espatsettings.nrfCePin, OUTPUT);
+    pinMode(espatsettings.nrfCsPin, OUTPUT);
+    digitalWrite(espatsettings.nrfCePin, LOW);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
 
     NRFSPI = &SPI;
-    NRFSPI->begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN);
+    NRFSPI->begin(espatsettings.spiSckPin,
+                  espatsettings.spiMisoPin,
+                  espatsettings.spiMosiPin,
+                  espatsettings.nrfCsPin);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(16000000);
     NRFSPI->setBitOrder(MSBFIRST);
     // Initialize the NRF24 radio
-    if (!NRFRadio.begin(NRFSPI)) {
+    if (!NRFRadio.begin(NRFSPI, rf24_gpio_pin_t(espatsettings.nrfCePin), rf24_gpio_pin_t(espatsettings.nrfCsPin))) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
@@ -223,7 +232,7 @@ void NRF24Modules::shutdownNRFJammer() {
 }
 
 void NRF24Modules::scanChannel() {
-   digitalWrite(NRF24_CE_PIN, LOW);
+   digitalWrite(espatsettings.nrfCePin, LOW);
 
     memset(scan_channel, 0, sizeof(scan_channel));
 
@@ -239,7 +248,7 @@ void NRF24Modules::scanChannel() {
         }
         setRX(*NRFSPI);
         delayMicroseconds(100);
-        digitalWrite(NRF24_CE_PIN, LOW);
+        digitalWrite(espatsettings.nrfCePin, LOW);
         scan_channel[i] += getRegister(*NRFSPI, NRF24_RPD);
       }
 
@@ -248,23 +257,26 @@ void NRF24Modules::scanChannel() {
 }
 
 void NRF24Modules::scannerSetup() {
-    pinMode(NRF24_CE_PIN, OUTPUT);
-    pinMode(NRF24_CSN_PIN, OUTPUT);
-    digitalWrite(NRF24_CE_PIN, LOW);
-    digitalWrite(NRF24_CSN_PIN, HIGH);
+    pinMode(espatsettings.nrfCePin, OUTPUT);
+    pinMode(espatsettings.nrfCsPin, OUTPUT);
+    digitalWrite(espatsettings.nrfCePin, LOW);
+    digitalWrite(espatsettings.nrfCsPin, HIGH);
 
     NRFSPI = &SPI;
-        
+    NRFSPI->begin(espatsettings.spiSckPin,
+                  espatsettings.spiMisoPin,
+                  espatsettings.spiMosiPin,
+                  espatsettings.nrfCsPin);
     NRFSPI->setDataMode(SPI_MODE0);
     NRFSPI->setFrequency(16000000);
     NRFSPI->setBitOrder(MSBFIRST);
 
-    if (!NRFRadio.begin(NRFSPI)) {
+    if (!NRFRadio.begin(NRFSPI, rf24_gpio_pin_t(espatsettings.nrfCePin), rf24_gpio_pin_t(espatsettings.nrfCsPin))) {
         Serial.println("[ERROR] NRF Radio Initialization Failed!");
         return;
     }
 
-    digitalWrite(NRF24_CE_PIN, LOW);
+    digitalWrite(espatsettings.nrfCePin, LOW);
 
     this->initNRF(*NRFSPI);
     this->setRegister(*NRFSPI, NRF24_EN_AA, 0x00);

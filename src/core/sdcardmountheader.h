@@ -10,9 +10,11 @@
 
 #include <LinkedList.h>
 
+#include "core/settingheader.h"
 #include "core/utilsheader.h"
 #include "configs.h"
 
+extern ESP32ATSetting espatsettings;
 extern LinkedList<String> *sdcard_buffer;
 
 class SDCardModules {
@@ -25,6 +27,7 @@ public:
     void addListFileToLinkedList(LinkedList<String> *file_names, String str_dir = "/", String ext = "");
     int8_t update();
     bool isExists(String path);
+    bool isMounted();
 };
 
 #endif // SDCARDMOUNTHEADER_H

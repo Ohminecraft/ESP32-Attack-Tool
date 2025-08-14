@@ -8,14 +8,16 @@
     * Licensed under the MIT License.
 */
 
-SPIClass *SDCardSPI;
 LinkedList<String> *sdcard_buffer;
 
 void SDCardModules::main() {
     SDCardSPI = &SPI;
     sdcard_buffer = new LinkedList<String>();
-    SDCardSPI->begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN, SD_CS_PIN);
-    if (!SD.begin(SD_CS_PIN, *SDCardSPI)) {
+    SDCardSPI->begin(espatsettings.spiSckPin,
+                     espatsettings.spiMisoPin,
+                     espatsettings.spiMosiPin,
+                     espatsettings.sdcardCsPin);
+    if (!SD.begin(espatsettings.sdcardCsPin, *SDCardSPI)) {
         Serial.println("[ERROR] SD Card Mount Failed!");
         return;
     }
@@ -58,6 +60,10 @@ void SDCardModules::close() {
     }
 }
 
+bool SDCardModules::isMounted() {
+    return mounted;
+}
+
 bool SDCardModules::deleteFile(String path) {
     if (mounted) {
         if(!SD.remove("/ESP32AttackTool" + path)) {
@@ -73,10 +79,8 @@ bool SDCardModules::deleteFile(String path) {
 bool SDCardModules::isExists(String path) {
     if (mounted) {
         if (SD.exists("/ESP32AttackTool" + path)) {
-            Serial.println("[INFO] File exists: " + path);
             return true;
         } else {
-            Serial.println("[ERROR] File does not exist: " + path);
             return false;
         }
     } else {
