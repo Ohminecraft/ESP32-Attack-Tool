@@ -341,7 +341,6 @@ class WiFiModules
         int16_t wifi_analyzer_value = 0;
         int8_t wifi_analyzer_rssi = 0;
         String wifi_analyzer_ssid = "";
-        const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 
         bool deauth_flood_redraw = false;
         bool deauth_flood_found_ap = false;

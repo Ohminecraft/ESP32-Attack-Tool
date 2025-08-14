@@ -18,11 +18,15 @@
 
 #include <LinkedList.h>
 
+#include "core/sdcardmountheader.h"
 #include "core/settingheader.h"
 #include "wifiheader.h"
 #include "core/utilsheader.h"
 
 extern ESP32ATSetting espatsettings;
+extern String htmlFile;
+
+extern SDCardModules sdcard;
 
 
 const char default_html[] PROGMEM = R"=====(

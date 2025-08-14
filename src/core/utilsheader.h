@@ -28,6 +28,7 @@ extern SPIClass *SDCardSPI;
 #define GET_USED_HEAP_PERCENT 3
 
 uint32_t getHeap(uint8_t type);
+const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 String generateRandomName();
 bool checkLeftMemory();
 

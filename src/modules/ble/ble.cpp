@@ -77,37 +77,19 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
 
             uint8_t name_len = Name.length();
 
-            //AdvData_Raw = new uint8_t[7 + name_len];
+            AdvData_Raw = new uint8_t[7 + name_len];
 
-            //AdvData_Raw[i++] = 7 + name_len - 1;
-            //AdvData_Raw[i++] = 0xFF;
-            //AdvData_Raw[i++] = 0x06;
-            //AdvData_Raw[i++] = 0x00;
-            //AdvData_Raw[i++] = 0x03;
-            //AdvData_Raw[i++] = 0x00;
-            //AdvData_Raw[i++] = 0x80;
-            //memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
-            //i += name_len;
-
-            //AdvData.addData(std::string((char *)AdvData_Raw, 7 + name_len));
-
-            uint8_t AdvData_Stack[64]; // Giả sử max length < 64
-            if (7 + name_len > 64) {
-                Serial.println("[ERROR] Microsoft name too long!");
-                return AdvData;
-            }
-            AdvData_Stack[i++] = 7 + name_len - 1;
-            AdvData_Stack[i++] = 0xFF;
-            AdvData_Stack[i++] = 0x06;
-            AdvData_Stack[i++] = 0x00;
-            AdvData_Stack[i++] = 0x03;
-            AdvData_Stack[i++] = 0x00;
-            AdvData_Stack[i++] = 0x80;
-            memcpy(&AdvData_Stack[i], Name.c_str(), name_len);
+            AdvData_Raw[i++] = 7 + name_len - 1;
+            AdvData_Raw[i++] = 0xFF;
+            AdvData_Raw[i++] = 0x06;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x03;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x80;
+            memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
             i += name_len;
 
-            AdvData.addData(std::string((char *)AdvData_Stack, 7 + name_len));
-            break;
+            AdvData.addData(std::string((char *)AdvData_Raw, 7 + name_len));
             break;
         }
 

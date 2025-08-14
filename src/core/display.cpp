@@ -62,6 +62,14 @@ void DisplayModules::drawBipmap(int x, int y, int w, int h, const uint8_t* icon,
     if (senddisplay) u8g2.sendBuffer();
 }
 
+void DisplayModules::drawingAvgMaxLine(int16_t value, int16_t cutout_value) {
+    u8g2.drawLine(0, espatsettings.displayHeight - (value * graph_scale), espatsettings.displayWidth, espatsettings.displayHeight - (value * graph_scale));
+    u8g2.setCursor(0, espatsettings.displayHeight - (value * graph_scale));
+    for (int i = 0; i < cutout_value; i++) value--;
+    if (value < 0) value = 0;
+    u8g2.println((String)(value));
+}
+
 float DisplayModules::calculateGraphScale(int16_t value) {
     if (value <= 0) return graph_scale;
 
@@ -82,16 +90,23 @@ void DisplayModules::addValueToGraph(int16_t value, int16_t* graph_array, int gr
     graph_array[0] = value;
 }
 
-void DisplayModules::drawingGraph(int16_t* array, bool senddisplay) {
-    drawingLine(0, 0, 0, 63);
-    drawingLine(espatsettings.displayWidth - 1, 0, espatsettings.displayWidth - 1, 63);
+void DisplayModules::drawingGraph(int16_t* array, int16_t cutout_value, bool senddisplay) {
+    drawingLine(0, 0, 0, espatsettings.displayHeight - 1);
+    drawingLine(espatsettings.displayWidth - 1, 0, espatsettings.displayWidth - 1, espatsettings.displayHeight - 1);
+
+    int16_t maxValue = 0;
+    int total = 0;
 
     for (int count = 10; count < espatsettings.displayWidth - 1; count += 10) {
 		drawingPixel(count, 0);
-		drawingPixel(count, 63);
+		drawingPixel(count, espatsettings.displayHeight - 1);
     }
 
-    for (int i = 0; i < espatsettings.displayWidth; i++) {
+    for (int i = espatsettings.displayWidth - 1; i >= 0; i--) {
+        total = total + array[i];
+        if (array[i] > maxValue) {
+            maxValue = array[i];
+        }
         int yValue = (int)(array[i] * graph_scale);
         if (yValue < 1) yValue = 1;
         if (yValue > espatsettings.graphLineLimit) yValue = espatsettings.graphLineLimit;
@@ -101,6 +116,8 @@ void DisplayModules::drawingGraph(int16_t* array, bool senddisplay) {
 
         this->drawingLine(i - 1, yStart, i - 1, yEnd);
     }
+    drawingAvgMaxLine(maxValue, cutout_value);
+    drawingAvgMaxLine(total / espatsettings.displayWidth, cutout_value);
     if (senddisplay) {
         u8g2.sendBuffer();
     }

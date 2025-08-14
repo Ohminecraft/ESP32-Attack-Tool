@@ -108,7 +108,7 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     JsonObject _wifi = defaultSetting["wifi"].to<JsonObject>();
     for (const auto &pair : wifi) { _wifi[pair.first] = pair.second; }
 
-    defaultSetting["autoConnectWiFi"] = false; // (WIP)
+    defaultSetting["autoConnectWiFi"] = false;
 
     defaultSetting["bleName"] = "ESP32AttackTool"; // default BLE name
     defaultSetting["sourappleSpamDelay"] = SOUR_APPLE_SPAM_DELAY; // default Sour Apple spam delay
@@ -134,7 +134,9 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
 
     defaultSetting["selBtnPin"] = SEL_BTN; // default select button pin
 
-    defaultSetting["timeZone"] = 0; // (WIP)
+    defaultSetting["timeZone"] = 0;
+    defaultSetting["autoDeepSleep"] = true;
+    defaultSetting["autoStandby"] = true;
 
     File configfile;
     if (useLittleFS) {
@@ -496,6 +498,22 @@ void ESP32ATSetting::loadSettings() {
         Serial.println("timeZone: " + String(timeZone));
     } else {
         Serial.println("[WARN] Failed to get 'timeZone' configuration");
+        failed_count++;
+    }
+    if (!_settings["autoDeepSleep"].isNull()) {
+        autoDeepSleep = _settings["autoDeepSleep"].as<bool>();
+        if (autoDeepSleep) Serial.println("autoDeepSleep: true");
+        else Serial.println("autoDeepSleep: false");
+    } else {
+        Serial.println("[WARN] Failed to get 'autoDeepSleep' configuration");
+        failed_count++;
+    }
+    if (!_settings["autoStandby"].isNull()) {
+        autoStandby = _settings["autoStandby"].as<bool>();
+        if (autoStandby) Serial.println("autoStandby: true");
+        else Serial.println("autoStandby: false");
+    } else {
+        Serial.println("[WARN] Failed to get 'autoStandby' configuration");
         failed_count++;
     }
 

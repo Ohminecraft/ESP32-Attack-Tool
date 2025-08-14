@@ -10,6 +10,7 @@
 
 HIDInterface *hid_usb = nullptr;
 HIDInterface *hid_ble = nullptr;
+BleMouse *hid_mouse = nullptr;
 
 uint8_t keyboardLayout;
 
@@ -137,7 +138,7 @@ void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usin
     }
 }
 
-void BadUSBModules::beginBadUSB(HIDInterface *&hid, bool usingble) {
+void BadUSBModules::beginLayout(HIDInterface *&hid, bool usingble) {
     if (hid == nullptr) {
         if (keyboardLayout == Layout_en_US) {
             beginKB(hid, KeyboardLayout_en_US, usingble);
@@ -296,4 +297,70 @@ void BadUSBModules::launchBadUSB(String badusbScript, HIDInterface *&hid) {
     }
     payloadFile.close();
     hid->releaseAll();
+}
+
+void BadUSBModules::mediaController(HIDInterface *&hid, MediaCommand command) {
+    if (command == MEDIA_SCREENSHOT) hid->press(KEY_PRINT_SCREEN);
+    else if (command == MEDIA_PLAY_PAUSE) hid->press(KEY_MEDIA_PLAY_PAUSE);
+    else if (command == MEDIA_STOP) hid->press(KEY_MEDIA_STOP);
+    else if (command == MEDIA_NEXT_TRACK) hid->press(KEY_MEDIA_NEXT_TRACK);
+    else if (command == MEDIA_PREV_TRACK) hid->press(KEY_MEDIA_PREVIOUS_TRACK);
+    else if (command == MEDIA_VOL_UP) hid->press(KEY_MEDIA_VOLUME_UP);
+    else if (command == MEDIA_VOL_DOWN) hid->press(KEY_MEDIA_VOLUME_DOWN);
+    else if (command == MEDIA_MUTE) hid->press(KEY_MEDIA_MUTE);
+    hid->releaseAll();
+}   
+
+void BadUSBModules::Keymote(HIDInterface *&hid, KeymoteCommand key) {
+    if (key == KEYMOTE_UP) hid->press(KEY_UP_ARROW);
+    if (key == KEYMOTE_DOWN) hid->press(KEY_DOWN_ARROW);
+    if (key == KEYMOTE_LEFT) hid->press(KEY_LEFT_ARROW);
+    if (key == KEYMOTE_RIGHT) hid->press(KEY_RIGHT_ARROW);
+    hid->releaseAll();
+}
+
+void BadUSBModules::beginMouse(BleMouse *&hid_mouse, bool usingble) {
+    if (usingble) {
+        hid_mouse = new BleMouse(espatsettings.bleName.c_str(), "ESP32AttackTool", 100);
+        hid_mouse->begin();
+    }
+}
+
+void BadUSBModules::tiktokScroll(BleMouse *&hid_mouse, TikTokScrollCommand cmd) {
+    hid_mouse->move(0, 0);
+    if (cmd == SCROLL_DOWN) {
+        hid_mouse->press(MOUSE_LEFT);   // Giữ
+        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
+            hid_mouse->move(0, -30); // Mỗi lần dịch 30 pixel
+            vTaskDelay(12 / portTICK_PERIOD_MS);
+        }
+        hid_mouse->release(MOUSE_LEFT); // Thả
+        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
+            hid_mouse->move(0, 30); // Mỗi lần dịch 30 pixel
+            vTaskDelay(12 / portTICK_PERIOD_MS);
+        }
+    }
+    else if (cmd == SCROLL_UP) {
+        hid_mouse->press(MOUSE_LEFT);   // Giữ
+        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
+            hid_mouse->move(0, 30); // Mỗi lần dịch 30 pixel
+            vTaskDelay(12 / portTICK_PERIOD_MS);
+        }
+        hid_mouse->release(MOUSE_LEFT); // Thả
+        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
+            hid_mouse->move(0, -30); // Mỗi lần dịch 30 pixel
+            vTaskDelay(12 / portTICK_PERIOD_MS);
+        }
+    }
+    else if (cmd == LIKE_VIDEO) {
+        hid_mouse->click();
+        hid_mouse->release();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        hid_mouse->click();
+    }
+    hid_mouse->release();
+}
+
+bool BadUSBModules::isMouseConnected(BleMouse *&hid_mouse) {
+    return hid_mouse->isConnected();
 }

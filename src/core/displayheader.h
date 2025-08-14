@@ -63,11 +63,12 @@ class DisplayModules
         void drawBipmap(int x, int y, int w, int h, const uint8_t* icon, bool senddisplay = false);
 
         // For Graphs
+        void drawingAvgMaxLine(int16_t value, int16_t cutout_value);
         void setGraphScale(float scale) { graph_scale = scale; }
         float getGraphScale() const { return graph_scale; }
         float calculateGraphScale(int16_t value);
         float graphScaleCheck(const int16_t array[]);
-        void drawingGraph(int16_t* array, bool senddisplay = false);
+        void drawingGraph(int16_t* array, int16_t cutout_value, bool senddisplay = false);
         void addValueToGraph(int16_t value, int16_t* graph_array, int graph_array_size = espatsettings.displayWidth);
         void clearGraph(int16_t* array);
         

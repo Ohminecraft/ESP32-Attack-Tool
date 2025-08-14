@@ -14,19 +14,19 @@
 */
 
 String generateRandomName() {
-    const char* charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    int len = rand() % 8 + 3; // Limit length to 3-10 characters
-    String randomName = "";
-    
-    // Reserve memory upfront to prevent fragmentation
-    randomName.reserve(len + 1);
-    
-    for (int i = 0; i < len; i++) {
-        randomName += charset[rand() % strlen(charset)];
-    }
-    
-    return randomName;
+	int len = rand() % 10 + 1; // Limit length to 3-10 characters
+	String randomName = "";
+	
+	// Reserve memory upfront to prevent fragmentation
+	randomName.reserve(len + 1);
+	
+	for (int i = 0; i < len; i++) {
+		randomName += alfa[rand() % alfa.length()];
+	}
+	
+	return randomName;
 }
+
 uint32_t getHeap(uint8_t type) {
 	if (type == GET_TOTAL_HEAP) return ESP.getHeapSize();
 	else if (type == GET_FREE_HEAP) return ESP.getFreeHeap();

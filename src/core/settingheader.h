@@ -31,7 +31,7 @@ class ESP32ATSetting {
         String evilportalSSID = "ESP32AttackTool";
         std::map<String, String> wifi = {};
         bool autoConnectWiFi = false;
-        String bleName = "ESP32 Attack Tool";
+        String bleName = "ESP32AttackTool";
         uint16_t sourappleSpamDelay = SOUR_APPLE_SPAM_DELAY;
         uint16_t applejuiceSpamDelay = APPLE_JUICE_SPAM_DELAY;
         uint16_t swiftpairSpamDelay = SWIFTPAIR_SPAM_DELAY;
@@ -49,6 +49,8 @@ class ESP32ATSetting {
         uint8_t rightBtnPin = RIGHT_BTN;
         uint8_t selectBtnPin = SEL_BTN;
         int8_t timeZone = 0;
+        bool autoDeepSleep = true;
+        bool autoStandby = true;
 
         void loadSettings();
         void saveSettings();

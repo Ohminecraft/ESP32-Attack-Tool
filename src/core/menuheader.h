@@ -74,6 +74,9 @@ enum MenuState {
     BLE_SPOOFER_RUNNING,
     BLE_ANALYZER_RUNNING,
     BLE_EXPLOIT_ATTACK_MENU,
+    BLE_MEDIA_MENU,
+    BLE_KEYMOTE_MENU,
+    BLE_TT_SCROLL_MENU,
     BLE_ATTACK_RUNNING,
     WIFI_ATTACK_RUNNING
 };
@@ -96,6 +99,9 @@ enum BLEMenuItem {
     BLE_SCAN,
     BLE_ANALYZER,
     BLE_INFO,
+    BLE_MEDIA_CMD,
+    BLE_KEYMOTE,
+    BLE_TT_SCROLL,
     BLE_BADUSB,
     BLE_SPOOFER,
     BLE_EXPLOIT_ATTACK,
@@ -267,6 +273,36 @@ enum BLEExploitAttackMenuItem {
     BLE_ATK_MENU_COUNT
 };
 
+enum BLEMediaCtrlItem {
+    BLE_MEDIA_SCREENSHOT,
+    BLE_MEDIA_PLAYPAUSE,
+    BLE_MEDIA_STOP,
+    BLE_MEDIA_NEXT_TRACK,
+    BLE_MEDIA_PREV_TRACK,
+    BLE_MEDIA_VOL_UP,
+    BLE_MEDIA_VOL_DOWN,
+    BLE_MEDIA_MUTE,
+    BLE_MEDIA_BACK,
+    BLE_MEDIA_MENU_COUNT
+};
+
+enum BLEKeymote {
+    BLE_KEYMOTE_UP,
+    BLE_KEYMOTE_DOWN,
+    BLE_KEYMOTE_LEFT,
+    BLE_KEYMOTE_RIGHT,
+    BLE_KEYMOTE_BACK,
+    BLE_KEYMOTE_ITEM_COUNT
+};
+
+enum TiktokScrollItem {
+    BLE_TT_SCROLL_UP,
+    BLE_TT_SCROLL_DOWN,
+    BLE_TT_LIKE_VIDEO,
+    BLE_TT_BACK,
+    BLE_TT_ITEM_COUNT
+};
+
 // WiFi menu items
 enum WiFiMenuItem {
     WIFI_GENERAL,
@@ -284,6 +320,7 @@ enum WiFiUtils {
     WIFI_UTILS_SET_STA_MAC,
     WIFI_UTILS_GENERATE_AP_MAC,
     WIFI_UTILS_GENERATE_STA_MAC,
+    WIFI_UTILS_SET_EVIL_PORTAL_HTML,
     WIFI_UTILS_BACK,
     WIFI_UTILS_MENU_COUNT
 };
@@ -422,6 +459,7 @@ bool fixDeauthFloodDisplayLoop = false;
 
 // Evil Portal
 bool evilPortalOneShot = false;
+bool selectforevilportal = false;
 
 // NRF24
 bool nrfAnalyzerSetupOneShot = false;
@@ -442,6 +480,7 @@ bool irreadOneShot = false;
 bool selectforbadusb = false;
 bool badble = false;
 String badusbFile;
+
 
 // System
 bool autoSleep = false;

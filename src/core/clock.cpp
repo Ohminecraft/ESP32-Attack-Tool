@@ -13,10 +13,10 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, 0);
 ESP32Time rtc;
 
 void TimeClock::main() {
-        //timeClient.setTimeOffset();
+    timeClient.setTimeOffset(espatsettings.timeZone * 3600);
     timeClient.begin();
-    if (timeClient.forceUpdate() && wifi_connected) {
-        rtc.setTime(timeClient.getEpochTime() + espatsettings.timeZone * 3600);
+    if (timeClient.update() && wifi_connected) {
+        rtc.setTime(timeClient.getEpochTime());
         update(rtc.getTimeStruct());
         Serial.println("[INFO] Get NTP Time successfully!");
     }      
