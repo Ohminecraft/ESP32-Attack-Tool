@@ -68,9 +68,8 @@ void connectWiFi(void *pvParameters) {
 	vTaskDelay(500 / portTICK_RATE_MS);
 	access_points->clear();
 	timeClock.main();
-	vTaskDelay(200 / portTICK_RATE_MS);
+	vTaskDelay(500 / portTICK_RATE_MS);
 	WiFi.disconnect();
-	WiFi.mode(WIFI_OFF);
     vTaskDelete(NULL);
     return;
 }
@@ -1983,6 +1982,14 @@ void selectCurrentItem() {
 					currentState = BLE_SCAN_RUNNING;
 					displayBLEScanMenu();
 				} else if (currentSelection == BLE_BADUSB) {
+					if (need_restart) {
+						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					selectforbadusb = true;
 					badble = true;
 					delete sdcard_buffer;
@@ -1995,6 +2002,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_MEDIA_CMD) {
 					display.clearScreen();
 					displayStatusBar();
+					if (need_restart) {
+						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
 					while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
@@ -2013,6 +2028,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_KEYMOTE) {
 					display.clearScreen();
 					displayStatusBar();
+					if (need_restart) {
+						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
 					while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
@@ -2031,6 +2054,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_TT_SCROLL) {
 					display.clearScreen();
 					displayStatusBar();
+					if (need_restart) {
+						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					badusb.beginMouse(hid_mouse, true);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
 					while (!badusb.isMouseConnected(hid_mouse) && !check(prevPress)) yield();
@@ -2154,6 +2185,8 @@ void selectCurrentItem() {
 					displayBLEMenu();
 					return;
 				}
+
+				need_restart = true;
 				
 				// Start BLE attack
 				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
@@ -3066,8 +3099,6 @@ void goBack() {
 		case BLE_TT_SCROLL_MENU:
 		case BLE_KEYMOTE_MENU:
 		case BLE_MEDIA_MENU:
-			if (hid_ble != nullptr) hid_ble->end();
-			if (hid_mouse != nullptr) hid_mouse->end();
 			currentState = BLE_MENU;
 			currentSelection = 0;
 			maxSelections = BLE_MENU_COUNT;
@@ -3809,6 +3840,7 @@ void menuloop() {
 	} else {
 		low_memory_warning = false;
 	}
+
 }
 
 #pragma GCC diagnostic pop
