@@ -322,6 +322,9 @@ void BadUSBModules::Keymote(HIDInterface *&hid, KeymoteCommand key) {
 void BadUSBModules::beginMouse(BleMouse *&hid_mouse, bool usingble) {
     if (usingble) {
         hid_mouse = new BleMouse(espatsettings.bleName.c_str(), "ESP32AttackTool", 100);
+    }
+
+    if (usingble) {
         hid_mouse->begin();
     }
 }

@@ -481,6 +481,7 @@ bool selectforbadusb = false;
 bool badble = false;
 String badusbFile;
 
+bool need_restart = false;
 
 // System
 bool autoSleep = false;
