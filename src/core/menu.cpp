@@ -2062,17 +2062,17 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginMouse(hid_mouse, true);
+					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true, BLE_KEYBOARD_MODE_MOUSE);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isMouseConnected(hid_mouse) && !check(prevPress)) yield();
-					if (badusb.isMouseConnected(hid_mouse)) {
+					while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
+					if (badusb.isConnected(hid_ble)) {
 						currentState = BLE_TT_SCROLL_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_TT_ITEM_COUNT;
 						displayTikTokScrollMenu();
 					} else {
 						display.clearScreen();
-						displayStatusBar();
+						displayStatusBar();				
 						display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
 						displayBLEMenu();
@@ -2232,9 +2232,9 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			}
-			else if (currentSelection == BLE_TT_SCROLL_UP) badusb.tiktokScroll(hid_mouse, SCROLL_UP);
-			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_mouse, SCROLL_DOWN);
-			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_mouse, LIKE_VIDEO);
+			else if (currentSelection == BLE_TT_SCROLL_UP) badusb.tiktokScroll(hid_ble, SCROLL_UP);
+			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_ble, SCROLL_DOWN);
+			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_ble, LIKE_VIDEO);
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
 			vTaskDelay(150 / portTICK_PERIOD_MS);
 			displayTikTokScrollMenu();
@@ -2846,7 +2846,6 @@ void selectCurrentItem() {
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					if (badble) {
 						goBack();
-						badble = false;
 					}
 					return;
 				}
@@ -3181,6 +3180,7 @@ void goBack() {
 		case SD_DELETE_MENU:
 		if (selectforbadusb) {
 			if (badble) {
+				badble = false;
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
@@ -3208,6 +3208,7 @@ void goBack() {
 			break;
 		case BADUSB_KEY_LAYOUT_MENU:
 			if (badble) {
+				badble = false;
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
@@ -3216,10 +3217,14 @@ void goBack() {
 			break;
 		case BADUSB_RUNNING:
 			if (badble) {
-				currentState = BLE_MENU;
+				selectforbadusb = true;
+				delete sdcard_buffer;
+				sdcard_buffer = new LinkedList<String>();
+				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".txt");
+				currentState = SD_DELETE_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_MENU_COUNT;
-				displayBLEMenu();
+				maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
+				displayDeleteSDCard();
 			}
 			break;
 		case IR_READ_RUNNING:

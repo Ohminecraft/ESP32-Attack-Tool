@@ -35,27 +35,40 @@
 #define BLE_KEYBOARD_VERSION_MINOR 0
 #define BLE_KEYBOARD_VERSION_REVISION 4
 
+
+#define BLE_KEYBOARD_MODE_KEYBOARD 1
+#define BLE_KEYBOARD_MODE_MOUSE 2
+#define BLE_KEYBOARD_MODE_GAMEPAD 3
+#define BLE_KEYBOARD_MODE_ALL 4
+
 class BleKeyboard : public BLEServerCallbacks, public BLECharacteristicCallbacks, public HIDInterface
 {
 private:
-  BLEHIDDevice* hid;
-  BLECharacteristic* inputKeyboard;
-  BLECharacteristic* outputKeyboard;
-  BLECharacteristic* inputMediaKeys;
-  BLEAdvertising*    advertising;
-  BLEServer*          pServer;
-  KeyReport          _keyReport;
-  MediaKeyReport     _mediaKeyReport;
-  std::string        deviceName;
-  std::string        deviceManufacturer;
-  uint8_t            batteryLevel;
-  bool               connected = false;
-  uint32_t           _delay_ms = 7;
-  void delay_ms(uint64_t ms);
+  uint8_t _buttons;
+  uint8_t _buttonsGamepad[16]; // 2x64 -> 128 bytes) [0: 0-64, 1->64-128]
+  BLEHIDDevice *hid;
+  BLECharacteristic *inputKeyboard;
+  BLECharacteristic *outputKeyboard;
+  BLECharacteristic *inputMediaKeys;
+  BLECharacteristic *inputMouse;
+  //BLECharacteristic *outputMouse;
+  BLECharacteristic *inputGamepad;
+  BLECharacteristic *outputGamepad;
 
-  uint16_t vid       = 0x05ac;
-  uint16_t pid       = 0x820a;
-  uint16_t version   = 0x0210;
+  BLEAdvertising *advertising;
+  KeyReport _keyReport;
+  MediaKeyReport _mediaKeyReport;
+  std::string deviceName;
+  std::string deviceManufacturer;
+  uint8_t batteryLevel;
+  bool connected = false;
+  uint32_t _delay_ms = 7;
+  void delay_ms(uint64_t ms);
+  void buttons(const uint16_t b);
+
+  uint16_t vid = 0x05ac;
+  uint16_t pid = 0x820a;
+  uint16_t version = 0x0210;
 
   uint16_t appearance = 0x03C1;
 
@@ -63,20 +76,35 @@ private:
 
 public:
   BleKeyboard(std::string deviceName = "ESP32 Keyboard", std::string deviceManufacturer = "Espressif", uint8_t batteryLevel = 100);
-  void begin(const uint8_t *layout = KeyboardLayout_en_US) override { begin(layout, HID_KEYBOARD); };
-  void begin(const uint8_t *layout, uint16_t showAs);
+  void begin(const uint8_t *layout = KeyboardLayout_en_US, uint8_t mode = BLE_KEYBOARD_MODE_ALL) override { begin(layout, HID_KEYBOARD, mode); };
+  void begin(const uint8_t *layout, uint16_t showAs, uint8_t mode);
   void end(void);
   void setLayout(const uint8_t *layout = KeyboardLayout_en_US) { _asciimap = layout; }
   void sendReport(KeyReport* keys);
   void sendReport(MediaKeyReport* keys);
   size_t press(uint8_t k);
   size_t press(const MediaKeyReport k);
+  size_t pressMouse(const uint16_t b = MOUSE_LEFT);
   size_t release(uint8_t k);
   size_t release(const MediaKeyReport k);
+  size_t releaseMouse(const uint16_t b = MOUSE_LEFT);
   size_t write(uint8_t c);
   size_t write(const MediaKeyReport c);
   size_t write(const uint8_t *buffer, size_t size);
   void releaseAll(void);
+
+  // keypad magic
+  void resetButtons();
+  void setAxes(int16_t x, int16_t y, int16_t a1, int16_t a2, int16_t a3, int16_t a4, int16_t a5, int16_t a6, signed char hat1, signed char hat2, signed char hat3, signed char hat4);
+  size_t pressButton(uint8_t b);
+  size_t releaseButton(uint8_t b);
+  bool isPressedButton(uint8_t b);
+
+  void click(const uint16_t b = MOUSE_LEFT );
+  void move(signed char x, signed char y, signed char wheel = 0, signed char hWheel = 0);
+  void wheel(signed char wheel = 0, signed char hWheel = 0);
+  bool isPressed(const uint16_t b);
+
   bool isConnected(void);
   void setBatteryLevel(uint8_t level);
   void setAppearence(uint16_t v) { appearance = v; }

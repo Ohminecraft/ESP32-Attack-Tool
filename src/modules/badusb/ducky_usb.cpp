@@ -10,7 +10,6 @@
 
 HIDInterface *hid_usb = nullptr;
 HIDInterface *hid_ble = nullptr;
-BleMouse *hid_mouse = nullptr;
 
 uint8_t keyboardLayout;
 
@@ -114,9 +113,9 @@ const DuckyCommand duckyCmds[]{
     {"SPACE",          KEY_SPACE,        DuckyCommandType_Cmd        }
 };
 
-void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble) {
+void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble, uint8_t mode) {
     if (usingble) {
-        hid = new BleKeyboard(espatsettings.bleName.c_str(), "ESP32AttackTool", 100);
+        if (hid == nullptr) hid = new BleKeyboard(espatsettings.bleName.c_str(), "ESP32AttackTool", 100);
     } else {
         #if !defined(BOARD_ESP32_C3_MINI)
         hid = new USBHIDKeyboard();
@@ -130,10 +129,9 @@ void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usin
             Serial.println("[INFO] Set Layout for BadUSB (BLE) Successfully");
             return;
         }
-        hid->begin(layout);
+        if (!hid->isConnected()) hid->begin(layout, mode);
     } else {
         #if !defined(BOARD_ESP32_C3_MINI)
-        hid->begin(layout);
         #endif
     }
 }
@@ -319,51 +317,41 @@ void BadUSBModules::Keymote(HIDInterface *&hid, KeymoteCommand key) {
     hid->releaseAll();
 }
 
-void BadUSBModules::beginMouse(BleMouse *&hid_mouse, bool usingble) {
-    if (usingble) {
-        hid_mouse = new BleMouse(espatsettings.bleName.c_str(), "ESP32AttackTool", 100);
-    }
-
-    if (usingble) {
-        hid_mouse->begin();
-    }
-}
-
-void BadUSBModules::tiktokScroll(BleMouse *&hid_mouse, TikTokScrollCommand cmd) {
-    hid_mouse->move(0, 0);
+void BadUSBModules::tiktokScroll(HIDInterface *&hid, TikTokScrollCommand cmd) {
+    hid->move(0, 0);
     if (cmd == SCROLL_DOWN) {
-        hid_mouse->press(MOUSE_LEFT);   // Giữ
-        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
-            hid_mouse->move(0, -30); // Mỗi lần dịch 30 pixel
+        hid->pressMouse(MOUSE_LEFT);   // Giữ
+        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+            hid->move(0, -30); // Mỗi lần dịch 30 pixel
             vTaskDelay(12 / portTICK_PERIOD_MS);
         }
-        hid_mouse->release(MOUSE_LEFT); // Thả
-        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
-            hid_mouse->move(0, 30); // Mỗi lần dịch 30 pixel
+        hid->releaseMouse(MOUSE_LEFT); // Thả
+        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+            hid->move(0, 30); // Mỗi lần dịch 30 pixel
             vTaskDelay(12 / portTICK_PERIOD_MS);
         }
     }
     else if (cmd == SCROLL_UP) {
-        hid_mouse->press(MOUSE_LEFT);   // Giữ
-        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
-            hid_mouse->move(0, 30); // Mỗi lần dịch 30 pixel
+        hid->pressMouse(MOUSE_LEFT);   // Giữ
+        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+            hid->move(0, 30); // Mỗi lần dịch 30 pixel
             vTaskDelay(12 / portTICK_PERIOD_MS);
         }
-        hid_mouse->release(MOUSE_LEFT); // Thả
-        for (int i = 0; i < 10; i++) { // Vuốt dài hơn
-            hid_mouse->move(0, -30); // Mỗi lần dịch 30 pixel
+        hid->releaseMouse(MOUSE_LEFT); // Thả
+        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+            hid->move(0, -30); // Mỗi lần dịch 30 pixel
             vTaskDelay(12 / portTICK_PERIOD_MS);
         }
     }
     else if (cmd == LIKE_VIDEO) {
-        hid_mouse->click();
-        hid_mouse->release();
+        hid->click();
+        hid->releaseMouse();
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        hid_mouse->click();
+        hid->click();
     }
-    hid_mouse->release();
+    hid->releaseMouse();
 }
 
-bool BadUSBModules::isMouseConnected(BleMouse *&hid_mouse) {
-    return hid_mouse->isConnected();
+void BadUSBModules::endHID(HIDInterface *&hid) {
+    hid->end();
 }
