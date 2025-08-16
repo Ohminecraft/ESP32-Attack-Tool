@@ -373,7 +373,7 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   _asciimap = layout;
   NimBLEDevice::init(deviceName);
   NimBLEDevice::setPower(MAX_TX_POWER);
-  NimBLEServer* pServer = BLEDevice::createServer();
+  NimBLEServer* pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(this);
   pServer->advertiseOnDisconnect(true);
 
@@ -386,7 +386,7 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
     inputGamepad = hid->getInputReport(GAMEPAD_ID);
     outputGamepad = hid->getOutputReport(GAMEPAD_ID);
 
-    outputKeyboard->setCallbacks(this);;
+    outputKeyboard->setCallbacks(this);
     outputGamepad->setCallbacks(this);
   } else if (mode == BLE_KEYBOARD_MODE_MOUSE) {
     inputMouse = hid->getInputReport(0);
@@ -429,7 +429,7 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   advertising->setAppearance(appearance);
   if (_randUUID) {
     advertising->addServiceUUID(BLEUUID((uint16_t)(ESP.getEfuseMac() & 0xFFFF)));
-} else {;
+} else {
     advertising->addServiceUUID(hid->getHidService()->getUUID());
 }
   advertising->enableScanResponse(false);
@@ -687,10 +687,7 @@ void BleKeyboard::move(signed char x, signed char y, signed char wheel, signed c
 		m[4] = hWheel;
 		this->inputMouse->setValue(m, 5);
 		this->inputMouse->notify();
-#if defined(USE_NIMBLE)
-		// vTaskDelay(delayTicks);
 		this->delay_ms(_delay_ms);
-#endif // USE_NIMBLE
 	}
 }
 
