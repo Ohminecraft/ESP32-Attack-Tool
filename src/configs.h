@@ -13,7 +13,7 @@
 #define APPLE_JUICE_SPAM_DELAY 400
 #define SWIFTPAIR_SPAM_DELAY 10
 
-#define ATTACK_TOOL_VERSION "2.6.1"
+#define ATTACK_TOOL_VERSION "2.7.0"
 
 // SCREEN CONFIGURATION //
 
@@ -91,7 +91,7 @@
 
 // IR Configuration //
 
-#define IR_REPEAT 1
+#define IR_REPEAT 0
 
 #ifdef BOARD_ESP32
     #define IR_PIN 15

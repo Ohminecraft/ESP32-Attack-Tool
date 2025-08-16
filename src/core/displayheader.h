@@ -39,7 +39,9 @@ class DisplayModules
         float graph_scale = 1.0;
     public:
         DisplayModules();
-        ~DisplayModules();
+        ~DisplayModules() {
+            
+        };
 
         bool main();
 

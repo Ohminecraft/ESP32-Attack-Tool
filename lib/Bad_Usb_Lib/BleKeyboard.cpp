@@ -1,18 +1,11 @@
 #include "BleKeyboard.h"
 #include "KeyboardLayout.h"
 
-#if defined(USE_NIMBLE)
-#include <NimBLEDevice.h>
+#include <NimBLEDevice.h> // Newest Version of NimBLE
 #include <NimBLEServer.h>
 #include <NimBLEUtils.h>
 #include <NimBLEHIDDevice.h>
-#else
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include "BLE2902.h"
-#include "BLEHIDDevice.h"
-#endif // USE_NIMBLE
+
 #include "HIDTypes.h"
 #include <driver/adc.h>
 #include "sdkconfig.h"
@@ -23,13 +16,15 @@
   #define LOG_TAG ""
 #else
   #include "esp_log.h"
-  static const char* LOG_TAG = "BLEDevice";
+  static const char* LOG_TAG = "NimBLEDevice";
 #endif
 
 
 // Report IDs:
 #define KEYBOARD_ID 0x01
 #define MEDIA_KEYS_ID 0x02
+#define MOUSE_ID 0x03
+#define GAMEPAD_ID 0x04
 
 static const uint8_t _hidReportDescriptor[] = {
   USAGE_PAGE(1),      0x01,          // USAGE_PAGE (Generic Desktop Ctrls)
@@ -93,8 +88,278 @@ static const uint8_t _hidReportDescriptor[] = {
   USAGE(2),           0x83, 0x01,    //   Usage (Media sel)   ; bit 6: 64
   USAGE(2),           0x8A, 0x01,    //   Usage (Mail)        ; bit 7: 128
   HIDINPUT(1),        0x02,          //   INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-  END_COLLECTION(0)                  // END_COLLECTION
+  END_COLLECTION(0),                 // END_COLLECTION
+  // ------------------------------------------------- Mouse
+	USAGE_PAGE(1),      0x01,	         // USAGE_PAGE (Generic Desktop)
+	USAGE(1),           0x02,			     // USAGE (Mouse)
+	COLLECTION(1),      0x01,	         // COLLECTION (Application)
+	USAGE(1),           0x01,			     //   USAGE (Pointer)
+	COLLECTION(1),      0x00,	         //   COLLECTION (Physical)
+	REPORT_ID(1),       MOUSE_ID,      //     REPORT_ID (1)
+	// ------------------------------------------------- Buttons (Left, Right, Middle, Back, Forward)
+	USAGE_PAGE(1),      0x09,	         //     USAGE_PAGE (Button)
+	USAGE_MINIMUM(1),   0x01,	         //     USAGE_MINIMUM (Button 1)
+	USAGE_MAXIMUM(1),   0x05,	         //     USAGE_MAXIMUM (Button 5)
+	LOGICAL_MINIMUM(1), 0x00,          //     LOGICAL_MINIMUM (0)
+	LOGICAL_MAXIMUM(1), 0x01,          //     LOGICAL_MAXIMUM (1)
+	REPORT_SIZE(1),     0x01,      	   //     REPORT_SIZE (1)
+	REPORT_COUNT(1),    0x05,          //     REPORT_COUNT (5)
+	HIDINPUT(1),        0x02,		       //     INPUT (Data, Variable, Absolute) ;5 button bits
+	// ------------------------------------------------- Padding
+	REPORT_SIZE(1),     0x03,          //     REPORT_SIZE (3)
+	REPORT_COUNT(1),    0x01,          //     REPORT_COUNT (1)
+	HIDINPUT(1),        0x03,	         //     INPUT (Constant, Variable, Absolute) ;3 bit padding
+	// ------------------------------------------------- X/Y position, Wheel
+	USAGE_PAGE(1),      0x01,	         //     USAGE_PAGE (Generic Desktop)
+	USAGE(1),           0x30,			     //     USAGE (X)
+	USAGE(1),           0x31,			     //     USAGE (Y)
+	USAGE(1),           0x38,			     //     USAGE (Wheel)
+	LOGICAL_MINIMUM(1), 0x81,          //     LOGICAL_MINIMUM (-127)
+	LOGICAL_MAXIMUM(1), 0x7f,          //     LOGICAL_MAXIMUM (127)
+	REPORT_SIZE(1),     0x08,	         //     REPORT_SIZE (8)
+	REPORT_COUNT(1),    0x03,	         //     REPORT_COUNT (3)
+	HIDINPUT(1),        0x06,		       //     INPUT (Data, Variable, Relative) ;3 bytes (X,Y,Wheel)
+	// ------------------------------------------------- Horizontal wheel
+	USAGE_PAGE(1),      0x0c,	         //     USAGE PAGE (Consumer Devices)
+	USAGE(2),           0x38, 0x02,	   //     USAGE (AC Pan)
+	LOGICAL_MINIMUM(1), 0x81,          //     LOGICAL_MINIMUM (-127)
+	LOGICAL_MAXIMUM(1), 0x7f,          //     LOGICAL_MAXIMUM (127)
+	REPORT_SIZE(1),     0x08,	         //     REPORT_SIZE (8)
+	REPORT_COUNT(1),    0x01,	         //     REPORT_COUNT (1)
+	HIDINPUT(1),        0x06,		       //     INPUT (Data, Var, Rel)
+	END_COLLECTION(0),		             //   END_COLLECTION
+	END_COLLECTION(0),		             // END_COLLECTION
+	// -------------------------------------------------- Keypad
+	// --------------------------------------------------
+	USAGE_PAGE(1),       0x01,         // USAGE_PAGE (Generic Desktop)
+	USAGE(1),            0x04,         // USAGE (Joystick - 0x04; Gamepad - 0x05; Multi-axis Controller - 0x08)
+	COLLECTION(1),       0x01,         // COLLECTION (Application)
+	USAGE(1),            0x01,         //   USAGE (Pointer)
+	COLLECTION(1),       0x00,         //   COLLECTION (Physical)
+	REPORT_ID(1),        GAMEPAD_ID,   //     REPORT_ID (1)
+	// ------------------------------------------------- Buttons (1 to 32)
+	USAGE_PAGE(1),       0x09,         //     USAGE_PAGE (Button)
+	USAGE_MINIMUM(1),    0x01,         //     USAGE_MINIMUM (Button 1)
+	USAGE_MAXIMUM(1),    0x80,         //     USAGE_MAXIMUM (Button 128)
+	LOGICAL_MINIMUM(1),  0x00,         //     LOGICAL_MINIMUM (0)
+	LOGICAL_MAXIMUM(1),  0x01,         //     LOGICAL_MAXIMUM (1)
+	REPORT_SIZE(1),      0x01,         //     REPORT_SIZE (1)
+	REPORT_COUNT(1),     0x80,         //     REPORT_COUNT (128)
+	HIDINPUT(1),         0x02,         //     INPUT (Data, Variable, Absolute) ; 16 bytes
+	// ------------------------------------------------- X/Y position, Z/rZ position
+	USAGE_PAGE(1),       0x01,         //     USAGE_PAGE (Generic Desktop)
+	USAGE(1),            0x30,         //     USAGE (X)
+	USAGE(1),            0x31,         //     USAGE (Y)
+	USAGE(1),            0x32,         //     USAGE (Z)
+	USAGE(1),            0x35,         //     USAGE (rZ)
+	LOGICAL_MINIMUM(1),  0x81,         //     LOGICAL_MINIMUM (-127)
+	LOGICAL_MAXIMUM(1),  0x7f,         //     LOGICAL_MAXIMUM (127)
+	REPORT_SIZE(1),      0x08,         //     REPORT_SIZE (8)
+	//REPORT_COUNT(1),     0x04,       //     REPORT_COUNT (4)
+	//LOGICAL_MINIMUM(2),  0x01, 0x80, // LOGICAL_MINIMUM (-32767)
+	//LOGICAL_MAXIMUM(2),  0xff, 0x7f, // LOGICAL_MAXIMUM (32767)
+	//REPORT_SIZE(1),      0x10,       //     REPORT_SIZE (16)
+	REPORT_COUNT(1),     0x04,         //     REPORT_COUNT (4)
+	
+	HIDINPUT(1),         0x02,         //     INPUT (Data, Variable, Absolute) ;4 bytes (X,Y,Z,rZ) (8 bytes)
+
+	USAGE_PAGE(1),       0x01,         //     USAGE_PAGE (Generic Desktop)
+	USAGE(1),            0x33,         //     USAGE (rX) Left Trigger
+	USAGE(1),            0x34,         //     USAGE (rY) Right Trigger
+	USAGE(1),            0x36,         //     USAGE (analog5) Slider
+	USAGE(1),            0x37,         //     USAGE (analog6) Dial
+	LOGICAL_MINIMUM(1),  0x81,         //     LOGICAL_MINIMUM (-127)
+	LOGICAL_MAXIMUM(1),  0x7f,         //     LOGICAL_MAXIMUM (127)
+	REPORT_SIZE(1),      0x08,         //     REPORT_SIZE (8)
+	//REPORT_COUNT(1),     0x04,       //     REPORT_COUNT (4)
+	//LOGICAL_MINIMUM(2),  0x01, 0x80, // LOGICAL_MINIMUM (-32767)
+	//LOGICAL_MAXIMUM(2),  0xff, 0x7f, // LOGICAL_MAXIMUM (32767)
+	//REPORT_SIZE(1),      0x10,       //     REPORT_SIZE (16)
+	REPORT_COUNT(1),     0x04,         //     REPORT_COUNT (4)
+	HIDINPUT(1),         0x02,         //     INPUT (Data, Variable, Absolute) ;4 bytes rX, rY (8 bytes)
+
+	USAGE_PAGE(1),   	   0x01,         //     USAGE_PAGE (Generic Desktop)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	LOGICAL_MINIMUM(1),  0x01,         //		LOGICAL_MINIMUM (1)
+	LOGICAL_MAXIMUM(1),  0x08,         //     LOGICAL_MAXIMUM (8)
+	REPORT_SIZE(1), 	   0x04,         //		REPORT_SIZE (4)
+	REPORT_COUNT(1), 	   0x04,         //		REPORT_COUNT (4)
+	HIDINPUT(1), 		     0x02,         //		INPUT (Data, Variable, Absolute) ;2 byte Hat1, Hat2, Hat3, Hat4
+	END_COLLECTION(0),                 //   END_COLLECTION
+	END_COLLECTION(0)                  // END_COLLECTION	
 };
+
+static const uint8_t _mouseHidReportDescriptor[] = {
+  USAGE_PAGE(1),       0x01, // USAGE_PAGE (Generic Desktop)
+  USAGE(1),            0x02, // USAGE (Mouse)
+  COLLECTION(1),       0x01, // COLLECTION (Application)
+  USAGE(1),            0x01, //   USAGE (Pointer)
+  COLLECTION(1),       0x00, //   COLLECTION (Physical)
+  // ------------------------------------------------- Buttons (Left, Right, Middle, Back, Forward)
+  USAGE_PAGE(1),       0x09, //     USAGE_PAGE (Button)
+  USAGE_MINIMUM(1),    0x01, //     USAGE_MINIMUM (Button 1)
+  USAGE_MAXIMUM(1),    0x05, //     USAGE_MAXIMUM (Button 5)
+  LOGICAL_MINIMUM(1),  0x00, //     LOGICAL_MINIMUM (0)
+  LOGICAL_MAXIMUM(1),  0x01, //     LOGICAL_MAXIMUM (1)
+  REPORT_SIZE(1),      0x01, //     REPORT_SIZE (1)
+  REPORT_COUNT(1),     0x05, //     REPORT_COUNT (5)
+  HIDINPUT(1),         0x02, //     INPUT (Data, Variable, Absolute) ;5 button bits
+  // ------------------------------------------------- Padding
+  REPORT_SIZE(1),      0x03, //     REPORT_SIZE (3)
+  REPORT_COUNT(1),     0x01, //     REPORT_COUNT (1)
+  HIDINPUT(1),         0x03, //     INPUT (Constant, Variable, Absolute) ;3 bit padding
+  // ------------------------------------------------- X/Y position, Wheel
+  USAGE_PAGE(1),       0x01, //     USAGE_PAGE (Generic Desktop)
+  USAGE(1),            0x30, //     USAGE (X)
+  USAGE(1),            0x31, //     USAGE (Y)
+  USAGE(1),            0x38, //     USAGE (Wheel)
+  LOGICAL_MINIMUM(1),  0x81, //     LOGICAL_MINIMUM (-127)
+  LOGICAL_MAXIMUM(1),  0x7f, //     LOGICAL_MAXIMUM (127)
+  REPORT_SIZE(1),      0x08, //     REPORT_SIZE (8) 
+  REPORT_COUNT(1),     0x03, //     REPORT_COUNT (3)
+  HIDINPUT(1),         0x06, //     INPUT (Data, Variable, Relative) ;3 bytes (X,Y,Wheel)
+  // ------------------------------------------------- Horizontal wheel
+  USAGE_PAGE(1),       0x0c, //     USAGE PAGE (Consumer Devices)
+  USAGE(2),      0x38, 0x02, //     USAGE (AC Pan)
+  LOGICAL_MINIMUM(1),  0x81, //     LOGICAL_MINIMUM (-127)
+  LOGICAL_MAXIMUM(1),  0x7f, //     LOGICAL_MAXIMUM (127)
+  REPORT_SIZE(1),      0x08, //     REPORT_SIZE (8)
+  REPORT_COUNT(1),     0x01, //     REPORT_COUNT (1)
+  HIDINPUT(1),         0x06, //     INPUT (Data, Var, Rel)
+  END_COLLECTION(0),         //   END_COLLECTION
+  END_COLLECTION(0)          // END_COLLECTION
+};
+
+static const uint8_t _keyboardHidReportDescriptor[] = {
+  USAGE_PAGE(1),      0x01,          // USAGE_PAGE (Generic Desktop Ctrls)
+  USAGE(1),           0x06,          // USAGE (Keyboard)
+  COLLECTION(1),      0x01,          // COLLECTION (Application)
+  // ------------------------------------------------- Keyboard
+  REPORT_ID(1),       KEYBOARD_ID,   //   REPORT_ID (1)
+  USAGE_PAGE(1),      0x07,          //   USAGE_PAGE (Kbrd/Keypad)
+  USAGE_MINIMUM(1),   0xE0,          //   USAGE_MINIMUM (0xE0)
+  USAGE_MAXIMUM(1),   0xE7,          //   USAGE_MAXIMUM (0xE7)
+  LOGICAL_MINIMUM(1), 0x00,          //   LOGICAL_MINIMUM (0)
+  LOGICAL_MAXIMUM(1), 0x01,          //   Logical Maximum (1)
+  REPORT_SIZE(1),     0x01,          //   REPORT_SIZE (1)
+  REPORT_COUNT(1),    0x08,          //   REPORT_COUNT (8)
+  HIDINPUT(1),        0x02,          //   INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+  REPORT_COUNT(1),    0x01,          //   REPORT_COUNT (1) ; 1 byte (Reserved)
+  REPORT_SIZE(1),     0x08,          //   REPORT_SIZE (8)
+  HIDINPUT(1),        0x01,          //   INPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
+  REPORT_COUNT(1),    0x05,          //   REPORT_COUNT (5) ; 5 bits (Num lock, Caps lock, Scroll lock, Compose, Kana)
+  REPORT_SIZE(1),     0x01,          //   REPORT_SIZE (1)
+  USAGE_PAGE(1),      0x08,          //   USAGE_PAGE (LEDs)
+  USAGE_MINIMUM(1),   0x01,          //   USAGE_MINIMUM (0x01) ; Num Lock
+  USAGE_MAXIMUM(1),   0x05,          //   USAGE_MAXIMUM (0x05) ; Kana
+  HIDOUTPUT(1),       0x02,          //   OUTPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+  REPORT_COUNT(1),    0x01,          //   REPORT_COUNT (1) ; 3 bits (Padding)
+  REPORT_SIZE(1),     0x03,          //   REPORT_SIZE (3)
+  HIDOUTPUT(1),       0x01,          //   OUTPUT (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
+  REPORT_COUNT(1),    0x06,          //   REPORT_COUNT (6) ; 6 bytes (Keys)
+  REPORT_SIZE(1),     0x08,          //   REPORT_SIZE(8)
+  LOGICAL_MINIMUM(1), 0x00,          //   LOGICAL_MINIMUM(0)
+  LOGICAL_MAXIMUM(1), 0x65,          //   LOGICAL_MAXIMUM(0x65) ; 101 keys
+  USAGE_PAGE(1),      0x07,          //   USAGE_PAGE (Kbrd/Keypad)
+  USAGE_MINIMUM(1),   0x00,          //   USAGE_MINIMUM (0)
+  USAGE_MAXIMUM(1),   0x65,          //   USAGE_MAXIMUM (0x65)
+  HIDINPUT(1),        0x00,          //   INPUT (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
+  END_COLLECTION(0),                 // END_COLLECTION
+  // ------------------------------------------------- Media Keys
+  USAGE_PAGE(1),      0x0C,          // USAGE_PAGE (Consumer)
+  USAGE(1),           0x01,          // USAGE (Consumer Control)
+  COLLECTION(1),      0x01,          // COLLECTION (Application)
+  REPORT_ID(1),       MEDIA_KEYS_ID, //   REPORT_ID (3)
+  USAGE_PAGE(1),      0x0C,          //   USAGE_PAGE (Consumer)
+  LOGICAL_MINIMUM(1), 0x00,          //   LOGICAL_MINIMUM (0)
+  LOGICAL_MAXIMUM(1), 0x01,          //   LOGICAL_MAXIMUM (1)
+  REPORT_SIZE(1),     0x01,          //   REPORT_SIZE (1)
+  REPORT_COUNT(1),    0x10,          //   REPORT_COUNT (16)
+  USAGE(1),           0xB5,          //   USAGE (Scan Next Track)     ; bit 0: 1
+  USAGE(1),           0xB6,          //   USAGE (Scan Previous Track) ; bit 1: 2
+  USAGE(1),           0xB7,          //   USAGE (Stop)                ; bit 2: 4
+  USAGE(1),           0xCD,          //   USAGE (Play/Pause)          ; bit 3: 8
+  USAGE(1),           0xE2,          //   USAGE (Mute)                ; bit 4: 16
+  USAGE(1),           0xE9,          //   USAGE (Volume Increment)    ; bit 5: 32
+  USAGE(1),           0xEA,          //   USAGE (Volume Decrement)    ; bit 6: 64
+  USAGE(2),           0x23, 0x02,    //   Usage (WWW Home)            ; bit 7: 128
+  USAGE(2),           0x94, 0x01,    //   Usage (My Computer) ; bit 0: 1
+  USAGE(2),           0x92, 0x01,    //   Usage (Calculator)  ; bit 1: 2
+  USAGE(2),           0x2A, 0x02,    //   Usage (WWW fav)     ; bit 2: 4
+  USAGE(2),           0x21, 0x02,    //   Usage (WWW search)  ; bit 3: 8
+  USAGE(2),           0x26, 0x02,    //   Usage (WWW stop)    ; bit 4: 16
+  USAGE(2),           0x24, 0x02,    //   Usage (WWW back)    ; bit 5: 32
+  USAGE(2),           0x83, 0x01,    //   Usage (Media sel)   ; bit 6: 64
+  USAGE(2),           0x8A, 0x01,    //   Usage (Mail)        ; bit 7: 128
+  HIDINPUT(1),        0x02,          //   INPUT (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+  END_COLLECTION(0),                 // END_COLLECTION
+};
+
+static const uint8_t _gamepadHidReportDescriptor[] = {
+  USAGE_PAGE(1),       0x01,         // USAGE_PAGE (Generic Desktop)
+	USAGE(1),            0x04,         // USAGE (Joystick - 0x04; Gamepad - 0x05; Multi-axis Controller - 0x08)
+	COLLECTION(1),       0x01,         // COLLECTION (Application)
+	USAGE(1),            0x01,         //   USAGE (Pointer)
+	COLLECTION(1),       0x00,         //   COLLECTION (Physical)
+	REPORT_ID(1),        GAMEPAD_ID,   //     REPORT_ID (1)
+	// ------------------------------------------------- Buttons (1 to 32)
+	USAGE_PAGE(1),       0x09,         //     USAGE_PAGE (Button)
+	USAGE_MINIMUM(1),    0x01,         //     USAGE_MINIMUM (Button 1)
+	USAGE_MAXIMUM(1),    0x80,         //     USAGE_MAXIMUM (Button 128)
+	LOGICAL_MINIMUM(1),  0x00,         //     LOGICAL_MINIMUM (0)
+	LOGICAL_MAXIMUM(1),  0x01,         //     LOGICAL_MAXIMUM (1)
+	REPORT_SIZE(1),      0x01,         //     REPORT_SIZE (1)
+	REPORT_COUNT(1),     0x80,         //     REPORT_COUNT (128)
+	HIDINPUT(1),         0x02,         //     INPUT (Data, Variable, Absolute) ; 16 bytes
+	// ------------------------------------------------- X/Y position, Z/rZ position
+	USAGE_PAGE(1),       0x01,         //     USAGE_PAGE (Generic Desktop)
+	USAGE(1),            0x30,         //     USAGE (X)
+	USAGE(1),            0x31,         //     USAGE (Y)
+	USAGE(1),            0x32,         //     USAGE (Z)
+	USAGE(1),            0x35,         //     USAGE (rZ)
+	LOGICAL_MINIMUM(1),  0x81,         //     LOGICAL_MINIMUM (-127)
+	LOGICAL_MAXIMUM(1),  0x7f,         //     LOGICAL_MAXIMUM (127)
+	REPORT_SIZE(1),      0x08,         //     REPORT_SIZE (8)
+	//REPORT_COUNT(1),     0x04,       //     REPORT_COUNT (4)
+	//LOGICAL_MINIMUM(2),  0x01, 0x80, // LOGICAL_MINIMUM (-32767)
+	//LOGICAL_MAXIMUM(2),  0xff, 0x7f, // LOGICAL_MAXIMUM (32767)
+	//REPORT_SIZE(1),      0x10,       //     REPORT_SIZE (16)
+	REPORT_COUNT(1),     0x04,         //     REPORT_COUNT (4)
+	
+	HIDINPUT(1),         0x02,         //     INPUT (Data, Variable, Absolute) ;4 bytes (X,Y,Z,rZ) (8 bytes)
+
+	USAGE_PAGE(1),       0x01,         //     USAGE_PAGE (Generic Desktop)
+	USAGE(1),            0x33,         //     USAGE (rX) Left Trigger
+	USAGE(1),            0x34,         //     USAGE (rY) Right Trigger
+	USAGE(1),            0x36,         //     USAGE (analog5) Slider
+	USAGE(1),            0x37,         //     USAGE (analog6) Dial
+	LOGICAL_MINIMUM(1),  0x81,         //     LOGICAL_MINIMUM (-127)
+	LOGICAL_MAXIMUM(1),  0x7f,         //     LOGICAL_MAXIMUM (127)
+	REPORT_SIZE(1),      0x08,         //     REPORT_SIZE (8)
+	//REPORT_COUNT(1),     0x04,       //     REPORT_COUNT (4)
+	//LOGICAL_MINIMUM(2),  0x01, 0x80, // LOGICAL_MINIMUM (-32767)
+	//LOGICAL_MAXIMUM(2),  0xff, 0x7f, // LOGICAL_MAXIMUM (32767)
+	//REPORT_SIZE(1),      0x10,       //     REPORT_SIZE (16)
+	REPORT_COUNT(1),     0x04,         //     REPORT_COUNT (4)
+	HIDINPUT(1),         0x02,         //     INPUT (Data, Variable, Absolute) ;4 bytes rX, rY (8 bytes)
+
+	USAGE_PAGE(1),   	   0x01,         //     USAGE_PAGE (Generic Desktop)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	USAGE(1), 		       0x39,         //     USAGE (Hat switch)
+	LOGICAL_MINIMUM(1),  0x01,         //		LOGICAL_MINIMUM (1)
+	LOGICAL_MAXIMUM(1),  0x08,         //     LOGICAL_MAXIMUM (8)
+	REPORT_SIZE(1), 	   0x04,         //		REPORT_SIZE (4)
+	REPORT_COUNT(1), 	   0x04,         //		REPORT_COUNT (4)
+	HIDINPUT(1), 		     0x02,         //		INPUT (Data, Variable, Absolute) ;2 byte Hat1, Hat2, Hat3, Hat4
+	END_COLLECTION(0),                 //   END_COLLECTION
+	END_COLLECTION(0)                  // END_COLLECTION	
+};
+
 
 BleKeyboard::BleKeyboard(std::string deviceName, std::string deviceManufacturer, uint8_t batteryLevel) 
     : hid(0)
@@ -102,39 +367,60 @@ BleKeyboard::BleKeyboard(std::string deviceName, std::string deviceManufacturer,
     , deviceManufacturer(std::string(deviceManufacturer).substr(0,15))
     , batteryLevel(batteryLevel) {}
 
-void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs)
+void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
 {
   appearance = showAs;
   _asciimap = layout;
-  BLEDevice::init(deviceName);
-  BLEServer* pServer = BLEDevice::createServer();
+  NimBLEDevice::init(deviceName);
+  NimBLEDevice::setPower(MAX_TX_POWER);
+  NimBLEServer* pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(this);
+  pServer->advertiseOnDisconnect(true);
 
-  hid = new BLEHIDDevice(pServer);
-  inputKeyboard = hid->inputReport(KEYBOARD_ID);  // <-- input REPORTID from report map
-  outputKeyboard = hid->outputReport(KEYBOARD_ID);
-  inputMediaKeys = hid->inputReport(MEDIA_KEYS_ID);
+  hid = new NimBLEHIDDevice(pServer);
+  if (mode == BLE_KEYBOARD_MODE_ALL) {
+    inputKeyboard = hid->getInputReport(KEYBOARD_ID);
+    outputKeyboard = hid->getOutputReport(KEYBOARD_ID);
+    inputMediaKeys = hid->getInputReport(MEDIA_KEYS_ID);
+    inputMouse = hid->getInputReport(MOUSE_ID);
+    inputGamepad = hid->getInputReport(GAMEPAD_ID);
+    outputGamepad = hid->getOutputReport(GAMEPAD_ID);
 
-  outputKeyboard->setCallbacks(this);
+    outputKeyboard->setCallbacks(this);
+    outputGamepad->setCallbacks(this);
+  } else if (mode == BLE_KEYBOARD_MODE_MOUSE) {
+    inputMouse = hid->getInputReport(0);
+  } else if (mode == BLE_KEYBOARD_MODE_KEYBOARD) {
+    inputKeyboard = hid->getInputReport(KEYBOARD_ID);
+    outputKeyboard = hid->getOutputReport(KEYBOARD_ID);
+    inputMediaKeys = hid->getInputReport(MEDIA_KEYS_ID);
+    outputKeyboard->setCallbacks(this);
+  } else if (mode == BLE_KEYBOARD_MODE_GAMEPAD) {
+    inputGamepad = hid->getInputReport(GAMEPAD_ID);
+    outputGamepad = hid->getOutputReport(GAMEPAD_ID);
+    outputGamepad->setCallbacks(this);
+  }
+  
+  hid->setManufacturer(deviceManufacturer);
 
-  hid->manufacturer()->setValue(deviceManufacturer);
+  hid->setPnp(0x02, vid, pid, version);
+  hid->setHidInfo(0x00, 0x01);
 
-  hid->pnp(0x02, vid, pid, version);
-  hid->hidInfo(0x00, 0x01);
+  NimBLEDevice::setSecurityAuth(true, false, true); // man in the middle protection (mitm) cause keyboard mouse, etc can't using when device reconnect so disable it
+  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
 
+  NimBLEDevice::setSecurityInitKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
+  NimBLEDevice::setSecurityRespKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
+  
+  if (mode == BLE_KEYBOARD_MODE_ALL)
+  hid->setReportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
+  else if (mode == BLE_KEYBOARD_MODE_MOUSE)
+  hid->setReportMap((uint8_t*)_mouseHidReportDescriptor, sizeof(_mouseHidReportDescriptor));
+  else if (mode == BLE_KEYBOARD_MODE_KEYBOARD)
+  hid->setReportMap((uint8_t*)_keyboardHidReportDescriptor, sizeof(_keyboardHidReportDescriptor));
+  else if (mode == BLE_KEYBOARD_MODE_GAMEPAD)
+  hid->setReportMap((uint8_t*)_gamepadHidReportDescriptor, sizeof(_gamepadHidReportDescriptor));
 
-#if defined(USE_NIMBLE)
-
-  BLEDevice::setSecurityAuth(true, true, true);
-
-#else
-
-  BLESecurity* pSecurity = new BLESecurity();
-  pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_MITM_BOND);
-
-#endif // USE_NIMBLE
-
-  hid->reportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
   hid->startServices();
 
   onStarted(pServer);
@@ -144,23 +430,16 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs)
   if (_randUUID) {
     advertising->addServiceUUID(BLEUUID((uint16_t)(ESP.getEfuseMac() & 0xFFFF)));
 } else {
-    advertising->addServiceUUID(hid->hidService()->getUUID());
+    advertising->addServiceUUID(hid->getHidService()->getUUID());
 }
-  advertising->setScanResponse(false);
+  advertising->enableScanResponse(false);
   advertising->start();
   hid->setBatteryLevel(batteryLevel);
 }
 
 void BleKeyboard::end(void)
+
 {
-    #ifdef USE_NIMBLE
-    int i = 0;
-    i = pServer->getConnectedCount();
-    if (i > 0) {
-        int j;
-        for (j = 0; j < i; j++) pServer->disconnect(pServer->getPeerInfo(j).getConnHandle());
-    }
-    #endif // USE_NIMBLE
 }
 
 bool BleKeyboard::isConnected(void) {
@@ -201,35 +480,23 @@ void BleKeyboard::set_version(uint16_t version) {
 
 void BleKeyboard::sendReport(KeyReport* keys)
 {
-#ifndef USE_NIMBLE
   if (this->isConnected())
-#else
-  if (this->isConnected() && this->inputKeyboard->getSubscribedCount() > 0)
-#endif
+  //if (this->isConnected() && this->inputKeyboard->getSubscribedCount() > 0)
   {
     this->inputKeyboard->setValue((uint8_t*)keys, sizeof(KeyReport));
     this->inputKeyboard->notify();
-#if defined(USE_NIMBLE)        
-    // vTaskDelay(delayTicks);
     this->delay_ms(_delay_ms);
-#endif // USE_NIMBLE
   }	
 }
 
 void BleKeyboard::sendReport(MediaKeyReport* keys)
 {
-#ifndef USE_NIMBLE
   if (this->isConnected())
-#else
-  if (this->isConnected() && this->inputKeyboard->getSubscribedCount() > 0)
-#endif
+  //if (this->isConnected() && this->inputKeyboard->getSubscribedCount() > 0)
   {
     this->inputMediaKeys->setValue((uint8_t*)keys, sizeof(MediaKeyReport));
     this->inputMediaKeys->notify();
-#if defined(USE_NIMBLE)        
-    //vTaskDelay(delayTicks);
     this->delay_ms(_delay_ms);
-#endif // USE_NIMBLE
   }	
 }
 
@@ -300,6 +567,12 @@ size_t BleKeyboard::press(const MediaKeyReport k)
     return 1;
 }
 
+size_t BleKeyboard::pressMouse(const uint16_t b)
+{
+	buttons(_buttons | b);
+	return 1;
+}
+
 // release() takes the specified key out of the persistent key report and
 // sends the report.  This tells the OS the key is no longer pressed and that
 // it shouldn't be repeated any more.
@@ -343,6 +616,12 @@ size_t BleKeyboard::release(const MediaKeyReport k)
     _mediaKeyReport[1] = (uint8_t)(mediaKeyReport_16 & 0x00FF);
 
 	sendReport(&_mediaKeyReport);
+	return 1;
+}
+
+size_t BleKeyboard::releaseMouse(const uint16_t b)
+{
+	buttons(_buttons & ~b);
 	return 1;
 }
 
@@ -390,36 +669,128 @@ size_t BleKeyboard::write(const uint8_t *buffer, size_t size) {
 	return n;
 }
 
-void BleKeyboard::onConnect(BLEServer* pServer) {
-  this->connected = true;
-
-#if !defined(USE_NIMBLE)
-
-  BLE2902* desc = (BLE2902*)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-  desc = (BLE2902*)this->inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-
-#endif // !USE_NIMBLE
-
+void BleKeyboard::click(const uint16_t b)
+{
+	buttons(_buttons | b);
+	buttons(_buttons & ~b);
 }
 
-void BleKeyboard::onDisconnect(BLEServer* pServer) {
+void BleKeyboard::move(signed char x, signed char y, signed char wheel, signed char hWheel)
+{
+	if (this->isConnected())
+	{
+		uint8_t m[5];
+		m[0] = _buttons;
+		m[1] = x;
+		m[2] = y;
+		m[3] = wheel;
+		m[4] = hWheel;
+		this->inputMouse->setValue(m, 5);
+		this->inputMouse->notify();
+		this->delay_ms(_delay_ms);
+	}
+}
+
+
+void BleKeyboard::wheel(signed char wheel, signed char hWheel)
+{
+	if (this->isConnected())
+	{
+		uint8_t m[5];
+		m[0] = _buttons;
+		m[1] = 0;
+		m[2] = 0;
+		m[3] = wheel;
+		m[4] = hWheel;
+		this->inputMouse->setValue(m, 5);
+		this->inputMouse->notify();
+		this->delay_ms(_delay_ms);
+	}
+}
+
+void BleKeyboard::buttons(const uint16_t b)
+{
+	if (b != _buttons)
+	{
+		_buttons = b;
+		move(0, 0, 0, 0);
+	}
+}
+
+bool BleKeyboard::isPressed(const uint16_t b)
+{
+	if ((b & _buttons) > 0)
+		return true;
+	return false;
+}
+
+void BleKeyboard::resetButtons() {
+	memset(&_buttonsGamepad,0,sizeof(_buttonsGamepad));
+	sendReport(&_keyReport);
+
+}
+void BleKeyboard::setAxes(int16_t x, int16_t y, int16_t a1, int16_t a2, int16_t a3, int16_t a4, int16_t a5, int16_t a6, signed char hat1, signed char hat2, signed char hat3, signed char hat4) {
+
+ uint8_t m[26]; // 34
+    memset(&m,0,sizeof(m));
+
+    memcpy(&m, &_buttonsGamepad, sizeof(_buttonsGamepad));
+    m[16] = x;
+    m[17] = y;
+    m[18] = a1; // z
+    m[19] = a2; // rx
+    m[20] = a3; // ry
+    m[21] = a4; // rz
+    m[22] = a5; // slider
+    m[23] = a6; // dial
+    m[24] = hat1 | (hat2 << 4); // 1 and 2
+    m[25] = hat3 | (hat4 << 4); // 3 and 4 
+    
+    //memset(&m,0, sizeof(m));
+    this->inputGamepad->setValue(m, sizeof(m));
+    this->inputGamepad->notify();
+
+}
+size_t BleKeyboard::pressButton(uint8_t b) {
+	char index = (b-1) / 8;
+  char bit = (b-1) % 8;
+  uint8_t bitmask = (1 << bit);
+
+  uint8_t result = _buttonsGamepad[index] | bitmask;
+  if (result != _buttonsGamepad[index]) {
+    _buttonsGamepad[index] = result;
+  }
+ return result;
+
+}
+size_t BleKeyboard::releaseButton(uint8_t b) {
+ char index = (b-1) / 8;
+  char bit = (b-1) % 8;
+  uint8_t bitmask = (1 << bit);
+
+  uint64_t result = _buttonsGamepad[index] & ~bitmask;
+    _buttonsGamepad[index] = result;
+  return result;
+
+}
+bool BleKeyboard::isPressedButton(uint8_t b) {
+  char index = (b-1) / 8;
+  char bit = (b-1) % 8;
+  uint8_t bitmask = (1 << bit);
+
+  if ((bitmask & _buttonsGamepad[index]) > 0)
+    return true;
+  return false;	
+}
+
+//void BleKeyboard::onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) {}
+
+void BleKeyboard::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason) {
   this->connected = false;
-
-#if !defined(USE_NIMBLE)
-
-  BLE2902* desc = (BLE2902*)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-  desc = (BLE2902*)this->inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-
-  advertising->start();
-
-#endif // !USE_NIMBLE
 }
 
-void BleKeyboard::onWrite(BLECharacteristic* me) {
+//void BleKeyboard::onWrite(BLECharacteristic* me) {
+void BleKeyboard::onWrite(NimBLECharacteristic * me, NimBLEConnInfo & 	connInfo) {
   uint8_t* value = (uint8_t*)(me->getValue().c_str());
   (void)value;
   ESP_LOGI(LOG_TAG, "special keys: %d", *value);
@@ -435,26 +806,19 @@ void BleKeyboard::delay_ms(uint64_t ms) {
     while(esp_timer_get_time() < e) {}
   }
 }
-
-#ifdef USE_NIMBLE
-
-void BleKeyboard::onAuthenticationComplete(ble_gap_conn_desc *desc) {
-    if (desc->sec_state.encrypted) {
-        Serial.println("Paired successfully.");
+void BleKeyboard::onAuthenticationComplete(NimBLEConnInfo& connInfo) {
+    if (connInfo.isEncrypted()) {
+        Serial.println("[INFO] Paired successfully.");
         this->connected = true;
     } else {
-        Serial.println("Pairing failed");
-        this->connected = false;
+        Serial.println("[ERROR] Pairing failed");
     }
 }
 
-void BleKeyboard::onSubscribe(
-    NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue
-) {
+void BleKeyboard::onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue ) {
     if (subValue == 0) {
-        Serial.println("Client unsubscribed from notifications/indications.");
+        Serial.println("[INFO] Client unsubscribed from notifications/indications.");
     } else {
-        Serial.println("Client subscribed to notifications.");
+        Serial.println("[INFO] Client subscribed to notifications.");
     }
 }
-#endif

@@ -8,7 +8,6 @@
 
 #include <USBHIDKeyboard.h>
 #include <BleKeyboard.h>
-#include <BleMouse.h>
 
 #include "core/utilsheader.h"
 #include "core/sdcardmountheader.h"
@@ -61,22 +60,21 @@ enum TikTokScrollCommand {
 
 extern HIDInterface *hid_usb;
 extern HIDInterface *hid_ble;
-extern BleMouse *hid_mouse;
 extern uint8_t keyboardLayout;
+extern uint8_t currentkbmode;
 
 extern SDCardModules sdcard;
 
 class BadUSBModules {
     public:
-        void beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble);
-        void beginMouse(BleMouse *&hid_mouse, bool usingble);
+        void beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble, uint8_t mode = BLE_KEYBOARD_MODE_KEYBOARD);
         void beginLayout(HIDInterface *&hid, bool usingble = false);
         bool isConnected(HIDInterface *&hid);
         void launchBadUSB(String badusbScript, HIDInterface *&hid);
         void mediaController(HIDInterface *&hid, MediaCommand command);
         void Keymote(HIDInterface *&hid, KeymoteCommand key);
-        void tiktokScroll(BleMouse *&hid_mouse, TikTokScrollCommand cmd);
-        bool isMouseConnected(BleMouse *&hid_mouse);
+        void tiktokScroll(HIDInterface *&hid, TikTokScrollCommand cmd);
+        void endHID(HIDInterface *&hid);
 };
 
 #endif

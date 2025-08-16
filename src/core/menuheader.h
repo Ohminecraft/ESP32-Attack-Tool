@@ -47,7 +47,9 @@ enum MenuState {
     BADUSB_KEY_LAYOUT_MENU,
     BADUSB_RUNNING,
     IR_TV_B_GONE_REGION,
+    IR_READ_MENU,
     IR_READ_RUNNING,
+    IR_CODE_SELECT,
     IR_SEND_RUNNING,
     NRF24_ANALYZER_RUNNING,
     NRF24_SCANNER_RUNNING,
@@ -388,6 +390,13 @@ enum IRMenuItem {
     IR_MENU_COUNT
 };
 
+enum IRReadMenuItem {
+    QUICK_TV,
+    CUSTOM_READ,
+    IR_READ_BACK,
+    IR_READ_MENU_COUNT
+};
+
 enum IRTVBGoneRegion {
     IR_TV_B_GONE_NA,
     IR_TV_B_GONE_EU,
@@ -471,6 +480,8 @@ bool nrfScannerSetupOneShot = false;
 TvBeGoneRegion irTvBGoneRegion;
 bool starttvbgone = false;
 
+//bool irtxRedraw = false;
+bool send_select_code = false;
 bool selectforirtx = false;
 String irSendFile;
 
@@ -488,32 +499,8 @@ bool autoSleep = false;
 bool standby = false;
 bool handleStateRunningCheck = false; // Used to check if the handle state is running
 
-// Menu display functions
 void displayWelcome();
 void displayMainMenu();
-void displayBLEMenu();
-void displayBLEScanMenu();
-void displayBLEInfoListMenu();
-void displayBLEInfoDetail();
-void displayMainSpooferMenu();
-void displayAppleSpooferMenu();
-void displaySamsungSpooferMenu();
-void displayGoogleSpooferMenu();
-void displayAdTypeSpooferMenu();
-void displaySpooferRunning();
-void displayExploitAttackBLEMenu();
-void displayWiFiMenu();
-void displayWiFiScanMenu(WiFiGeneralItem mode);
-//void displayWiFiReScanMenu(uint32_t elapsedTime);
-void displayWiFiSelectMenu();
-void displayWiFiAttackMenu();
-void displayAttackStatus();
-void displayDeauthFloodInfo();
-void displayNRF24Menu();
-void displayNRF24JammerMenu();
-void displayNRFJammerStatus();
-void displayEvilPortalInfo();
-void displayRebootConfirm();
         
 // Menu navigation
 void navigateUp();

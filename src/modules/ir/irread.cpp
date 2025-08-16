@@ -9,6 +9,9 @@
 */
 
 bool irrecvRedraw = false;
+bool quickRemoteTV = false;
+uint8_t button_pos = 0;
+
 
 #define IR_FREQUENCY 38000
 #define DUTY_CYCLE 0.330000
@@ -30,6 +33,9 @@ void IRReadModules::begin() {
     display_buffer->clear();
     display_buffer->add("Waiting for IR");
     display_buffer->add("signal...");
+    if (quickRemoteTV) {
+        display_buffer->add(quickremoteTV[button_pos]);   
+    }
     display_buffer->add("Press SELECT to exit");
 }
 
@@ -91,26 +97,49 @@ void IRReadModules::discard_code() {
 
 void IRReadModules::save_code() {
     if (_read) {
-        code_content = "";
-        display_buffer->clear();
-        processSignalToContent();
-        if (sdcard.isMounted()) {
-            if (!saveintoSD()) {
-                display.clearScreen();
-                display.displayStringwithCoordinates("Error saving IR code", 0, 12);
-                display.displayStringwithCoordinates("to SD card!", 0, 24, true);
-                vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+        if (!quickRemoteTV) {
+            code_content = "";
+            display_buffer->clear();
+            processSignalToContent();
+            if (sdcard.isMounted()) {
+                if (!saveintoSD()) {
+                    display.clearScreen();
+                    display.displayStringwithCoordinates("Error saving IR code", 0, 12);
+                    display.displayStringwithCoordinates("to SD card!", 0, 24, true);
+                    vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+                } else {
+                    display.clearScreen();
+                    display.displayStringwithCoordinates("IR code saved to SD", 0, 12);
+                    display.displayStringwithCoordinates("card successfully!", 0, 24);
+                    display.displayStringwithCoordinates("Name: " + fileName, 0, 36, true);
+                    vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+                }
             } else {
                 display.clearScreen();
-                display.displayStringwithCoordinates("IR code saved to SD", 0, 12);
-                display.displayStringwithCoordinates("card successfully!", 0, 24);
-                display.displayStringwithCoordinates("Name: " + fileName, 0, 36, true);
+                display.displayStringwithCoordinates("SD Card not mounted", 0, 12, true);
                 vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
             }
         } else {
-            display.clearScreen();
-            display.displayStringwithCoordinates("SD Card not mounted", 0, 12, true);
-            vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+            if (button_pos != quickremoteTV.size() - 1) {
+                processSignalToContent(quickremoteTV[button_pos]);
+                button_pos++;
+            } else {
+                processSignalToContent(quickremoteTV[button_pos]);
+                if (!saveintoSD()) {
+                    display.clearScreen();
+                    display.displayStringwithCoordinates("Error saving IR code", 0, 12);
+                    display.displayStringwithCoordinates("to SD card!", 0, 24, true);
+                    vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+                    quickRemoteTV = false;
+                } else {
+                    display.clearScreen();
+                    display.displayStringwithCoordinates("IR code saved to SD", 0, 12);
+                    display.displayStringwithCoordinates("card successfully!", 0, 24);
+                    display.displayStringwithCoordinates("Name: " + fileName, 0, 36, true);
+                    vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for 1 second
+                    quickRemoteTV = false;
+                }
+            }
         }
         discard_code();
     }
@@ -118,7 +147,70 @@ void IRReadModules::save_code() {
 }
 
 void IRReadModules::processSignalToContent() {
-    
+    if (raw_data) {
+        code_content += "type: raw\n";
+        code_content += "frequency: " + String(IR_FREQUENCY) + "\n";
+        code_content += "duty_cycle: " + String(DUTY_CYCLE) + "\n";
+        code_content += "data: " + parse_raw_signal() + "\n";
+    } else {
+        // parsed signal  https://github.com/jamisonderek/flipper-zero-tutorials/wiki/Infrared
+        code_content += "type: parsed\n";
+        switch (results.decode_type) {
+            case decode_type_t::RC5: {
+                if (results.command > 0x3F) code_content += "protocol: RC5X\n";
+                else code_content += "protocol: RC5\n";
+                break;
+            }
+            case decode_type_t::RC6: {
+                code_content += "protocol: RC6\n";
+                break;
+            }
+            case decode_type_t::SAMSUNG: {
+                code_content += "protocol: Samsung32\n";
+                break;
+            }
+            case decode_type_t::SONY: {
+                // check address and command ranges to find the exact protocol
+                if (results.address > 0xFF) code_content += "protocol: SIRC20\n";
+                else if (results.address > 0x1F) code_content += "protocol: SIRC15\n";
+                else code_content += "protocol: SIRC\n";
+                break;
+            }
+            case decode_type_t::NEC: {
+                // check address and command ranges to find the exact protocol
+                if (results.address > 0xFFFF) code_content += "protocol: NEC42ext\n";
+                else if (results.address > 0xFF1F) code_content += "protocol: NECext\n";
+                else if (results.address > 0xFF) code_content += "protocol: NEC42\n";
+                else code_content += "protocol: NEC\n";
+                break;
+            }
+            case decode_type_t::UNKNOWN: {
+                Serial.println("[WARN] unknown protocol, try raw mode");
+                return;
+            }
+            default: {
+                code_content += "protocol: " + typeToString(results.decode_type, results.repeat) + "\n";
+                break;
+            }
+        }
+
+        code_content += "address: " + uint32ToString(results.address) + "\n";
+        code_content += "command: " + uint32ToString(results.command) + "\n";
+
+        // extra fields not supported on flipper
+        code_content += "bits: " + String(results.bits) + "\n";
+        if (hasACState(results.decode_type)) code_content += "state: " + parse_state_signal() + "\n";
+        else if (results.bits > 32)
+            code_content += "value: " + uint32ToString(results.value) + " " +
+                                uint32ToString(results.value >> 32) + "\n"; // MEMO: from uint64_t
+        else code_content += "value: " + uint32ToStringInverted(results.value) + "\n";
+    }
+    code_content += "#\n";
+}
+
+void IRReadModules::processSignalToContent(String btn_name) {
+    code_content += "name: " + btn_name + "\n";
+
     if (raw_data) {
         code_content += "type: raw\n";
         code_content += "frequency: " + String(IR_FREQUENCY) + "\n";
@@ -181,7 +273,9 @@ void IRReadModules::processSignalToContent() {
 }
 
 bool IRReadModules::saveintoSD() {
-    String file_name = "Code_";
+    String file_name = "";
+    if (quickRemoteTV) file_name = "TvRemote_";
+    else file_name = "Code_";
     int i = 1;
 
     while(sdcard.isExists("/" + file_name + String(i) + ".ir")) i++;

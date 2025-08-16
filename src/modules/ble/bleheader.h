@@ -24,7 +24,7 @@
 
 DisplayModules ble_display_obj;
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) ||                              \
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || \
     defined(CONFIG_IDF_TARGET_ESP32S3)
 #define MAX_TX_POWER ESP_PWR_LVL_P21 // ESP32C3 ESP32C2 ESP32S3
 #elif defined(CONFIG_IDF_TARGET_ESP32H2) || defined(CONFIG_IDF_TARGET_ESP32C6)
@@ -370,7 +370,6 @@ extern uint8_t spooferAdTypeIndex;
 class BLEModules {
     private:
         BLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
-        static void scanCompleteCB(BLEScanResults scanResults);
         void executeSwiftpair(EBLEPayloadType type, bool forspamall = false);
         void bleScan();
         BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);

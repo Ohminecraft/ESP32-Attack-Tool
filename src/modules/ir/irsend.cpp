@@ -18,6 +18,8 @@ extern const IrCode* const NApowerCodes[];
 extern const IrCode* const EUpowerCodes[];
 extern uint8_t num_NAcodes, num_EUcodes;
 
+LinkedList<IRCode>* ir_codes;
+
 uint8_t bitsleft_r = 0;
 uint8_t bits_r=0;
 uint8_t code_ptr;
@@ -27,6 +29,7 @@ bool ending_early = false;
 void IRSendModules::main() {
     // Initialize IR send module
     irsend.begin();
+    ir_codes = new LinkedList<IRCode>();
     pinMode(espatsettings.irTxPin, OUTPUT); // Set the IR pin as output
     Serial.println("[INFO] IR Send Module Initialized");
 }
@@ -161,9 +164,7 @@ void IRSendModules::sendIRTx(String filename) {
         if (line.startsWith("type:")) {
             String type = line.substring(5);
             type.trim();
-            Serial.println("[INFO] Type: " + type);
             if (type == "raw") {
-                Serial.println("[INFO] Ir Type: RAW code");
                 while (databaseFile.available()) {
                     line = databaseFile.readStringUntil('\n');
                     if (line.endsWith("\r")) line.remove(line.length() - 1);
@@ -172,11 +173,9 @@ void IRSendModules::sendIRTx(String filename) {
                         line = line.substring(10);
                         line.trim();
                         frequency = line.toInt();
-                        Serial.printf("[INFO] Frequency: %d\n", frequency);
                     } else if (line.startsWith("data:")) {
                         rawData = line.substring(5);
                         rawData.trim();
-                        Serial.println("[INFO] RawData: " + rawData);
                     } else if ((frequency != 0 && rawData != "") || line.startsWith("#")) {
                         IRCode code;
                         code.type = "raw";
@@ -192,7 +191,6 @@ void IRSendModules::sendIRTx(String filename) {
                     }
                 }
             } else if (type == "parsed") {
-                Serial.println("[INFO] Ir Type: PARSED");
                 while (databaseFile.available()) {
                     line = databaseFile.readStringUntil('\n');
                     if (line.endsWith("\r")) line.remove(line.length() - 1);
@@ -200,22 +198,17 @@ void IRSendModules::sendIRTx(String filename) {
                     if (line.startsWith("protocol:")) {
                         protocol = line.substring(9);
                         protocol.trim();
-                        Serial.println("[INFO] Protocol: " + protocol);
                     } else if (line.startsWith("address:")) {
                         address = line.substring(8);
                         address.trim();
-                        Serial.println("[INFO] Address: " + address);
                     } else if (line.startsWith("command:")) {
                         command = line.substring(8);
                         command.trim();
-                        Serial.println("[INFO] Command: " + command);
                     } else if (line.startsWith("value:") || line.startsWith("state:")) {
                         value = line.substring(6);
                         value.trim();
-                        Serial.println("[INFO] Value: " + value);
                     } else if (line.startsWith("bits:")) {
                         bits = line.substring(strlen("bits:")).toInt();
-                        Serial.println("[INFO] Bits: " + bits);
                     } else if (line.indexOf("#") != -1) { // TODO: also detect EOF
                         IRCode code(protocol, address, command, value, bits);
                         sendIRCommand(&code);
@@ -236,6 +229,54 @@ void IRSendModules::sendIRTx(String filename) {
     databaseFile.close();
     digitalWrite(espatsettings.irTxPin, LOW);
     return;
+}
+
+void IRSendModules::getCodesToSendIR(String filename) {
+    String line;
+    String txt;
+    IRCode codes;
+    bool codeReady = false;
+
+    File databaseFile = sdcard.getFile(filename, FILE_READ);
+    if (!databaseFile) {
+        Serial.println("[ERROR] Failed to open database file: " + filename);
+        return;
+    }
+
+    Serial.println("[INFO] Opened database file: " + filename);
+
+    while (databaseFile.available() && ir_codes->size() < 100) {
+        line = databaseFile.readStringUntil('\n');
+        line.trim();
+        if (line.length() == 0) continue;
+
+        txt = line.substring(line.indexOf(":") + 1);
+        txt.trim();
+
+        if (line.startsWith("name:")) {
+            if (codeReady) {
+                ir_codes->add(codes);
+                codes = IRCode();
+            }
+            codes.name = txt;
+            codes.filepath = txt + " " + filename.substring(1 + filename.lastIndexOf("/"));
+            codeReady = true;
+        }
+        else if (line.startsWith("type:")) codes.type = txt;
+        else if (line.startsWith("protocol:")) codes.protocol = txt;
+        else if (line.startsWith("address:")) codes.address = txt;
+        else if (line.startsWith("frequency:")) codes.frequency = txt.toInt();
+        else if (line.startsWith("bits:")) codes.bits = txt.toInt();
+        else if (line.startsWith("command:")) codes.command = txt;
+        else if (line.startsWith("data:") || line.startsWith("value:") || line.startsWith("state:"))
+            codes.data = txt;
+    }
+
+    if (codeReady) {
+        ir_codes->add(codes);
+    }
+
+    databaseFile.close();
 }
 
 void IRSendModules::sendIRCommand(IRCode *code) {
@@ -265,13 +306,13 @@ void IRSendModules::sendNECCommand(String address, String command) {
     uint64_t data = irsend.encodeNEC(addressValue, commandValue);
     irsend.sendNEC(data, 32);
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.sendNEC(data, 32); }
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.sendNEC(data, 32); }
     }
 
     Serial.println(
         "[INFO] Ir Sent NEC Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
 
     digitalWrite(espatsettings.irTxPin, LOW);
@@ -303,13 +344,13 @@ void IRSendModules::sendNECextCommand(String address, String command) {
     uint32_t data = ((uint32_t)lsbAddress << 16) | lsbCommand;
     irsend.sendNEC(data, 32); // Sends MSB first
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.sendNEC(data, 32); }
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.sendNEC(data, 32); }
     }
 
     Serial.println(
         "[INFO] Ir Sent NECext Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
 }
@@ -323,12 +364,12 @@ void IRSendModules::sendRC5Command(String address, String command) {
     uint16_t data = irsend.encodeRC5(addressValue, commandValue);
     irsend.sendRC5(data, 13);
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.sendRC5(data, 13); }
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.sendRC5(data, 13); }
     }
     Serial.println(
         "[INFO] Ir Sent RC5 Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
 }
@@ -345,13 +386,13 @@ void IRSendModules::sendRC6Command(String address, String command) {
 
     irsend.sendRC6(data, 20);
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.sendRC6(data, 20); }
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.sendRC6(data, 20); }
     }
 
     Serial.println(
         "[INFO] Ir Sent RC6 Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
 }
@@ -365,13 +406,13 @@ void IRSendModules::sendSamsungCommand(String address, String command) {
 
     irsend.sendSAMSUNG(data, 32);
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.sendSAMSUNG(data, 32); }
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.sendSAMSUNG(data, 32); }
     }
 
     Serial.println(
         "[INFO] Ir Sent Samsung Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
 }
@@ -411,13 +452,13 @@ void IRSendModules::sendSonyCommand(String address, String command, uint8_t nbit
     // 1 initial + 2 repeat
     irsend.sendSony(data, nbits, 2); // Sends MSB First
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.sendSony(data, nbits, 2); }
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.sendSony(data, nbits, 2); }
     }
 
     Serial.println(
         "[INFO] Ir Sent Sony Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
 }
@@ -463,13 +504,13 @@ void IRSendModules::sendKaseikyoCommand(String address, String command) {
 
     irsend.sendPanasonic64(msb_data, 48); // Sends MSB First
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.sendPanasonic64(msb_data, 48); }
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.sendPanasonic64(msb_data, 48); }
     }
 
     Serial.println(
         "[INFO] Ir Sent Kaseikyo Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
 }
@@ -496,8 +537,8 @@ bool IRSendModules::sendDecodedCommand(String protocol, String value, uint8_t bi
         // success = irsend.send(type, state, bits / 8);
         success = irsend.send(type, state, state_pos); // safer
 
-        if (IR_REPEAT > 0) {
-            for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.send(type, state, state_pos); }
+        if (espatsettings.irRepeat > 0) {
+            for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.send(type, state, state_pos); }
         }
 
     } else {
@@ -508,15 +549,15 @@ bool IRSendModules::sendDecodedCommand(String protocol, String value, uint8_t bi
             irsend.send(type, value_int, bits); // bool send(const decode_type_t type, const uint64_t data,
                                                 // const uint16_t nbits, const uint16_t repeat = kNoRepeat);
 
-        if (IR_REPEAT > 0) {
-            for (uint8_t i = 1; i <= IR_REPEAT; i++) { irsend.send(type, value_int, bits); }
+        if (espatsettings.irRepeat > 0) {
+            for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) { irsend.send(type, value_int, bits); }
         }
     }
 
     delay(20);
     Serial.println(
         "[INFO] Ir Sent Decoded Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
     return success;
@@ -550,8 +591,8 @@ void IRSendModules::sendRawCommand(uint16_t frequency, String rawData) {
     // Send raw command
     irsend.sendRaw(dataBuffer, count, frequency);
 
-    if (IR_REPEAT > 0) {
-        for (uint8_t i = 1; i <= IR_REPEAT; i++) {
+    if (espatsettings.irRepeat > 0) {
+        for (uint8_t i = 1; i <= espatsettings.irRepeat; i++) {
             irsend.sendRaw(dataBuffer, count, frequency);
         }
     }
@@ -560,7 +601,7 @@ void IRSendModules::sendRawCommand(uint16_t frequency, String rawData) {
 
     Serial.println(
         "[INFO] Ir Sent Raw Command" +
-        (IR_REPEAT > 0 ? " (1 initial + " + String(IR_REPEAT) + " repeats)" : "")
+        (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
     digitalWrite(espatsettings.irTxPin, LOW);
 }

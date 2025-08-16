@@ -218,8 +218,12 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("IR Tv-B-Gone", 0, 12);
 	else if (currentState == IR_SEND_RUNNING)
 		display.displayStringwithCoordinates("IR Send", 0, 12);
+	else if (currentState == IR_READ_MENU)
+		display.displayStringwithCoordinates("IR Read Mode", 0, 12);
 	else if (currentState == IR_READ_RUNNING)
 		display.displayStringwithCoordinates("IR Read", 0, 12);
+	else if (currentState == IR_CODE_SELECT)
+		display.displayStringwithCoordinates("IR Codes", 0, 12);
 	else if (currentState == SD_MENU)
 		display.displayStringwithCoordinates("SD Menu", 0, 12);
 	else if (currentState == SD_UPDATE_MENU)
@@ -468,7 +472,6 @@ void displaySamsungSpooferMenu() {
 	menuNode(items, BLE_SPO_SAMSUNG_COUNT);
 }
 
-
 void displayGoogleSpooferMenu() {
 	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
@@ -546,7 +549,6 @@ void displayGoogleSpooferMenu() {
 	};
 	menuNode(items, BLE_SPO_GOOGLE_COUNT);
 }
-
 
 void displayAdTypeSpooferMenu() {
 	digitalWrite(espatsettings.statusLedPin, LOW);
@@ -707,16 +709,6 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 		display.displayStringwithCoordinates("or LEFT to go back", 0, 48, true);
 	}
 }
-
-/*
-void displayWiFiReScanMenu(uint32_t elapsedTime) {
-	display.clearScreen();
-	display.displayStringwithCoordinates("==== WIFI SCAN ====", 0, 12);
-	display.displayStringwithCoordinates("ERROR!", 0, 24);
-	display.displayStringwithCoordinates("Not Found Any AP", 0, 36);
-	display.displayStringwithCoordinates("ReScan in: " + String(elapsedTime), 0, 48);
-}
-*/
 
 void displayWiFiSelectMenu() {
 	displayStatusBar();
@@ -1046,6 +1038,36 @@ void displayIRMenu() {
 	};
 
 	menuNode(items, IR_MENU_COUNT);
+}
+
+void displayIRReadMenu() {
+	displayStatusBar();
+
+	String items[IR_READ_MENU] = {
+		"Quick TV",
+		"Custom Read",
+		"< Back"
+	};
+
+	menuNode(items, IR_READ_MENU);
+}
+
+void displayIrCodeDataInFile() {
+	displayStatusBar();
+
+	String items[1] = {};
+	
+	if (currentSelection < ir_codes->size()) {
+		IRCode code = ir_codes->get(currentSelection);
+		items[0] = code.name;
+	}
+
+	String errorText[2] = {
+		"No Codes found!",
+		"Scan First!"
+	};
+
+	menuNode(items, sizeof(items) / sizeof(items[0]), "Codes: ", errorText, ir_codes->size());
 }
 
 void displayIRTvBGoneRegionMenu() {
@@ -1587,7 +1609,6 @@ bool hasSelectedProbeReqSSID() {
 	return false;
 }
 
-
 void performReboot() {
 	Serial.println("[SYSTEM_REBOOT] Performing system reboot...");
 	
@@ -1769,6 +1790,12 @@ void navigateUp() {
 		case BLE_TT_SCROLL_MENU:
 			displayTikTokScrollMenu();
 			break;
+		case IR_READ_MENU:
+			displayIRReadMenu();
+			break;
+		case IR_CODE_SELECT:
+			displayIrCodeDataInFile();
+			break;
 	}
 }
 
@@ -1867,6 +1894,12 @@ void navigateDown() {
 			break;
 		case BLE_TT_SCROLL_MENU:
 			displayTikTokScrollMenu();
+			break;
+		case IR_READ_MENU:
+			displayIRReadMenu();
+			break;
+		case IR_CODE_SELECT:
+			displayIrCodeDataInFile();
 			break;
 	}
 	
@@ -1982,6 +2015,14 @@ void selectCurrentItem() {
 					currentState = BLE_SCAN_RUNNING;
 					displayBLEScanMenu();
 				} else if (currentSelection == BLE_BADUSB) {
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
@@ -2002,6 +2043,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_MEDIA_CMD) {
 					display.clearScreen();
 					displayStatusBar();
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
@@ -2028,6 +2077,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_KEYMOTE) {
 					display.clearScreen();
 					displayStatusBar();
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
@@ -2054,6 +2111,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_TT_SCROLL) {
 					display.clearScreen();
 					displayStatusBar();
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_ALL || currentkbmode == BLE_KEYBOARD_MODE_KEYBOARD || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
@@ -2062,17 +2127,17 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginMouse(hid_mouse, true);
+					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true, BLE_KEYBOARD_MODE_MOUSE);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isMouseConnected(hid_mouse) && !check(prevPress)) yield();
-					if (badusb.isMouseConnected(hid_mouse)) {
+					while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
+					if (badusb.isConnected(hid_ble)) {
 						currentState = BLE_TT_SCROLL_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_TT_ITEM_COUNT;
 						displayTikTokScrollMenu();
 					} else {
 						display.clearScreen();
-						displayStatusBar();
+						displayStatusBar();				
 						display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
 						displayBLEMenu();
@@ -2232,9 +2297,9 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			}
-			else if (currentSelection == BLE_TT_SCROLL_UP) badusb.tiktokScroll(hid_mouse, SCROLL_UP);
-			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_mouse, SCROLL_DOWN);
-			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_mouse, LIKE_VIDEO);
+			else if (currentSelection == BLE_TT_SCROLL_UP) badusb.tiktokScroll(hid_ble, SCROLL_UP);
+			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_ble, SCROLL_DOWN);
+			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_ble, LIKE_VIDEO);
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
 			vTaskDelay(150 / portTICK_PERIOD_MS);
 			displayTikTokScrollMenu();
@@ -2606,12 +2671,11 @@ void selectCurrentItem() {
 				maxSelections = IR_TV_B_GONE_REGION_COUNT;
 				displayIRTvBGoneRegionMenu();
 			} else if (currentSelection == IR_READ) {
-				currentState = IR_READ_RUNNING;
+				currentState = IR_READ_MENU;
+				currentSelection = 0;
+				maxSelections = IR_READ_MENU_COUNT;
 				display.clearScreen();
-				displayStatusBar();
-				irrecvRedraw = true;
-				irrx.main();
-				irrx.begin();
+				displayIRReadMenu();
 			} else if (currentSelection == IR_SEND) {
 				currentState = SD_DELETE_MENU;
 				selectforirtx = true;
@@ -2623,6 +2687,26 @@ void selectCurrentItem() {
 				displayDeleteSDCard();
 			} else if (currentSelection == IR_BACK) {
 				goBack();
+			}
+			break;
+		case IR_READ_MENU:
+			if (currentSelection == IR_READ_BACK) {
+				goBack();
+			}
+			else if (currentSelection == QUICK_TV) {
+				irrecvRedraw = true;
+				irrx.main();
+				irrx.begin();
+				currentState = IR_READ_RUNNING;
+				button_pos = 0;
+				quickRemoteTV = true;
+			}
+			else if (currentSelection == CUSTOM_READ) {
+				irrecvRedraw = true;
+				irrx.main();
+				irrx.begin();
+				currentState = IR_READ_RUNNING;
+				quickRemoteTV = false;
 			}
 			break;
 		case IR_TV_B_GONE_REGION:
@@ -2715,7 +2799,6 @@ void selectCurrentItem() {
 						display.displayStringwithCoordinates(fileName, 0, 36);
 						display.displayStringwithCoordinates("Press SELECT to", 0, 48);
 						display.displayStringwithCoordinates("confirm", 0, 60, true);
-							
 						bool confirmed = false;
 						while (!confirmed) {
 							if (check(selPress)) {
@@ -2727,11 +2810,31 @@ void selectCurrentItem() {
 									display.displayStringwithCoordinates("file", 0, 36, true);
 									vTaskDelay(1000 / portTICK_PERIOD_MS);
 									displayDeleteSDCard();
+									checkisnotempty.close();
 									return;
 								}
+								checkisnotempty.close();
 								selectforirtx = false;
 								confirmed = true;
 								irSendFile = "/" + fileName;
+								File datafile = sdcard.getFile(irSendFile, FILE_READ);
+								while (datafile.available()) {
+									String line = datafile.readStringUntil('\n');
+									if (line.indexOf("name:") != -1) {
+										send_select_code = true;
+										Serial.println("[INFO] Found More Ir Codes");
+										break;
+									}
+								}
+								datafile.close();
+								if (send_select_code) {
+									irtx.getCodesToSendIR(irSendFile);
+									currentState = IR_CODE_SELECT;
+									currentSelection = 0;
+									maxSelections = ir_codes->size() + 1;
+									display.clearScreen();
+									displayIrCodeDataInFile();
+								}
 							} else if (check(prevPress)) {
 								confirmed = true;
 								displayDeleteSDCard();
@@ -2739,7 +2842,7 @@ void selectCurrentItem() {
 							}
 							vTaskDelay(10 / portTICK_PERIOD_MS);
 						}
-						currentState = IR_SEND_RUNNING;
+						if (!send_select_code) currentState = IR_SEND_RUNNING;
 					} else if (selectforevilportal) {
 						String fileName = sdcard_buffer->get(currentSelection);
 						display.clearScreen();
@@ -2846,11 +2949,25 @@ void selectCurrentItem() {
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					if (badble) {
 						goBack();
-						badble = false;
 					}
 					return;
 				}
 
+			}
+			break;
+		case IR_CODE_SELECT:
+			if (currentSelection < ir_codes->size()) {
+				IRCode code = ir_codes->get(currentSelection);
+				irtx.sendIRCommand(&code);
+				display.clearScreen();
+				displayStatusBar();
+				display.displayStringwithCoordinates("IR Code Sent", 0, 24, true);
+				vTaskDelay(500 / portTICK_PERIOD_MS);
+				display.clearScreen();
+				displayIrCodeDataInFile();
+			} else {
+				ir_codes->clear();
+				goBack();
 			}
 			break;
 	}
@@ -3165,11 +3282,19 @@ void goBack() {
 				maxSelections = IR_MENU_COUNT;
 				displayIRMenu();
 			} else {
-				selectforirtx = true;
-				currentState = SD_DELETE_MENU;
-				currentSelection = 0;
-				maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-				displayDeleteSDCard();
+				if (send_select_code) {
+					send_select_code = false;
+					currentState = IR_MENU;
+					currentSelection = 0;
+					maxSelections = IR_MENU_COUNT;
+					displayIRMenu();
+				} else {
+					selectforirtx = true;
+					currentState = SD_DELETE_MENU;
+					currentSelection = 0;
+					maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
+					displayDeleteSDCard();
+				}
 			}
 			break;
 		case SD_MENU:
@@ -3181,6 +3306,7 @@ void goBack() {
 		case SD_DELETE_MENU:
 		if (selectforbadusb) {
 			if (badble) {
+				badble = false;
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
@@ -3208,6 +3334,7 @@ void goBack() {
 			break;
 		case BADUSB_KEY_LAYOUT_MENU:
 			if (badble) {
+				badble = false;
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
@@ -3216,10 +3343,14 @@ void goBack() {
 			break;
 		case BADUSB_RUNNING:
 			if (badble) {
-				currentState = BLE_MENU;
+				selectforbadusb = true;
+				delete sdcard_buffer;
+				sdcard_buffer = new LinkedList<String>();
+				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".txt");
+				currentState = SD_DELETE_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_MENU_COUNT;
-				displayBLEMenu();
+				maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
+				displayDeleteSDCard();
 			}
 			break;
 		case IR_READ_RUNNING:
@@ -3229,6 +3360,20 @@ void goBack() {
 			displayIRMenu();
 			irrx.shutdown();
 			irreadOneShot = false;
+			break;
+		case IR_READ_MENU:
+			currentState = IR_MENU;
+			currentSelection = 0;
+			maxSelections = IR_MENU_COUNT;
+			displayIRMenu();
+			break;
+		case IR_CODE_SELECT:
+			digitalWrite(espatsettings.irTxPin, LOW);
+			send_select_code = false;
+			currentState = IR_MENU;
+			currentSelection = 0;
+			maxSelections = IR_MENU_COUNT;
+			displayIRMenu();
 			break;
 	}
 	
@@ -3536,22 +3681,24 @@ void handleTasks(MenuState handle_state) {
 			irtx.begone_code_sended = 0;
 			goBack();
 		} else {
-			display.clearScreen();
-			displayStatusBar();
-			display.displayStringwithCoordinates("Send Ir File:", 0, 24);
-			display.displayStringwithCoordinates(irSendFile, 0,36);
-			display.displayStringwithCoordinates("Please wait!", 0, 48, true);
-			Serial.println("[INFO] Starting IR Send File: " + irSendFile);
-			irtx.sendIRTx(irSendFile);
-			vTaskDelay(300 / portTICK_PERIOD_MS);
-			display.clearScreen();
-			displayStatusBar();
-			display.displayStringwithCoordinates("IR File Sent", 0, 24);
-			display.displayStringwithCoordinates("Press Sel to exit", 0, 36, true);
-			while(!check(selPress)) yield();
-			Serial.println("[INFO] IR File Sent: " + irSendFile);
-			irSendFile = "";
-			goBack();
+			if (!send_select_code) {
+				display.clearScreen();
+				displayStatusBar();
+				display.displayStringwithCoordinates("Send Ir File:", 0, 24);
+				display.displayStringwithCoordinates(irSendFile, 0,36);
+				display.displayStringwithCoordinates("Please wait!", 0, 48, true);
+				Serial.println("[INFO] Starting IR Send File: " + irSendFile);
+				irtx.sendIRTx(irSendFile);
+				vTaskDelay(300 / portTICK_PERIOD_MS);
+				display.clearScreen();
+				displayStatusBar();
+				display.displayStringwithCoordinates("IR File Sent", 0, 24);
+				display.displayStringwithCoordinates("Press Sel to exit", 0, 36, true);
+				while(!check(selPress)) yield();
+				Serial.println("[INFO] IR File Sent: " + irSendFile);
+				irSendFile = "";
+				goBack();
+			}
 		}
 	}
 
@@ -3768,6 +3915,12 @@ void redrawTasks() {
 			break;
 		case BLE_TT_SCROLL_MENU:
 			displayTikTokScrollMenu();
+			break;
+		case IR_READ_MENU:
+			displayIRReadMenu();
+			break;
+		case IR_CODE_SELECT:
+			displayIrCodeDataInFile();
 			break;
 	}
 }
