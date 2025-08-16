@@ -370,7 +370,6 @@ extern uint8_t spooferAdTypeIndex;
 class BLEModules {
     private:
         BLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
-        static void scanCompleteCB(BLEScanResults scanResults);
         void executeSwiftpair(EBLEPayloadType type, bool forspamall = false);
         void bleScan();
         BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);

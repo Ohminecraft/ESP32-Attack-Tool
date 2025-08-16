@@ -61,6 +61,7 @@ enum TikTokScrollCommand {
 extern HIDInterface *hid_usb;
 extern HIDInterface *hid_ble;
 extern uint8_t keyboardLayout;
+extern uint8_t currentkbmode;
 
 extern SDCardModules sdcard;
 

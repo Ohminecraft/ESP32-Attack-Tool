@@ -10,6 +10,7 @@
 
 HIDInterface *hid_usb = nullptr;
 HIDInterface *hid_ble = nullptr;
+uint8_t currentkbmode = 0;
 
 uint8_t keyboardLayout;
 
@@ -129,7 +130,7 @@ void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usin
             Serial.println("[INFO] Set Layout for BadUSB (BLE) Successfully");
             return;
         }
-        if (!hid->isConnected()) hid->begin(layout, mode);
+        if (!hid->isConnected()) { hid->begin(layout, mode);  currentkbmode = mode;}
     } else {
         #if !defined(BOARD_ESP32_C3_MINI)
         #endif
@@ -170,7 +171,8 @@ void BadUSBModules::beginLayout(HIDInterface *&hid, bool usingble) {
 }
 
 bool BadUSBModules::isConnected(HIDInterface *&hid) {
-    return hid->isConnected();
+    if (hid == nullptr) return false;
+    else return hid->isConnected();
 }
 
 void BadUSBModules::launchBadUSB(String badusbScript, HIDInterface *&hid) {
@@ -318,7 +320,7 @@ void BadUSBModules::Keymote(HIDInterface *&hid, KeymoteCommand key) {
 }
 
 void BadUSBModules::tiktokScroll(HIDInterface *&hid, TikTokScrollCommand cmd) {
-    hid->move(0, 0);
+    hid->move(-100, 0);
     if (cmd == SCROLL_DOWN) {
         hid->pressMouse(MOUSE_LEFT);   // Giữ
         for (int i = 0; i < 5; i++) { // Vuốt dài hơn

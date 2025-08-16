@@ -10,14 +10,7 @@
 
 #include "NimBLECharacteristic.h"
 #include "NimBLEHIDDevice.h"
-
-#define BLEDevice                  NimBLEDevice
-#define BLEServerCallbacks         NimBLEServerCallbacks
-#define BLECharacteristicCallbacks NimBLECharacteristicCallbacks
-#define BLEHIDDevice               NimBLEHIDDevice
-#define BLECharacteristic          NimBLECharacteristic
-#define BLEAdvertising             NimBLEAdvertising
-#define BLEServer                  NimBLEServer
+#include "NimBLEServer.h"
 
 #else
 
@@ -30,6 +23,15 @@
 #include "Print.h"
 #include "keys.h"
 
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) ||                              \
+    defined(CONFIG_IDF_TARGET_ESP32S3)
+#define MAX_TX_POWER ESP_PWR_LVL_P21 // ESP32C3 ESP32C2 ESP32S3
+#elif defined(CONFIG_IDF_TARGET_ESP32H2) || defined(CONFIG_IDF_TARGET_ESP32C6)
+#define MAX_TX_POWER ESP_PWR_LVL_P20 // ESP32H2 ESP32C6
+#else
+#define MAX_TX_POWER ESP_PWR_LVL_P9 // Default
+#endif
+
 #define BLE_KEYBOARD_VERSION "0.0.4"
 #define BLE_KEYBOARD_VERSION_MAJOR 0
 #define BLE_KEYBOARD_VERSION_MINOR 0
@@ -41,21 +43,21 @@
 #define BLE_KEYBOARD_MODE_GAMEPAD 3
 #define BLE_KEYBOARD_MODE_ALL 4
 
-class BleKeyboard : public BLEServerCallbacks, public BLECharacteristicCallbacks, public HIDInterface
+class BleKeyboard : public NimBLEServerCallbacks, public NimBLECharacteristicCallbacks, public HIDInterface
 {
 private:
   uint8_t _buttons;
-  uint8_t _buttonsGamepad[16]; // 2x64 -> 128 bytes) [0: 0-64, 1->64-128]
-  BLEHIDDevice *hid;
-  BLECharacteristic *inputKeyboard;
-  BLECharacteristic *outputKeyboard;
-  BLECharacteristic *inputMediaKeys;
-  BLECharacteristic *inputMouse;
+  uint8_t _buttonsGamepad[16];
+  NimBLEHIDDevice *hid;
+  NimBLECharacteristic *inputKeyboard;
+  NimBLECharacteristic *outputKeyboard;
+  NimBLECharacteristic *inputMediaKeys;
+  NimBLECharacteristic *inputMouse;
   //BLECharacteristic *outputMouse;
-  BLECharacteristic *inputGamepad;
-  BLECharacteristic *outputGamepad;
+  NimBLECharacteristic *inputGamepad;
+  NimBLECharacteristic *outputGamepad;
 
-  BLEAdvertising *advertising;
+  NimBLEAdvertising *advertising;
   KeyReport _keyReport;
   MediaKeyReport _mediaKeyReport;
   std::string deviceName;
@@ -118,14 +120,21 @@ public:
   void set_version(uint16_t version);
 protected:
   bool _randUUID = false;
-  virtual void onStarted(BLEServer *pServer) { };
-  virtual void onConnect(BLEServer* pServer) override;
-  virtual void onDisconnect(BLEServer* pServer) override;
-  virtual void onWrite(BLECharacteristic* me) override;
+  virtual void onStarted(NimBLEServer *pServer) { };
+  //virtual void onConnect(BLEServer* pServer) override;
+  virtual void onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) override;
+  //virtual void onDisconnect(BLEServer* pServer) override;
+  virtual void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason) override;
+  //virtual void onWrite(BLECharacteristic* me) override;
+  virtual void onWrite(NimBLECharacteristic* me, NimBLEConnInfo& connInfo) override;
 
   #ifdef USE_NIMBLE
-  virtual void onAuthenticationComplete(ble_gap_conn_desc *desc);
-  virtual void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) override;
+  //virtual void onAuthenticationComplete(ble_gap_conn_desc *desc);
+  virtual void onAuthenticationComplete(NimBLEConnInfo& connInfo) override;
+  //virtual void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) override;
+  virtual void onSubscribe(NimBLECharacteristic * 	pCharacteristic,
+    NimBLEConnInfo & 	connInfo,
+    uint16_t 	subValue) override;
   #endif // USE_NIMBLE
 
 };

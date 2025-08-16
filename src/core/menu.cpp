@@ -1982,6 +1982,14 @@ void selectCurrentItem() {
 					currentState = BLE_SCAN_RUNNING;
 					displayBLEScanMenu();
 				} else if (currentSelection == BLE_BADUSB) {
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
@@ -2002,6 +2010,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_MEDIA_CMD) {
 					display.clearScreen();
 					displayStatusBar();
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
@@ -2028,6 +2044,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_KEYMOTE) {
 					display.clearScreen();
 					displayStatusBar();
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
@@ -2054,6 +2078,14 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_TT_SCROLL) {
 					display.clearScreen();
 					displayStatusBar();
+					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_ALL || currentkbmode == BLE_KEYBOARD_MODE_KEYBOARD || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
+						display.displayStringwithCoordinates("Device To Use This",  0, 36);
+						display.displayStringwithCoordinates("Feature!",  0, 48, true);
+						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						displayBLEMenu();
+						return;
+					}
 					if (need_restart) {
 						display.displayStringwithCoordinates("Please Restart Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
