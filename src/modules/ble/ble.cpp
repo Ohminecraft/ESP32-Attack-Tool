@@ -61,14 +61,12 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
                                       0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
                                       0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
                                       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                //AdvData.addData(std::string((char *)packet, 31));
                 AdvData.addData(packet, 31);
             } else if (randdevice == 1) {
                 uint8_t packet[23] = {0x16, 0xff, 0x4c, 0x00, 0x04, 0x04, 0x2a,
                                       0x00, 0x00, 0x00, 0x0f, 0x05, 0xc1, IOS2[random() % sizeof(IOS2)],
                                       0x60, 0x4c, 0x95, 0x00, 0x00, 0x10, 0x00,
                                       0x00, 0x00};
-                //AdvData.addData(std::string((char *)packet, 23));
                 AdvData.addData(packet, 23);
             }
             break;
@@ -90,8 +88,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData_Raw[i++] = 0x80;
             memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
             i += name_len;
-
-            //AdvData.addData(std::string((char *)AdvData_Raw, 7 + name_len));
             AdvData.addData(AdvData_Raw, 7 + name_len);
             break;
         }
@@ -116,8 +112,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData_Raw[i++] = 0x00;
             AdvData_Raw[i++] = 0x43;
             AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // Watch Model / Color (?)
-
-            //AdvData.addData(std::string((char *)AdvData_Raw, 15));
             AdvData.addData(AdvData_Raw, 15);
             break;
         }
@@ -142,7 +136,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData_Raw[i++] = 0x0A;
             AdvData_Raw[i++] = (rand() % 120) - 100; // -100 to +20 dBm
 
-            //AdvData.addData(std::string((char *)AdvData_Raw, 14));
             AdvData.addData(AdvData_Raw, 14);
             break;
         }
@@ -165,8 +158,8 @@ void BLEModules::main()
     blescanres = new LinkedList<BLEScanResult>();
       
     // Initialize BLE
-    //BLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
-    //BLEDevice::setScanDuplicateCacheSize(200);
+    NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
+    NimBLEDevice::setScanDuplicateCacheSize(200);
     NimBLEDevice::init("");
     NimBLEDevice::setPower(MAX_TX_POWER);
     pBLEScan = NimBLEDevice::getScan();
@@ -248,7 +241,6 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
                               0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
                               0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
                               0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-       // AdvData.addData(std::string((char *)packet, 31));
        AdvData.addData(packet, 31);
     } else if (device_brand == BLE_SPOOFER_DEVICE_BRAND_SAMSUNG) {
         Serial.println("[INFO] BLE Samsung Spoofer Starting");
@@ -256,7 +248,6 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
         uint8_t AdvData_Raw[15] = {0x0E, 0xFF, 0x75, 0x00, 0x01, 0x00, 0x02, 
                                    0x00, 0x01, 0x01, 0xFF, 0x00, 0x00, 0x43,
                                    (uint8_t)((model >> 0x00) & 0xFF)};
-        //AdvData.addData(std::string((char *)AdvData_Raw, 15));
         AdvData.addData(AdvData_Raw, 15);
     } else if (device_brand == BLE_SPOOFER_DEVICE_BRAND_GOOGLE) {
         Serial.println("[INFO] BLE Google Spoofer Starting");
@@ -268,7 +259,6 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
                                    (uint8_t)((model >> 0x00) & 0xFF), // 6 more data to inform FastPair and device data
                                    0x02, 0x0A,
                                    (uint8_t)((rand() % 120) - 100)}; // 2 more data to inform RSSI data.
-        //AdvData.addData(std::string((char *)AdvData_Raw, 14));
         AdvData.addData(AdvData_Raw, 14);
     }
 
@@ -277,17 +267,14 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
     
     switch(adv_type) {
         case ADV_MODE_NON:
-            //pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_NON);
             adv_type_str = "NONN";
             break;
         case ADV_MODE_DIR:
-            //pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_DIR);
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_DIR);
             adv_type_str = "DIR";
             break;
         case ADV_MODE_UND:
-            //pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_UND);
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_UND);
             adv_type_str = "UND";
             break;
@@ -331,8 +318,6 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
     pAdvertising->setAdvertisementData(oAdvertisementData);
     pAdvertising->setMinInterval(0x20); // 32.5ms
     pAdvertising->setMaxInterval(0x20);
-    //pAdvertising->setMinPreferred(0x20);
-    //pAdvertising->setMaxPreferred(0x20);
     pAdvertising->setPreferredParams(0x20, 0x20);
     pAdvertising->start();
     Serial.println("[INFO] Starting Spoofer Advertisement");
@@ -378,8 +363,6 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     pAdvertising->setAdvertisementData(advertisementData);
     pAdvertising->setMinInterval(0x20);
     pAdvertising->setMaxInterval(0x20);
-    //pAdvertising->setMinPreferred(0x20);
-    //pAdvertising->setMaxPreferred(0x20);
     pAdvertising->setPreferredParams(0x20, 0x20);
     pAdvertising->start();
     if (!forspamall) {
@@ -389,17 +372,11 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     } else {
         vTaskDelay(espatsettings.spamAllDelay / portTICK_PERIOD_MS);
     }
-    if (pAdvertising->isAdvertising()) {
-            pAdvertising->stop();
-        while (pAdvertising->isAdvertising()) {
-            yield();
-        }
-    }
-    vTaskDelay(40 / portTICK_PERIOD_MS);
+    pAdvertising->stop();
+    vTaskDelay(10 / portTICK_PERIOD_MS);
     NimBLEDevice::deinit();
 }
 
-//class BLEScanDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
     void onResult(const NimBLEAdvertisedDevice *advertisedDevice) override {
         extern BLEModules ble;
@@ -420,9 +397,6 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
                 if (ble_name.isEmpty()) add_to_buffer = String(bleres.addr.toString().c_str());
                 else add_to_buffer = ble_name;
             } else add_to_buffer = String("Low Mem! Ignore!");
-            
-            //if (display_buffer->size() > 4)
-            //    display_buffer->shift();
             display_buffer->add(add_to_buffer);
             if (!low_memory_warning) Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
             else Serial.println("[INFO] Low Memory Warning! Ignore: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
@@ -452,19 +426,17 @@ void BLEModules::bleScan() {
     NimBLEDevice::init(espatsettings.bleName.c_str());
     ble_initialized = true;
     pBLEScan = BLEDevice::getScan();
-    //pBLEScan->setAdvertisedDeviceCallbacks(new BLEScanDeviceCallbacks(), false);
     if (!bleAnalyzerMode)
     pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), false);
     else
     pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), true);
-    
+
     pBLEScan->setActiveScan(true);
     pBLEScan->setInterval(100);
     pBLEScan->setWindow(99);
     pBLEScan->setMaxResults(0);
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    //delay(100);
 
     Serial.println("[INFO] Starting BLE Scan");
     pBLEScan->start(0, false, true);

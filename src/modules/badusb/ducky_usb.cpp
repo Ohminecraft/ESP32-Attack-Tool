@@ -323,26 +323,26 @@ void BadUSBModules::tiktokScroll(HIDInterface *&hid, TikTokScrollCommand cmd) {
     hid->move(-100, 0);
     if (cmd == SCROLL_DOWN) {
         hid->pressMouse(MOUSE_LEFT);   // Giữ
-        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
             hid->move(0, -30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(12 / portTICK_PERIOD_MS);
+            vTaskDelay(17 / portTICK_PERIOD_MS);
         }
         hid->releaseMouse(MOUSE_LEFT); // Thả
-        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
             hid->move(0, 30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(12 / portTICK_PERIOD_MS);
+            vTaskDelay(17 / portTICK_PERIOD_MS);
         }
     }
     else if (cmd == SCROLL_UP) {
         hid->pressMouse(MOUSE_LEFT);   // Giữ
-        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
             hid->move(0, 30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(12 / portTICK_PERIOD_MS);
+            vTaskDelay(17 / portTICK_PERIOD_MS);
         }
         hid->releaseMouse(MOUSE_LEFT); // Thả
-        for (int i = 0; i < 5; i++) { // Vuốt dài hơn
+        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
             hid->move(0, -30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(12 / portTICK_PERIOD_MS);
+            vTaskDelay(17 / portTICK_PERIOD_MS);
         }
     }
     else if (cmd == LIKE_VIDEO) {

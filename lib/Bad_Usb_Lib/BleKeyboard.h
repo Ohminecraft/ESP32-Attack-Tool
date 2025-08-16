@@ -5,19 +5,10 @@
 #define ESP32_BLE_KEYBOARD_H
 #include "sdkconfig.h"
 #if defined(CONFIG_BT_ENABLED)
-#define USE_NIMBLE
-#if defined(USE_NIMBLE)
 
 #include "NimBLECharacteristic.h"
 #include "NimBLEHIDDevice.h"
 #include "NimBLEServer.h"
-
-#else
-
-#include "BLEHIDDevice.h"
-#include "BLECharacteristic.h"
-
-#endif // USE_NIMBLE
 
 #include "Bad_Usb_Lib.h"
 #include "Print.h"
@@ -53,7 +44,6 @@ private:
   NimBLECharacteristic *outputKeyboard;
   NimBLECharacteristic *inputMediaKeys;
   NimBLECharacteristic *inputMouse;
-  //BLECharacteristic *outputMouse;
   NimBLECharacteristic *inputGamepad;
   NimBLECharacteristic *outputGamepad;
 
@@ -121,21 +111,11 @@ public:
 protected:
   bool _randUUID = false;
   virtual void onStarted(NimBLEServer *pServer) { };
-  //virtual void onConnect(BLEServer* pServer) override;
-  virtual void onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) override;
-  //virtual void onDisconnect(BLEServer* pServer) override;
+  //virtual void onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) override;
   virtual void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason) override;
-  //virtual void onWrite(BLECharacteristic* me) override;
   virtual void onWrite(NimBLECharacteristic* me, NimBLEConnInfo& connInfo) override;
-
-  #ifdef USE_NIMBLE
-  //virtual void onAuthenticationComplete(ble_gap_conn_desc *desc);
   virtual void onAuthenticationComplete(NimBLEConnInfo& connInfo) override;
-  //virtual void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) override;
-  virtual void onSubscribe(NimBLECharacteristic * 	pCharacteristic,
-    NimBLEConnInfo & 	connInfo,
-    uint16_t 	subValue) override;
-  #endif // USE_NIMBLE
+  virtual void onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) override;
 
 };
 

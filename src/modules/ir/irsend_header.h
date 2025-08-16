@@ -63,6 +63,8 @@ struct IRCode {
     String filepath = "";
 };
 
+extern LinkedList<IRCode> *ir_codes;
+
 class IRSendModules {
     private:
         IRsend irsend;
@@ -74,6 +76,7 @@ class IRSendModules {
         void main();
         void startTVBGone();
         void sendIRTx(String filename);
+        void getCodesToSendIR(String filename);
         void sendIRCommand(IRCode *code);
         void sendNECCommand(String address, String command);
         void sendNECextCommand(String address, String command);

@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <IRrecv.h>
 #include <IRutils.h>
+#include <vector>
 #include "core/sdcardmountheader.h"
 #include "core/settingheader.h"
 #include "core/utilsheader.h"
@@ -13,6 +14,8 @@
 #include "configs.h"
 
 extern bool irrecvRedraw;
+extern bool quickRemoteTV;
+extern uint8_t button_pos;
 extern SDCardModules sdcard;
 extern DisplayModules display;
 extern ESP32ATSetting espatsettings;
@@ -38,6 +41,11 @@ class IRReadModules {
         void save_code();
         bool saveintoSD();
         void processSignalToContent();
+        void processSignalToContent(String btn_name);
+
+        std::vector<String> quickremoteTV =  {"POWER", "UP",   "DOWN", "LEFT",  "RIGHT", "OK",       "SOURCES",
+                                              "VOL+",  "VOL-", "CHA+", "CHA-",  "MUTE",  "SETTINGS", "NETFLIX",
+                                              "HOME",  "BACK", "EXIT", "SMART"};
 };
 
 #endif

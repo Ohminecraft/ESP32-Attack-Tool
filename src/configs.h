@@ -91,7 +91,7 @@
 
 // IR Configuration //
 
-#define IR_REPEAT 1
+#define IR_REPEAT 0
 
 #ifdef BOARD_ESP32
     #define IR_PIN 15

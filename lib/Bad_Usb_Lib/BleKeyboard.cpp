@@ -1,18 +1,11 @@
 #include "BleKeyboard.h"
 #include "KeyboardLayout.h"
 
-#if defined(USE_NIMBLE)
 #include <NimBLEDevice.h> // Newest Version of NimBLE
 #include <NimBLEServer.h>
 #include <NimBLEUtils.h>
 #include <NimBLEHIDDevice.h>
-#else
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include "BLE2902.h"
-#include "BLEHIDDevice.h"
-#endif // USE_NIMBLE
+
 #include "HIDTypes.h"
 #include <driver/adc.h>
 #include "sdkconfig.h"
@@ -23,7 +16,7 @@
   #define LOG_TAG ""
 #else
   #include "esp_log.h"
-  static const char* LOG_TAG = "BLEDevice";
+  static const char* LOG_TAG = "NimBLEDevice";
 #endif
 
 
@@ -386,13 +379,6 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
 
   hid = new NimBLEHIDDevice(pServer);
   if (mode == BLE_KEYBOARD_MODE_ALL) {
-    //inputKeyboard = hid->inputReport(KEYBOARD_ID); // <-- input REPORTID from report map
-    //outputKeyboard = hid->outputReport(KEYBOARD_ID);
-    //inputMediaKeys = hid->inputReport(MEDIA_KEYS_ID);
-    //inputMouse = hid->inputReport(MOUSE_ID);
-    //outputMouse = hid->outputReport(MOUSE_ID);
-    //inputGamepad = hid->inputReport(GAMEPAD_ID);
-    //outputGamepad = hid->outputReport(GAMEPAD_ID);
     inputKeyboard = hid->getInputReport(KEYBOARD_ID);
     outputKeyboard = hid->getOutputReport(KEYBOARD_ID);
     inputMediaKeys = hid->getInputReport(MEDIA_KEYS_ID);
@@ -400,40 +386,25 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
     inputGamepad = hid->getInputReport(GAMEPAD_ID);
     outputGamepad = hid->getOutputReport(GAMEPAD_ID);
 
-    outputKeyboard->setCallbacks(this);
-    //outputMouse->setCallbacks(this);
+    outputKeyboard->setCallbacks(this);;
     outputGamepad->setCallbacks(this);
   } else if (mode == BLE_KEYBOARD_MODE_MOUSE) {
-    //inputMouse = hid->inputReport(0);
-    //outputMouse = hid->outputReport(MOUSE_ID);
     inputMouse = hid->getInputReport(0);
-    } else if (mode == BLE_KEYBOARD_MODE_KEYBOARD) {
-    //inputKeyboard = hid->inputReport(KEYBOARD_ID); // <-- input REPORTID from report map
-    //outputKeyboard = hid->outputReport(KEYBOARD_ID);
-    //inputMediaKeys = hid->inputReport(MEDIA_KEYS_ID);
+  } else if (mode == BLE_KEYBOARD_MODE_KEYBOARD) {
     inputKeyboard = hid->getInputReport(KEYBOARD_ID);
     outputKeyboard = hid->getOutputReport(KEYBOARD_ID);
     inputMediaKeys = hid->getInputReport(MEDIA_KEYS_ID);
     outputKeyboard->setCallbacks(this);
   } else if (mode == BLE_KEYBOARD_MODE_GAMEPAD) {
-    //inputGamepad = hid->inputReport(GAMEPAD_ID);
-    //outputGamepad = hid->outputReport(GAMEPAD_ID);
     inputGamepad = hid->getInputReport(GAMEPAD_ID);
     outputGamepad = hid->getOutputReport(GAMEPAD_ID);
     outputGamepad->setCallbacks(this);
   }
   
-
-  //hid->manufacturer()->setValue(deviceManufacturer);
   hid->setManufacturer(deviceManufacturer);
 
-  //hid->pnp(0x02, vid, pid, version);
-  //hid->hidInfo(0x00, 0x01);
   hid->setPnp(0x02, vid, pid, version);
   hid->setHidInfo(0x00, 0x01);
-
-
-#if defined(USE_NIMBLE)
 
   NimBLEDevice::setSecurityAuth(true, false, true); // man in the middle protection (mitm) cause keyboard mouse, etc can't using when device reconnect so disable it
   NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
@@ -441,28 +412,13 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   NimBLEDevice::setSecurityInitKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
   NimBLEDevice::setSecurityRespKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
   
-  //BLESecurity* pSecurity = new BLESecurity();
-  //pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
-  //pSecurity->setCapability(ESP_IO_CAP_NONE);
-  //pSecurity->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
-
-#else
-
-  BLESecurity* pSecurity = new BLESecurity();
-  pSecurity->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_MITM_BOND);
-
-#endif // USE_NIMBLE
   if (mode == BLE_KEYBOARD_MODE_ALL)
-  //hid->reportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
   hid->setReportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
   else if (mode == BLE_KEYBOARD_MODE_MOUSE)
-  //hid->reportMap((uint8_t*)_mouseHidReportDescriptor, sizeof(_mouseHidReportDescriptor));
   hid->setReportMap((uint8_t*)_mouseHidReportDescriptor, sizeof(_mouseHidReportDescriptor));
   else if (mode == BLE_KEYBOARD_MODE_KEYBOARD)
-  //hid->reportMap((uint8_t*)_keyboardHidReportDescriptor, sizeof(_keyboardHidReportDescriptor));
   hid->setReportMap((uint8_t*)_keyboardHidReportDescriptor, sizeof(_keyboardHidReportDescriptor));
   else if (mode == BLE_KEYBOARD_MODE_GAMEPAD)
-  //hid->reportMap((uint8_t*)_gamepadHidReportDescriptor, sizeof(_gamepadHidReportDescriptor));
   hid->setReportMap((uint8_t*)_gamepadHidReportDescriptor, sizeof(_gamepadHidReportDescriptor));
 
   hid->startServices();
@@ -473,11 +429,9 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   advertising->setAppearance(appearance);
   if (_randUUID) {
     advertising->addServiceUUID(BLEUUID((uint16_t)(ESP.getEfuseMac() & 0xFFFF)));
-} else {
-    //advertising->addServiceUUID(hid->hidService()->getUUID());
+} else {;
     advertising->addServiceUUID(hid->getHidService()->getUUID());
 }
-  //advertising->setScanResponse(false);
   advertising->enableScanResponse(false);
   advertising->start();
   hid->setBatteryLevel(batteryLevel);
@@ -531,10 +485,7 @@ void BleKeyboard::sendReport(KeyReport* keys)
   {
     this->inputKeyboard->setValue((uint8_t*)keys, sizeof(KeyReport));
     this->inputKeyboard->notify();
-#if defined(USE_NIMBLE)        
-    // vTaskDelay(delayTicks);
     this->delay_ms(_delay_ms);
-#endif // USE_NIMBLE
   }	
 }
 
@@ -545,10 +496,7 @@ void BleKeyboard::sendReport(MediaKeyReport* keys)
   {
     this->inputMediaKeys->setValue((uint8_t*)keys, sizeof(MediaKeyReport));
     this->inputMediaKeys->notify();
-#if defined(USE_NIMBLE)        
-    //vTaskDelay(delayTicks);
     this->delay_ms(_delay_ms);
-#endif // USE_NIMBLE
   }	
 }
 
@@ -759,10 +707,7 @@ void BleKeyboard::wheel(signed char wheel, signed char hWheel)
 		m[4] = hWheel;
 		this->inputMouse->setValue(m, 5);
 		this->inputMouse->notify();
-#if defined(USE_NIMBLE)
-		// vTaskDelay(delayTicks);
 		this->delay_ms(_delay_ms);
-#endif // USE_NIMBLE
 	}
 }
 
@@ -841,43 +786,10 @@ bool BleKeyboard::isPressedButton(uint8_t b) {
   return false;	
 }
 
-//void BleKeyboard::onConnect(BLEServer* pServer) {
-void BleKeyboard::onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) {
-  //this->connected = true;
+//void BleKeyboard::onConnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo) {}
 
-#if !defined(USE_NIMBLE)
-
-  BLE2902 *desc = (BLE2902 *)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-  desc = (BLE2902 *)this->inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-  desc = (BLE2902 *)this->inputMouse->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-  desc = (BLE2902 *)this->inputGamepad->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(true);
-
-#endif // !USE_NIMBLE
-
-}
-
-//void BleKeyboard::onDisconnect(BLEServer* pServer) {
 void BleKeyboard::onDisconnect(NimBLEServer *pServer, NimBLEConnInfo& connInfo, int reason) {
   this->connected = false;
-
-#if !defined(USE_NIMBLE)
-
-  BLE2902 *desc = (BLE2902 *)this->inputKeyboard->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-  desc = (BLE2902 *)this->inputMediaKeys->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-  desc = (BLE2902 *)this->inputMouse->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-  desc = (BLE2902 *)this->inputGamepad->getDescriptorByUUID(BLEUUID((uint16_t)0x2902));
-  desc->setNotifications(false);
-
-  advertising->start();
-
-#endif // !USE_NIMBLE
 }
 
 //void BleKeyboard::onWrite(BLECharacteristic* me) {
@@ -897,10 +809,6 @@ void BleKeyboard::delay_ms(uint64_t ms) {
     while(esp_timer_get_time() < e) {}
   }
 }
-
-#ifdef USE_NIMBLE
-
-//void BleKeyboard::onAuthenticationComplete(ble_gap_conn_desc *desc) {
 void BleKeyboard::onAuthenticationComplete(NimBLEConnInfo& connInfo) {
     if (connInfo.isEncrypted()) {
         Serial.println("[INFO] Paired successfully.");
@@ -910,16 +818,10 @@ void BleKeyboard::onAuthenticationComplete(NimBLEConnInfo& connInfo) {
     }
 }
 
-void BleKeyboard::onSubscribe(
-    //NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue
-    NimBLECharacteristic * 	pCharacteristic,
-    NimBLEConnInfo & 	connInfo,
-    uint16_t 	subValue 
-) {
+void BleKeyboard::onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue ) {
     if (subValue == 0) {
         Serial.println("[INFO] Client unsubscribed from notifications/indications.");
     } else {
         Serial.println("[INFO] Client subscribed to notifications.");
     }
 }
-#endif
