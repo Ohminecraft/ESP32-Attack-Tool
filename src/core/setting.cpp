@@ -218,55 +218,122 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     }
 
     Serial.println("[INFO] Settings reset successfully.");
-    Serial.println("[INFO] Loading Config Atempt 2.");
+    Serial.println("[INFO] Loading Config Attempt 2.");
     loadSettings();
 }
 
+void ESP32ATSetting::loadSPIPinsFromJson(JsonObject &_settings) {
+    if (!_settings["spiSckPin"].isNull()) {
+        spiSckPin = _settings["spiSckPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded spiSckPin: " + String(spiSckPin));
+    }
+    if (!_settings["spiMisoPin"].isNull()) {
+        spiMisoPin = _settings["spiMisoPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded spiMisoPin: " + String(spiMisoPin));
+    }
+    if (!_settings["spiMosiPin"].isNull()) {
+        spiMosiPin = _settings["spiMosiPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded spiMosiPin: " + String(spiMosiPin));
+    }
+    if (!_settings["sdCsPin"].isNull()) {
+        sdcardCsPin = _settings["sdCsPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded sdCsPin: " + String(sdcardCsPin));
+    }
+}
+
 void ESP32ATSetting::loadSettings() {
+    Serial.println("[INFO] Loading settings...");
+
+    // Bước 1: Mount LittleFS trước
+    if (!LittleFS.begin(true)) {
+        Serial.println("[ERROR] Failed to mount LittleFS!");
+        return;
+    }
+
+    bool useLittleFS = true;
+    bool mountSD = false;
+    static bool reloadedOnce = false;
+
     SDCardSPI = &SPI;
     SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin, sdcardCsPin);
-    LittleFS.begin(true);
-    bool useLittleFS = false;
-    Serial.println("[INFO] Loading settings...");
-    if (SD.begin(sdcardCsPin, *SDCardSPI)) {
-        if (!SD.exists("/ESP32AttackTool/ESP32AttackToolconfig.json")) {
-            Serial.println("[WARN] Settings file not found, creating default settings...");
-            resetSettings(false);
+
+    if (!SD.begin(sdcardCsPin, *SDCardSPI)) {
+        Serial.println("[INFO] Failed to mount SD, open LittleFS config file to check sd pin");
+        if (LittleFS.exists("/ESP32AttackToolconfig.json")) {
+            File configfile = LittleFS.open("/ESP32AttackToolconfig.json", FILE_READ);
+            if (configfile) {
+                JsonDocument jsonDoc;
+                if (!deserializeJson(jsonDoc, configfile)) {
+                    JsonObject _settings = jsonDoc.as<JsonObject>();
+                    loadSPIPinsFromJson(_settings);
+                    SDCardSPI->end();
+                }
+                configfile.close();
+            }
+        } else {
+            Serial.println("[WARN] LittleFS config not found, will use default SPI + CS pins");
         }
+    } else {
+        mountSD = true;
+        Serial.println("[INFO] SD Card mounted");
+    }
+
+
+    if (!mountSD) {
+        SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin, sdcardCsPin);
+        if (SD.begin(sdcardCsPin, *SDCardSPI)) {
+            mountSD = true;
+            Serial.println("[INFO] SD Card Attempt 2 mounted successfully");
+        }
+    }
+    
+
+    if (mountSD) {
+        if (!SD.exists("/ESP32AttackTool/ESP32AttackToolconfig.json")) {
+            Serial.println("[WARN] SD config not found");
+            if (LittleFS.exists("/ESP32AttackToolconfig.json")) {
+                Serial.println("[INFO] Found Configuration file in LittleFS, Copy from LittleFS");
+                copyFile(LittleFS, "/ESP32AttackToolconfig.json", SD, "/ESP32AttackTool/ESP32AttackToolconfig.json");
+                if (!reloadedOnce) {
+                    reloadedOnce = true;
+                    Serial.println("[INFO] Reloading config after copy...");
+                    loadSettings();
+                    return;
+                }
+            } else {
+                Serial.println("[INFO] Creating one...");
+                resetSettings(false);
+            }
+        }
+
         if (!filesAreIdentical(SD, "/ESP32AttackTool/ESP32AttackToolconfig.json", LittleFS, "/ESP32AttackToolconfig.json")) {
             Serial.println("[WARN] Config files differ, updating LittleFS from SD");
             copyFile(SD, "/ESP32AttackTool/ESP32AttackToolconfig.json", LittleFS, "/ESP32AttackToolconfig.json");
         }
+        useLittleFS = false;
     } else {
-        Serial.println("[WARN] SD Card is not mounted, use setting in LittleFS");
-        useLittleFS = true;
-        if (!LittleFS.exists("/ESP32AttackToolconfig.json")) {
-            Serial.println("[ERROR] Settings file not found, creating default settings...");
-            resetSettings(true);
-        }
+        Serial.println("[WARN] SD not mounted, fallback to LittleFS");
     }
-    
-    File configfile;
+
+    File finalConfig;
     if (useLittleFS) {
-        configfile = LittleFS.open("/ESP32AttackToolconfig.json", FILE_READ);
+        finalConfig = LittleFS.open("/ESP32AttackToolconfig.json", FILE_READ);
     } else {
-        configfile = SD.open("/ESP32AttackTool/ESP32AttackToolconfig.json", FILE_READ);
+        finalConfig = SD.open("/ESP32AttackTool/ESP32AttackToolconfig.json", FILE_READ);
     }
 
-    if (!configfile) {
-        Serial.println("[ERROR] Failed to open config file!");
+    if (!finalConfig) {
+        Serial.println("[ERROR] Cannot open config file!");
         return;
     }
-    
+
     JsonDocument jsonDoc;
-    if (deserializeJson(jsonDoc, configfile)) {
-        Serial.println("[ERROR] Failed to read config file! using default configuration");
+    if (deserializeJson(jsonDoc, finalConfig)) {
+        Serial.println("[ERROR] Failed to parse config, resetting...");
+        resetSettings(useLittleFS);
         return;
     }
-
-    Serial.println("[INFO] Configuration:");
-
-    configfile.close();
+    finalConfig.close();
 
     JsonObject _settings = jsonDoc.as<JsonObject>();
     int failed_count = 0;
@@ -519,10 +586,7 @@ void ESP32ATSetting::loadSettings() {
 
     if (failed_count > 0) {
         Serial.println("[INFO] Found " + String(failed_count) + " missing configuation, rewrite new configuration file");
-        if (useLittleFS)
-        resetSettings(true);
-        else
-        resetSettings(false);
+        resetSettings(useLittleFS);
     }
 }
 

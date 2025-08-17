@@ -52,6 +52,7 @@ class ESP32ATSetting {
         bool autoDeepSleep = true;
         bool autoStandby = true;
 
+        void loadSPIPinsFromJson(JsonObject &_settings);
         void loadSettings();
         void saveSettings();
         void resetSettings(bool useLittleFS);

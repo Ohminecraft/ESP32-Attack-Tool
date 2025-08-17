@@ -42,18 +42,12 @@ void WiFiModules::main() {
 	esp_wifi_init(&cfg);
 	esp_wifi_set_mode(WIFI_AP_STA);
 	esp_wifi_start();
-	//WiFi.mode(WIFI_AP_STA);
 	wifi_initialized = true;
 	Serial.println("[INFO] WiFi initialized successfully");
 	esp_wifi_get_mac(WIFI_IF_AP, this->ap_mac);
+	vTaskDelay(10 / portTICK_PERIOD_MS);
 	esp_wifi_get_mac(WIFI_IF_STA, this->sta_mac);
 	this->setMac();
-	Serial.printf("[INFO] AP MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n", 
-				this->ap_mac[0], this->ap_mac[1], this->ap_mac[2],
-				this->ap_mac[3], this->ap_mac[4], this->ap_mac[5]);
-	Serial.printf("[INFO] STA MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\n",
-				this->sta_mac[0], this->sta_mac[1], this->sta_mac[2],
-				this->sta_mac[3], this->sta_mac[4], this->sta_mac[5]);
 	this->ShutdownWiFi();
 }
 
@@ -246,14 +240,6 @@ void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
 	esp_wifi_set_promiscuous(true);
 	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
 
-	//WiFi.mode(WIFI_AP);
-		
-	//esp_wifi_init(&cfg);
-	//esp_wifi_set_storage(WIFI_STORAGE_RAM);
-	//esp_wifi_set_mode(WIFI_AP_STA);
-	//esp_wifi_start();
-	//esp_wifi_set_promiscuous_filter(NULL);
-	//esp_wifi_set_promiscuous(true);
 	esp_wifi_set_max_tx_power(82);
 	this->packet_sent = 0;
 	wifi_initialized = true;
@@ -264,17 +250,17 @@ void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
 void WiFiModules::setMac() {
 	wifi_mode_t currentWiFiMode;
   	esp_wifi_get_mode(&currentWiFiMode);
-	esp_err_t result = esp_wifi_set_mac(WIFI_IF_AP, this->ap_mac);
-	if ((result != ESP_OK) &&
-      ((currentWiFiMode == WIFI_MODE_AP) || (currentWiFiMode == WIFI_MODE_NULL)))
-        Serial.printf("[WARN] Failed to set AP MAC: %s | 0x%X\n", macToString(this->ap_mac).c_str(), result);
-  	else if ((currentWiFiMode == WIFI_MODE_AP) || (currentWiFiMode == WIFI_MODE_NULL))
+	esp_err_t result_ap = esp_wifi_set_mac(WIFI_IF_AP, this->ap_mac);
+	if ((result_ap != ESP_OK) &&
+		((currentWiFiMode == WIFI_MODE_AP) || (currentWiFiMode == WIFI_MODE_APSTA) || (currentWiFiMode == WIFI_MODE_NULL)))
+        Serial.printf("[WARN] Failed to set AP MAC: %s | 0x%X\n", macToString(this->ap_mac).c_str(), result_ap);
+  	else if ((currentWiFiMode == WIFI_MODE_AP) || (currentWiFiMode == WIFI_MODE_APSTA) || (currentWiFiMode == WIFI_MODE_NULL))
     	Serial.printf("[INFO] Successfully set AP MAC: %s\n", macToString(this->ap_mac).c_str());
-	result = esp_wifi_set_mac(WIFI_IF_STA, this->sta_mac);
-	if ((result != ESP_OK) &&
-	  ((currentWiFiMode == WIFI_MODE_STA) || (currentWiFiMode == WIFI_MODE_NULL)))
-		Serial.printf("[WARN] Failed to set STA MAC: %s | 0x%X\n", macToString(this->sta_mac).c_str(), result);
-  	else if ((currentWiFiMode == WIFI_MODE_STA) || (currentWiFiMode == WIFI_MODE_NULL))
+	esp_err_t result_sta = esp_wifi_set_mac(WIFI_IF_STA, this->sta_mac);
+	if ((result_sta != ESP_OK) &&
+		((currentWiFiMode == WIFI_MODE_STA) || (currentWiFiMode == WIFI_MODE_APSTA)))
+		Serial.printf("[WARN] Failed to set STA MAC: %s | 0x%X\n", macToString(this->sta_mac).c_str(), result_sta);
+  	else if ((currentWiFiMode == WIFI_MODE_STA) || (currentWiFiMode == WIFI_MODE_APSTA))
 		Serial.printf("[INFO] Successfully set STA MAC: %s\n", macToString(this->sta_mac).c_str());
 }
 
