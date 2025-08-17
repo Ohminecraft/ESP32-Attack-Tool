@@ -74,7 +74,7 @@ class BadUSBModules {
         void mediaController(HIDInterface *&hid, MediaCommand command);
         void Keymote(HIDInterface *&hid, KeymoteCommand key);
         void tiktokScroll(HIDInterface *&hid, TikTokScrollCommand cmd);
-        void endHID(HIDInterface *&hid);
+
 };
 
 #endif

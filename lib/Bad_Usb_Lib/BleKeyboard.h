@@ -29,7 +29,8 @@
 #define BLE_KEYBOARD_MODE_KEYBOARD 1
 #define BLE_KEYBOARD_MODE_MOUSE 2
 #define BLE_KEYBOARD_MODE_GAMEPAD 3
-#define BLE_KEYBOARD_MODE_ALL 4
+#define BLE_KEYBOARD_MODE_TOUCH 4
+#define BLE_KEYBOARD_MODE_ALL 5
 
 class BleKeyboard : public NimBLEServerCallbacks, public NimBLECharacteristicCallbacks, public HIDInterface
 {
@@ -43,7 +44,9 @@ private:
   NimBLECharacteristic *inputMouse;
   NimBLECharacteristic *inputGamepad;
   NimBLECharacteristic *outputGamepad;
-
+  NimBLECharacteristic *inputTouch;
+  NimBLECharacteristic *outputTouch;
+  NimBLEServer *pServer;
   NimBLEAdvertising *advertising;
   KeyReport _keyReport;
   MediaKeyReport _mediaKeyReport;
@@ -55,8 +58,8 @@ private:
   void delay_ms(uint64_t ms);
   void buttons(const uint16_t b);
 
-  uint16_t vid = 0x05ac;
-  uint16_t pid = 0x820a;
+  uint16_t vid = 0xe502;
+  uint16_t pid = 0xa111;
   uint16_t version = 0x0210;
 
   uint16_t appearance = 0x03C1;
@@ -71,6 +74,7 @@ public:
   void setLayout(const uint8_t *layout = KeyboardLayout_en_US) { _asciimap = layout; }
   void sendReport(KeyReport* keys);
   void sendReport(MediaKeyReport* keys);
+  void sendTouch(uint16_t x, uint16_t y, bool touch);
   size_t press(uint8_t k);
   size_t press(const MediaKeyReport k);
   size_t pressMouse(const uint16_t b = MOUSE_LEFT);

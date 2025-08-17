@@ -25,7 +25,8 @@
         "ostream": "cpp",
         "ratio": "cpp",
         "type_traits": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "new": "cpp"
     },
     "git.useEditorAsCommitInput": false,
     "cmake.sourceDirectory": "C:/Users/Administrator/Desktop/ESP32-Attack-Tool/lib/AsyncTCP-esphome"
