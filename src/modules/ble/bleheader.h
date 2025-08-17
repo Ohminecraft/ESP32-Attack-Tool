@@ -63,10 +63,13 @@ enum EBLEPayloadType
     Google
 };
 
-#define ADV_MODE_NON 0
-#define ADV_MODE_DIR 1
-#define ADV_MODE_UND 2
+#define CONN_MODE_NON 0
+#define CONN_MODE_DIR 1
+#define CONN_MODE_UND 2
 
+#define DISC_MODE_NON 0
+#define DISC_MODE_LTD 1
+#define DISC_MODE_GEN 2
 
 #define BLE_SPOOFER_DEVICE_BRAND_APPLE 0
 #define BLE_SPOOFER_DEVICE_BRAND_SAMSUNG 1
@@ -365,15 +368,16 @@ int android_models_count = (sizeof(android_models) / sizeof(android_models[0]));
 
 extern bool bleScanRedraw;
 extern uint8_t spooferDeviceIndex;
-extern uint8_t spooferAdTypeIndex;
+extern uint8_t spooferConnectableModeIndex;
+extern uint8_t spooferDiscoverableModeIndex;
 
 class BLEModules {
     private:
         BLEAdvertisementData GetAdvertismentData(EBLEPayloadType type);
         void executeSwiftpair(EBLEPayloadType type, bool forspamall = false);
         void bleScan();
-        BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
-        void startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type);
+        BLEAdvertisementData selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode);
+        void startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode);
         void stopSpoofer();
         void initSpoofer();
         void initSpam();

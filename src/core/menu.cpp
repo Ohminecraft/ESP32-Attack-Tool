@@ -170,8 +170,10 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("BLE Samsung Spf", 0, 12);
 	else if (currentState == BLE_SPOOFER_GOOGLE_MENU)
 		display.displayStringwithCoordinates("BLE Google Spf", 0, 12);
-	else if (currentState == BLE_SPOOFER_AD_TYPE_MENU)
-		display.displayStringwithCoordinates("BLE AdType", 0, 12);
+	else if (currentState == BLE_SPOOFER_CONN_MODE_MENU)
+		display.displayStringwithCoordinates("BLE Conn Mode", 0, 12);
+	else if (currentState == BLE_SPOOFER_DISC_MODE_MENU)
+		display.displayStringwithCoordinates("BLE Disc Mode", 0, 12);
 	else if (currentState == BLE_EXPLOIT_ATTACK_MENU)
 		display.displayStringwithCoordinates("BLE Exploit Atk", 0, 12);
 	else if (currentState == BLE_MEDIA_MENU)
@@ -550,18 +552,32 @@ void displayGoogleSpooferMenu() {
 	menuNode(items, BLE_SPO_GOOGLE_COUNT);
 }
 
-void displayAdTypeSpooferMenu() {
+void displayConnectableModeSpooferMenu() {
 	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
-	String items[BLE_SPO_AD_TYPE_COUNT] = {
-		"Type NON",
-		"Type DIR",
-		"Type UND",
+	String items[BLE_SPO_CONN_MODE_COUNT] = {
+		"NON Mode",
+		"DIR Mode",
+		"UND Mode",
 		"< Back"
 	};
 
-	menuNode(items, BLE_SPO_AD_TYPE_COUNT);
+	menuNode(items, BLE_SPO_CONN_MODE_COUNT);
+}
+
+void displayDiscoverableModeSpooferMenu() {
+	digitalWrite(espatsettings.statusLedPin, LOW);
+	displayStatusBar();
+
+	String items[BLE_SPO_DISC_MODE_COUNT] = {
+		"NON Mode",
+		"LTD Mode",
+		"GEN Mode",
+		"< Back"
+	};
+
+	menuNode(items, BLE_SPO_DISC_MODE_COUNT);
 }
 
 void displaySpooferRunning() {
@@ -1728,8 +1744,11 @@ void navigateUp() {
 		case BLE_SPOOFER_GOOGLE_MENU:
 			displayGoogleSpooferMenu();
 			break;
-		case BLE_SPOOFER_AD_TYPE_MENU:
-			displayAdTypeSpooferMenu();
+		case BLE_SPOOFER_CONN_MODE_MENU:
+			displayConnectableModeSpooferMenu();
+			break;
+		case BLE_SPOOFER_DISC_MODE_MENU:
+			displayDiscoverableModeSpooferMenu();
 			break;
 		case BLE_EXPLOIT_ATTACK_MENU:
 			displayExploitAttackBLEMenu();
@@ -1833,8 +1852,11 @@ void navigateDown() {
 		case BLE_SPOOFER_GOOGLE_MENU:
 			displayGoogleSpooferMenu();
 			break;
-		case BLE_SPOOFER_AD_TYPE_MENU:
-			displayAdTypeSpooferMenu();
+		case BLE_SPOOFER_CONN_MODE_MENU:
+			displayConnectableModeSpooferMenu();
+			break;
+		case BLE_SPOOFER_DISC_MODE_MENU:
+			displayDiscoverableModeSpooferMenu();
 			break;
 		case BLE_EXPLOIT_ATTACK_MENU:
 			displayExploitAttackBLEMenu();
@@ -2196,10 +2218,10 @@ void selectCurrentItem() {
 				goBack();
 			} else {
 				spooferDeviceIndex = currentSelection;
-				currentState = BLE_SPOOFER_AD_TYPE_MENU;
+				currentState = BLE_SPOOFER_CONN_MODE_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_SPO_AD_TYPE_COUNT;
-				displayAdTypeSpooferMenu();
+				maxSelections = BLE_SPO_CONN_MODE_COUNT;
+				displayConnectableModeSpooferMenu();
 			}
 			break;
 		
@@ -2208,10 +2230,10 @@ void selectCurrentItem() {
 				goBack();
 			} else {
 				spooferDeviceIndex = currentSelection;
-				currentState = BLE_SPOOFER_AD_TYPE_MENU;
+				currentState = BLE_SPOOFER_CONN_MODE_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_SPO_AD_TYPE_COUNT;
-				displayAdTypeSpooferMenu();
+				maxSelections = BLE_SPO_CONN_MODE_COUNT;
+				displayConnectableModeSpooferMenu();
 			}
 			break;
 		
@@ -2220,18 +2242,29 @@ void selectCurrentItem() {
 				goBack();
 			} else {
 				spooferDeviceIndex = currentSelection;
-				currentState = BLE_SPOOFER_AD_TYPE_MENU;
+				currentState = BLE_SPOOFER_CONN_MODE_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_SPO_AD_TYPE_COUNT;
-				displayAdTypeSpooferMenu();
+				maxSelections = BLE_SPO_CONN_MODE_COUNT;
+				displayConnectableModeSpooferMenu();
 			}
 			break;
 		
-		case BLE_SPOOFER_AD_TYPE_MENU:
-			if (currentSelection == BLE_SPO_AD_TYPE_BACK) {
+		case BLE_SPOOFER_CONN_MODE_MENU:
+			if (currentSelection == BLE_SPO_CONN_MODE_BACK) {
 				goBack();
 			} else {
-				spooferAdTypeIndex = currentSelection;
+				spooferConnectableModeIndex = currentSelection;
+				currentState = BLE_SPOOFER_DISC_MODE_MENU;
+				currentSelection = 0;
+				maxSelections = BLE_SPO_DISC_MODE_COUNT;
+				displayDiscoverableModeSpooferMenu();
+			}
+			break;
+		case BLE_SPOOFER_DISC_MODE_MENU:
+			if (currentSelection == BLE_SPO_DISC_MODE_BACK) {
+				goBack();
+			} else {
+				spooferDiscoverableModeIndex = currentSelection;
 				currentState = BLE_SPOOFER_RUNNING;
 			}
 			break;
@@ -3166,7 +3199,7 @@ void goBack() {
 			bleSpooferBrandType = NONE;
 			displayMainSpooferMenu();
 			break;
-		case BLE_SPOOFER_AD_TYPE_MENU:
+		case BLE_SPOOFER_CONN_MODE_MENU:
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
 				currentState = BLE_SPOOFER_APPLE_MENU;
 				currentSelection = 0;
@@ -3189,10 +3222,35 @@ void goBack() {
 				displayGoogleSpooferMenu();
 			} 
 			break;
+			case BLE_SPOOFER_DISC_MODE_MENU:
+				spooferConnectableModeIndex = -1;
+				if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
+					currentState = BLE_SPOOFER_APPLE_MENU;
+					currentSelection = 0;
+					maxSelections = BLE_SPO_APPLE_COUNT;
+					spooferDeviceIndex = -1;
+					displayAppleSpooferMenu();
+				} 
+				else if (bleSpooferBrandType == BLE_SPO_BRAND_SAMSUNG) {
+					currentState = BLE_SPOOFER_SAMSUNG_MENU;
+					currentSelection = 0;
+					maxSelections = BLE_SPO_SAMSUNG_COUNT;
+					spooferDeviceIndex = -1;
+					displaySamsungSpooferMenu();
+				} 
+				else if (bleSpooferBrandType == BLE_SPO_BRAND_GOOGLE) {
+					currentState = BLE_SPOOFER_GOOGLE_MENU;
+					currentSelection = 0;
+					maxSelections = BLE_SPO_GOOGLE_COUNT;
+					spooferDeviceIndex = -1;
+					displayGoogleSpooferMenu();
+				} 
+				break;
 		case BLE_SPOOFER_RUNNING:
 			bleSpooferDone = false;
 			spooferDeviceIndex = -1;
-			spooferAdTypeIndex = -1;
+			spooferConnectableModeIndex = -1;
+			spooferDiscoverableModeIndex = -1;
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
 				currentState = BLE_SPOOFER_APPLE_MENU;
 				currentSelection = 0;
@@ -3859,8 +3917,11 @@ void redrawTasks() {
 		case BLE_SPOOFER_GOOGLE_MENU:
 			displayGoogleSpooferMenu();
 			break;
-		case BLE_SPOOFER_AD_TYPE_MENU:
-			displayAdTypeSpooferMenu();
+		case BLE_SPOOFER_CONN_MODE_MENU:
+			displayConnectableModeSpooferMenu();
+			break;
+		case BLE_SPOOFER_DISC_MODE_MENU:
+			displayDiscoverableModeSpooferMenu();
 			break;
 		case BLE_EXPLOIT_ATTACK_MENU:
 			displayExploitAttackBLEMenu();
