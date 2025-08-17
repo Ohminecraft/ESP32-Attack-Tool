@@ -29,8 +29,7 @@
 #define BLE_KEYBOARD_MODE_KEYBOARD 1
 #define BLE_KEYBOARD_MODE_MOUSE 2
 #define BLE_KEYBOARD_MODE_GAMEPAD 3
-#define BLE_KEYBOARD_MODE_TOUCH 4
-#define BLE_KEYBOARD_MODE_ALL 5
+#define BLE_KEYBOARD_MODE_ALL 4
 
 class BleKeyboard : public NimBLEServerCallbacks, public NimBLECharacteristicCallbacks, public HIDInterface
 {
@@ -74,7 +73,6 @@ public:
   void setLayout(const uint8_t *layout = KeyboardLayout_en_US) { _asciimap = layout; }
   void sendReport(KeyReport* keys);
   void sendReport(MediaKeyReport* keys);
-  void sendTouch(uint16_t x, uint16_t y, bool touch);
   size_t press(uint8_t k);
   size_t press(const MediaKeyReport k);
   size_t pressMouse(const uint16_t b = MOUSE_LEFT);
