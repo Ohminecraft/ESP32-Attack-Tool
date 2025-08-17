@@ -323,7 +323,7 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
         uint8_t macAddr[6];
         generateRandomMac(macAddr);
         esp_base_mac_addr_set(macAddr);
-        esp_ble_gap_set_rand_addr((uint8_t*)dummy_addr);
+        esp_ble_gap_set_rand_addr(dummy_addr);
         NimBLEDevice::init(espatsettings.bleName.c_str());
         NimBLEDevice::setPower(MAX_TX_POWER);
         NimBLEServer *pServer = BLEDevice::createServer();
