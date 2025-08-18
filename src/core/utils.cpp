@@ -14,7 +14,7 @@
 */
 
 String generateRandomName() {
-	int len = rand() % 10 + 1; // Limit length to 3-10 characters
+	int len = rand() % 10 + 1; // Limit length to 1-10 characters
 	String randomName = "";
 	
 	// Reserve memory upfront to prevent fragmentation

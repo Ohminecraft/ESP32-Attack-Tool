@@ -27,6 +27,8 @@ extern SPIClass *SDCardSPI;
 #define GET_USED_HEAP 2
 #define GET_USED_HEAP_PERCENT 3
 
+#define GET_SIZE(x) (sizeof(x) / sizeof(x[0]))
+
 uint32_t getHeap(uint8_t type);
 const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 String generateRandomName();

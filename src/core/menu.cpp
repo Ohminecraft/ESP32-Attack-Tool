@@ -168,8 +168,6 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("BLE Apple Spf", 0, 12);
 	else if (currentState == BLE_SPOOFER_SAMSUNG_MENU)
 		display.displayStringwithCoordinates("BLE Samsung Spf", 0, 12);
-	else if (currentState == BLE_SPOOFER_GOOGLE_MENU)
-		display.displayStringwithCoordinates("BLE Google Spf", 0, 12);
 	else if (currentState == BLE_SPOOFER_CONN_MODE_MENU)
 		display.displayStringwithCoordinates("BLE Conn Mode", 0, 12);
 	else if (currentState == BLE_SPOOFER_DISC_MODE_MENU)
@@ -402,7 +400,6 @@ void displayMainSpooferMenu() {
 	String items[BLE_SPOOFER_COUNT] = {
 		"Apple",
 		"Samsung",
-		"Google",
 		"< Back"
 	};
 
@@ -468,88 +465,12 @@ void displaySamsungSpooferMenu() {
 		"Silver Watch6 Cyan 44mm",
 		"Black Watch6 Classic 43m",
 		"Green Watch6 Classic 43m",
+		"Black Watch6 Golf Edition",
+		"Black Watch6 TB Edition",
 		"< Back"
 	};
 
 	menuNode(items, BLE_SPO_SAMSUNG_COUNT);
-}
-
-void displayGoogleSpooferMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
-	displayStatusBar();
-
-	String items[BLE_SPO_GOOGLE_COUNT] = {
-		"Bisto Dev Board",
-		"Arduino 101",
-		"Arduino 101 2",
-		"AntiSpoof Test",
-		"Google Gphones",
-		"Test 00000D",
-		"Android Auto",
-		"Test Android TV",
-		"Test Android TV 2",
-		"Fast Pair Headphones",
-		"LG HBS1110",
-		"Smart Controller 1",
-		"BLE Phone",
-		"Goodyear",
-		"Smart Setup",
-		"Goodyear 2",
-		"T10",
-		"ATS2833 EVB",
-		"Bose NC700",
-		"Bose QC35 II",
-		"Bose QC35 II 2",
-		"JBL Flip 6",
-		"JBL Buds Pro",
-		"JBL Live 300TWS",
-		"JBL Everest 110GA",
-		"Pixel Buds",
-		"Pixel Buds 2",
-		"Sony XM5",
-		"DENON AH-C830NCW",
-		"JBL LIVE FLEX",
-		"JBL REFLECT MINI NC",
-		"Bose QC35 II Dup1",
-		"Bose QC35 II Dup2",
-		"JBL Everest 110GA 2",
-		"JBL LIVE400BT",
-		"JBL Everest 310GA",
-		"LG HBS 1500",
-		"JBL VIBE BEAM",
-		"JBL WAVE BEAM",
-		"Beoplay H4",
-		"JBL TUNE 720BT",
-		"WONDERBOOM 3",
-		"Beoplay E6",
-		"JBL LIVE220BT",
-		"Sony WI-1000X",
-		"JBL Everest 310GA 2",
-		"LG HBS 1700",
-		"SRS XB43",
-		"WI-1000XM2",
-		"Sony WF-SP700N",
-		"DENON AH-C830NCW 2",
-		"JBL TUNE125TWS",
-		"JBL LIVE770NC",
-		"JBL Everest 110GA GunMetal",
-		"LG HBS 835",
-		"LG HBS 2000",
-		"Flipper Zero",
-		"Free Robux",
-		"Free VBucks",
-		"Rickroll",
-		"Animated Rickroll",
-		"BLM",
-		"Talking Sasquach",
-		"Obama",
-		"Ryanair",
-		"FBI",
-		"Tesla",
-		"Ton Upgrade Netflix",
-		"< Back"
-	};
-	menuNode(items, BLE_SPO_GOOGLE_COUNT);
 }
 
 void displayConnectableModeSpooferMenu() {
@@ -593,9 +514,11 @@ void displayExploitAttackBLEMenu() {
 	String items[BLE_ATK_MENU_COUNT] = {
 		"Sour Apple",
 		"Apple Juice",
+		"Apple AirDrop",
 		"Swiftpair MS", 
 		"Samsung Spam",
 		"Google Spam",
+		"Name Flood",
 		"Spam All",
 		"< Back"
 	};
@@ -1179,6 +1102,9 @@ void displayAttackStatus() {
 			case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
 				attackName = "Apple Juice";
 				break;
+			case BLE_ATTACK_EXPLOIT_APPLE_AIRDROP:
+				attackName = "Apple Airdrop";
+				break;
 			case BLE_ATTACK_EXPLOIT_MICROSOFT:
 				attackName = "Swiftpair MS";
 				break;
@@ -1187,6 +1113,9 @@ void displayAttackStatus() {
 				break;
 			case BLE_ATTACK_EXPLOIT_GOOGLE:
 				attackName = "Google Spam";
+				break;
+			case BLE_ATTACK_EXPLOIT_NAME_FLOOD:
+				attackName = "Name Flood";
 				break;
 			case BLE_ATTACK_EXPLOIT_SPAM_ALL:
 				attackName = "Spam All";
@@ -1378,9 +1307,11 @@ void startBLEAttack(BLEScanState attackType) {
 	String strmode = "";
 	if (attackType == BLE_ATTACK_EXPLOIT_SOUR_APPLE) strmode = "Sour Apple";
 	else if (attackType == BLE_ATTACK_EXPLOIT_APPLE_JUICE) strmode = "Apple Juice";
+	else if (attackType == BLE_ATTACK_EXPLOIT_APPLE_AIRDROP) strmode = "Apple Airdrop";
 	else if (attackType == BLE_ATTACK_EXPLOIT_MICROSOFT) strmode = "Swiftpair";
 	else if (attackType == BLE_ATTACK_EXPLOIT_GOOGLE) strmode = "Android (Google)";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SAMSUNG) strmode = "Samsung";
+	else if (attackType == BLE_ATTACK_EXPLOIT_NAME_FLOOD) strmode = "NameFlood";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SPAM_ALL) strmode = "Spam All";
 	Serial.println("[INFO] Starting BLE attack: " + strmode);
 	
@@ -1741,9 +1672,6 @@ void navigateUp() {
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			displaySamsungSpooferMenu();
 			break;
-		case BLE_SPOOFER_GOOGLE_MENU:
-			displayGoogleSpooferMenu();
-			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			displayConnectableModeSpooferMenu();
 			break;
@@ -1848,9 +1776,6 @@ void navigateDown() {
 			break;
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			displaySamsungSpooferMenu();
-			break;
-		case BLE_SPOOFER_GOOGLE_MENU:
-			displayGoogleSpooferMenu();
 			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			displayConnectableModeSpooferMenu();
@@ -2203,12 +2128,6 @@ void selectCurrentItem() {
 					bleSpooferBrandType = BLE_SPO_BRAND_SAMSUNG;
 					displaySamsungSpooferMenu();
 		
-				} else if (currentSelection == BLE_SPOOFER_GOOGLE) {
-					currentState = BLE_SPOOFER_GOOGLE_MENU;
-					currentSelection = 0;
-					maxSelections = BLE_SPO_GOOGLE_COUNT;
-					bleSpooferBrandType = BLE_SPO_BRAND_GOOGLE;
-					displayGoogleSpooferMenu();
 				}
 			}
 			break;
@@ -2227,18 +2146,6 @@ void selectCurrentItem() {
 		
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			if (currentSelection == BLE_SPO_SAMSUNG_BACK) {
-				goBack();
-			} else {
-				spooferDeviceIndex = currentSelection;
-				currentState = BLE_SPOOFER_CONN_MODE_MENU;
-				currentSelection = 0;
-				maxSelections = BLE_SPO_CONN_MODE_COUNT;
-				displayConnectableModeSpooferMenu();
-			}
-			break;
-		
-		case BLE_SPOOFER_GOOGLE_MENU:
-			if (currentSelection == BLE_SPO_GOOGLE_BACK) {
 				goBack();
 			} else {
 				spooferDeviceIndex = currentSelection;
@@ -2287,8 +2194,8 @@ void selectCurrentItem() {
 				need_restart = true;
 				
 				// Start BLE attack
-				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
-									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_SPAM_ALL};
+				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_APPLE_AIRDROP, BLE_ATTACK_EXPLOIT_MICROSOFT, 
+									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_NAME_FLOOD, BLE_ATTACK_EXPLOIT_SPAM_ALL};
 				startBLEAttack(attackTypes[currentSelection]);
 				}
 			break;
@@ -3192,13 +3099,6 @@ void goBack() {
 			bleSpooferBrandType = NONE;
 			displayMainSpooferMenu();
 			break;
-		case BLE_SPOOFER_GOOGLE_MENU:
-			currentState = BLE_SPOOFER_MAIN_MENU;
-			currentSelection = 0;
-			maxSelections = BLE_SPOOFER_COUNT;
-			bleSpooferBrandType = NONE;
-			displayMainSpooferMenu();
-			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
 				currentState = BLE_SPOOFER_APPLE_MENU;
@@ -3213,13 +3113,6 @@ void goBack() {
 				maxSelections = BLE_SPO_SAMSUNG_COUNT;
 				spooferDeviceIndex = -1;
 				displaySamsungSpooferMenu();
-			} 
-			else if (bleSpooferBrandType == BLE_SPO_BRAND_GOOGLE) {
-				currentState = BLE_SPOOFER_GOOGLE_MENU;
-				currentSelection = 0;
-				maxSelections = BLE_SPO_GOOGLE_COUNT;
-				spooferDeviceIndex = -1;
-				displayGoogleSpooferMenu();
 			} 
 			break;
 			case BLE_SPOOFER_DISC_MODE_MENU:
@@ -3238,13 +3131,6 @@ void goBack() {
 					spooferDeviceIndex = -1;
 					displaySamsungSpooferMenu();
 				} 
-				else if (bleSpooferBrandType == BLE_SPO_BRAND_GOOGLE) {
-					currentState = BLE_SPOOFER_GOOGLE_MENU;
-					currentSelection = 0;
-					maxSelections = BLE_SPO_GOOGLE_COUNT;
-					spooferDeviceIndex = -1;
-					displayGoogleSpooferMenu();
-				} 
 				break;
 		case BLE_SPOOFER_RUNNING:
 			bleSpooferDone = false;
@@ -3262,12 +3148,6 @@ void goBack() {
 				currentSelection = 0;
 				maxSelections = BLE_SPO_SAMSUNG_COUNT;
 				displaySamsungSpooferMenu();
-			} 
-			else if (bleSpooferBrandType == BLE_SPO_BRAND_GOOGLE) {
-				currentState = BLE_SPOOFER_GOOGLE_MENU;
-				currentSelection = 0;
-				maxSelections = BLE_SPO_GOOGLE_COUNT;
-				displayGoogleSpooferMenu();
 			}
 			ble.StartMode(BLE_ATTACK_SPOOFER_STOP);
 			break;
@@ -3766,8 +3646,6 @@ void handleTasks(MenuState handle_state) {
 				ble.StartMode(BLE_ATTACK_SPOOFER_APPLE);
 			else if (bleSpooferBrandType == BLE_SPO_BRAND_SAMSUNG)
 				ble.StartMode(BLE_ATTACK_SPOOFER_SAMSUNG);
-			else if (bleSpooferBrandType == BLE_SPO_BRAND_GOOGLE)
-				ble.StartMode(BLE_ATTACK_SPOOFER_GOOGLE);
 			displaySpooferRunning();
 			bleSpooferDone = true;
 		}
@@ -3913,9 +3791,6 @@ void redrawTasks() {
 			break;
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			displaySamsungSpooferMenu();
-			break;
-		case BLE_SPOOFER_GOOGLE_MENU:
-			displayGoogleSpooferMenu();
 			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			displayConnectableModeSpooferMenu();
