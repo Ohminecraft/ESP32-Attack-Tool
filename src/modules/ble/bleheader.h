@@ -911,7 +911,9 @@ static const struct {
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 extern bool bleScanRedraw;
+extern bool samsungbuds;
 extern uint8_t spooferDeviceIndex;
+extern uint8_t spooferAppleDeviceColor;
 extern uint8_t spooferConnectableModeIndex;
 extern uint8_t spooferDiscoverableModeIndex;
 

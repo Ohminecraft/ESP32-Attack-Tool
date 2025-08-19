@@ -166,8 +166,14 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("BLE Spoofer", 0, 12);
 	else if (currentState == BLE_SPOOFER_APPLE_MENU)
 		display.displayStringwithCoordinates("BLE Apple Spf", 0, 12);
+	else if (currentState == BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU)
+		display.displayStringwithCoordinates("Color Select", 0, 12);
 	else if (currentState == BLE_SPOOFER_SAMSUNG_MENU)
-		display.displayStringwithCoordinates("BLE Samsung Spf", 0, 12);
+		display.displayStringwithCoordinates("BLE Sam Spoof", 0, 12);
+	else if (currentState == BLE_SPOOFER_SAMSUNG_BUDS_MENU)
+		display.displayStringwithCoordinates("Buds Select", 0, 12);
+	else if (currentState == BLE_SPOOFER_SAMSUNG_WATCHS_MENU)
+		display.displayStringwithCoordinates("Watch Select", 0, 12);
 	else if (currentState == BLE_SPOOFER_CONN_MODE_MENU)
 		display.displayStringwithCoordinates("BLE Conn Mode", 0, 12);
 	else if (currentState == BLE_SPOOFER_DISC_MODE_MENU)
@@ -410,28 +416,26 @@ void displayAppleSpooferMenu() {
 	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
-	String items[BLE_SPO_APPLE_COUNT] = {
-		"Airpods",
-		"Airpods Pro",
-		"Airpods Max",
-		"Airpods Gen 2",
-		"Airpods Gen 3",
-		"Airpods Pro Gen 2",
-		"PowerBeats",
-		"PowerBeats Pro",
-		"Beats Solo Pro",
-		"Beats Studio Buds",
-		"Beats Flex",
-		"Beats X",
-		"Beats Solo 3",
-		"Beats Studio 3",
-		"Beats Studio Pro",
-		"Beats Fit Pro",
-		"Beats Studio Buds+",
-		"< Back"
-	};
+	String items[GET_SIZE(pp_models) + 1];// + back option
+	for(int i = 0; i < GET_SIZE(pp_models); i++) {
+		items[i] = pp_models[i].name;
+	}
+	items[GET_SIZE(pp_models)] = "< Back";
 
-	menuNode(items, BLE_SPO_APPLE_COUNT);
+	menuNode(items, GET_SIZE(pp_models) + 1);
+}
+
+void displayAppleDeviceColorSpooferMenu() {
+	digitalWrite(espatsettings.statusLedPin, LOW);
+	displayStatusBar();
+
+	String items[pp_models[spooferDeviceIndex].colors_count + 1];// + back option
+	for(int i = 0; i < pp_models[spooferDeviceIndex].colors_count; i++) {
+		items[i] = pp_models[spooferDeviceIndex].colors[i].name;
+	}
+	items[pp_models[spooferDeviceIndex].colors_count] = "< Back";
+
+	menuNode(items, pp_models[spooferDeviceIndex].colors_count + 1);
 }
 
 void displaySamsungSpooferMenu() {
@@ -439,38 +443,38 @@ void displaySamsungSpooferMenu() {
 	displayStatusBar();
 
 	String items[BLE_SPO_SAMSUNG_COUNT] = {
-		"Fallback Watch",
-		"White Watch4 Classic 44m",
-		"Black Watch4 Classic 40m",
-		"White Watch4 Classic 40m",
-		"Black Watch4 44m",
-		"Silver Watch4 44m",
-		"Green Watch4 44m",
-		"Black Watch4 40m",
-		"White Watch4 40m",
-		"Gold Watch4 40m",
-		"French Watch4",
-		"French Watch4 Classic",
-		"Fox Watch5 44mm",
-		"Black Watch5 44mm",
-		"Sapphire Watch5 44mm",
-		"Purpleish Watch5 40mm",
-		"Gold Watch5 40mm",
-		"Black Watch5 Pro 45mm",
-		"Gray Watch5 Pro 45mm",
-		"White Watch5 44mm",
-		"White Black Watch5",
-		"Black Watch6 Pink 40mm",
-		"Gold Watch6 Gold 40mm",
-		"Silver Watch6 Cyan 44mm",
-		"Black Watch6 Classic 43m",
-		"Green Watch6 Classic 43m",
-		"Black Watch6 Golf Edition",
-		"Black Watch6 TB Edition",
+		"Buds",
+		"Watchs",
 		"< Back"
 	};
 
 	menuNode(items, BLE_SPO_SAMSUNG_COUNT);
+}
+
+void displaySamsungBudsDeviceMenu() {
+	digitalWrite(espatsettings.statusLedPin, LOW);
+	displayStatusBar();
+
+	String items[GET_SIZE(buds_models) + 1];// + back option
+	for(int i = 0; i < GET_SIZE(buds_models); i++) {
+		items[i] = buds_models[i].name;
+	}
+	items[GET_SIZE(buds_models)] = "< Back";
+
+	menuNode(items, GET_SIZE(buds_models) + 1);
+}
+
+void displaySamsungWatchsDeviceMenu() {
+	digitalWrite(espatsettings.statusLedPin, LOW);
+	displayStatusBar();
+
+	String items[GET_SIZE(watch_models) + 1];// + back option
+	for(int i = 0; i < GET_SIZE(watch_models); i++) {
+		items[i] = watch_models[i].name;
+	}
+	items[GET_SIZE(watch_models)] = "< Back";
+
+	menuNode(items, GET_SIZE(watch_models) + 1);
 }
 
 void displayConnectableModeSpooferMenu() {
@@ -1669,8 +1673,17 @@ void navigateUp() {
 		case BLE_SPOOFER_APPLE_MENU:
 			displayAppleSpooferMenu();
 			break;
+		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
+			displayAppleDeviceColorSpooferMenu();
+			break;
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			displaySamsungSpooferMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
+			displaySamsungBudsDeviceMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
+			displaySamsungWatchsDeviceMenu();
 			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			displayConnectableModeSpooferMenu();
@@ -1774,8 +1787,17 @@ void navigateDown() {
 		case BLE_SPOOFER_APPLE_MENU:
 			displayAppleSpooferMenu();
 			break;
+		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
+			displayAppleDeviceColorSpooferMenu();
+			break;
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			displaySamsungSpooferMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
+			displaySamsungBudsDeviceMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
+			displaySamsungWatchsDeviceMenu();
 			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			displayConnectableModeSpooferMenu();
@@ -2117,7 +2139,7 @@ void selectCurrentItem() {
 				if (currentSelection == BLE_SPOOFER_APPLE) {
 					currentState = BLE_SPOOFER_APPLE_MENU;
 					currentSelection = 0;
-					maxSelections = BLE_SPO_APPLE_COUNT;
+					maxSelections = GET_SIZE(pp_models) + 1;
 					bleSpooferBrandType = BLE_SPO_BRAND_APPLE;
 					displayAppleSpooferMenu();
 					
@@ -2133,21 +2155,57 @@ void selectCurrentItem() {
 			break;
 
 		case BLE_SPOOFER_APPLE_MENU:
-			if (currentSelection == BLE_SPO_APPLE_BACK) {
+			if (currentSelection == GET_SIZE(pp_models)) {
 				goBack();
 			} else {
 				spooferDeviceIndex = currentSelection;
+				if (espatsettings.useAppleJuicePaired) {
+					currentState = BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU;
+					currentSelection = 0;
+					maxSelections = pp_models[spooferDeviceIndex].colors_count + 1;
+					displayAppleDeviceColorSpooferMenu();
+				} else {
+					currentState = BLE_SPOOFER_CONN_MODE_MENU;
+					currentSelection = 0;
+					maxSelections = BLE_SPO_CONN_MODE_COUNT;
+					displayConnectableModeSpooferMenu();
+				}
+			}
+			break;
+		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
+			if (currentSelection == pp_models[spooferDeviceIndex].colors_count) {
+				goBack();
+			} else {
+				spooferAppleDeviceColor = currentSelection;
 				currentState = BLE_SPOOFER_CONN_MODE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_CONN_MODE_COUNT;
 				displayConnectableModeSpooferMenu();
 			}
 			break;
-		
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			if (currentSelection == BLE_SPO_SAMSUNG_BACK) {
 				goBack();
 			} else {
+				if (currentSelection == BLE_SPO_SAMSUNG_BUDS) {
+					samsungbuds = true;
+					currentState = BLE_SPOOFER_SAMSUNG_BUDS_MENU;
+					currentSelection = 0;
+					maxSelections = GET_SIZE(buds_models) + 1;
+					displaySamsungBudsDeviceMenu();
+				}
+				else if (currentSelection == BLE_SPO_SAMSUNG_WATCH) {
+					currentState = BLE_SPOOFER_SAMSUNG_WATCHS_MENU;
+					currentSelection = 0;
+					maxSelections = GET_SIZE(watch_models) + 1;
+					displaySamsungWatchsDeviceMenu();
+				}
+			}
+			break;
+		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
+			if (currentSelection == GET_SIZE(buds_models)) {
+				goBack();
+			} else {
 				spooferDeviceIndex = currentSelection;
 				currentState = BLE_SPOOFER_CONN_MODE_MENU;
 				currentSelection = 0;
@@ -2155,7 +2213,17 @@ void selectCurrentItem() {
 				displayConnectableModeSpooferMenu();
 			}
 			break;
-		
+		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
+			if (currentSelection == GET_SIZE(watch_models)) {
+				goBack();
+			} else {
+				spooferDeviceIndex = currentSelection;
+				currentState = BLE_SPOOFER_CONN_MODE_MENU;
+				currentSelection = 0;
+				maxSelections = BLE_SPO_CONN_MODE_COUNT;
+				displayConnectableModeSpooferMenu();
+			}
+			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			if (currentSelection == BLE_SPO_CONN_MODE_BACK) {
 				goBack();
@@ -3092,6 +3160,13 @@ void goBack() {
 			bleSpooferBrandType = NONE;
 			displayMainSpooferMenu();
 			break;
+		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
+			currentState = BLE_SPOOFER_APPLE_MENU;
+			currentSelection = 0;
+			maxSelections = GET_SIZE(pp_models) + 1;
+			spooferDeviceIndex = -1;
+			displayAppleSpooferMenu();
+			break;
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			currentState = BLE_SPOOFER_MAIN_MENU;
 			currentSelection = 0;
@@ -3099,18 +3174,35 @@ void goBack() {
 			bleSpooferBrandType = NONE;
 			displayMainSpooferMenu();
 			break;
+		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
+			samsungbuds = false;
+			currentState = BLE_SPOOFER_SAMSUNG_MENU;
+			currentSelection = 0;
+			maxSelections = BLE_SPO_SAMSUNG_COUNT;
+			spooferDeviceIndex = -1;
+			displaySamsungSpooferMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
+			currentState = BLE_SPOOFER_SAMSUNG_MENU;
+			currentSelection = 0;
+			maxSelections = BLE_SPO_SAMSUNG_COUNT;
+			spooferDeviceIndex = -1;
+			displaySamsungSpooferMenu();
+			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
 				currentState = BLE_SPOOFER_APPLE_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_SPO_APPLE_COUNT;
+				maxSelections = GET_SIZE(pp_models) + 1;
 				spooferDeviceIndex = -1;
+				spooferAppleDeviceColor = -1;
 				displayAppleSpooferMenu();
 			} 
 			else if (bleSpooferBrandType == BLE_SPO_BRAND_SAMSUNG) {
 				currentState = BLE_SPOOFER_SAMSUNG_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_SPO_SAMSUNG_COUNT;
+				samsungbuds = false;
 				spooferDeviceIndex = -1;
 				displaySamsungSpooferMenu();
 			} 
@@ -3120,27 +3212,31 @@ void goBack() {
 				if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
 					currentState = BLE_SPOOFER_APPLE_MENU;
 					currentSelection = 0;
-					maxSelections = BLE_SPO_APPLE_COUNT;
+					maxSelections = GET_SIZE(pp_models) + 1;
 					spooferDeviceIndex = -1;
+					spooferAppleDeviceColor = -1;
 					displayAppleSpooferMenu();
 				} 
 				else if (bleSpooferBrandType == BLE_SPO_BRAND_SAMSUNG) {
 					currentState = BLE_SPOOFER_SAMSUNG_MENU;
 					currentSelection = 0;
 					maxSelections = BLE_SPO_SAMSUNG_COUNT;
+					samsungbuds = false;
 					spooferDeviceIndex = -1;
 					displaySamsungSpooferMenu();
 				} 
 				break;
 		case BLE_SPOOFER_RUNNING:
 			bleSpooferDone = false;
+			samsungbuds = false;
 			spooferDeviceIndex = -1;
+			spooferAppleDeviceColor = -1;
 			spooferConnectableModeIndex = -1;
 			spooferDiscoverableModeIndex = -1;
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE) {
 				currentState = BLE_SPOOFER_APPLE_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_SPO_APPLE_COUNT;
+				maxSelections = GET_SIZE(pp_models) + 1;
 				displayAppleSpooferMenu();
 			} 
 			else if (bleSpooferBrandType == BLE_SPO_BRAND_SAMSUNG) {
@@ -3665,6 +3761,9 @@ void handleTasks(MenuState handle_state) {
 				case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_JUICE);
 					break;
+				case BLE_ATTACK_EXPLOIT_APPLE_AIRDROP:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_AIRDROP);
+					break;
 				case BLE_ATTACK_EXPLOIT_MICROSOFT:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_MICROSOFT);
 					break;
@@ -3673,6 +3772,9 @@ void handleTasks(MenuState handle_state) {
 					break;
 				case BLE_ATTACK_EXPLOIT_GOOGLE:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_GOOGLE);
+					break;
+				case BLE_ATTACK_EXPLOIT_NAME_FLOOD:
+					ble.StartMode(BLE_ATTACK_EXPLOIT_NAME_FLOOD);
 					break;
 				case BLE_ATTACK_EXPLOIT_SPAM_ALL:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_SPAM_ALL);
