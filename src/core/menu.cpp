@@ -103,8 +103,6 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 }
 
 void connectWiFi(void *pvParameters) {
-	if (WiFi.status() == WL_CONNECTED) return;
-
 	wifi.StartMode(WIFI_SCAN_AP); // using new style (marauder style) to scan wifi because old scan too stupid
 	while (wifi.set_channel < 15) {
 		wifi.set_channel++;
@@ -113,27 +111,32 @@ void connectWiFi(void *pvParameters) {
 	}
 	wifi.set_channel = 1;
 	wifi.StartMode(WIFI_SCAN_OFF);
+	WiFi.disconnect(true);
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+	WiFi.mode(WIFI_MODE_STA);
+	wifi.setMac();
 
 	for (int i = 0; i < access_points->size(); i++) {
-        String ssid = access_points->get(i).essid;
-        String pwd = espatsettings.getApPassword(ssid);
-        if (pwd == "") continue;
-
-        WiFi.begin(ssid, pwd);
-        for (int i = 0; i < 50; i++) {
-            if (WiFi.status() == WL_CONNECTED) {
+		String ssid = access_points->get(i).essid;
+		String pwd = espatsettings.getApPassword(ssid);
+		if (pwd == "") continue;
+		Serial.println("[INFO] Connecting to '" + ssid + "' WiFi, " +  "PWD: " + pwd);
+		WiFi.begin(ssid.c_str(), pwd.c_str());
+		int count = 0;
+		for (int j = 0; j < 20; j++) {
+			if (WiFi.status() == WL_CONNECTED) {
+				Serial.println("[INFO] Successfully connected '" + ssid + "' WiFi");
+				wifi_connected = true;
 				wifi_initialized = true;
-                wifi_connected = true;
-				Serial.println("[INFO] Connected WiFi successfully!");
-                break;
-            }
-            vTaskDelay(100 / portTICK_RATE_MS);
-        }
+				break;
+			}
+			delay(500);
+		}
     }
-	vTaskDelay(500 / portTICK_RATE_MS);
+	delay(500);
 	access_points->clear();
 	timeClock.main();
-	vTaskDelay(1000 / portTICK_RATE_MS);
+	delay(1000);
 	wifi.StartMode(WIFI_SCAN_OFF);
 	wifi_connected = false;
     vTaskDelete(NULL);
@@ -2050,6 +2053,8 @@ void selectCurrentItem() {
 					currentState = BLE_SCAN_RUNNING;
 					displayBLEScanMenu();
 				} else if (currentSelection == BLE_BADUSB) {
+					display.clearScreen();
+					displayStatusBar();
 					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
