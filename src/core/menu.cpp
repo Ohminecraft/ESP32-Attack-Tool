@@ -24,17 +24,81 @@ IRReadModules irrx;
 SDCardModules sdcard;
 TimeClock timeClock;
 
+void handleInputs() {
+	static unsigned long debounceTime = 0;
+    if (millis() - debounceTime < 50) return; // debounce 50ms
+
+    if (espatsettings.usingEncoder) {
+        static int lastDir = 0;
+        int encoderDir = (int)encoder->getDirection();
+
+        if (encoderDir > 0 && lastDir != -1) {
+            prevPress = true;
+            anykeyPress = true;
+            lastDir = -1;
+            debounceTime = millis();
+        }
+        else if (encoderDir < 0 && lastDir != 1) {
+            nextPress = true;
+            anykeyPress = true;
+            lastDir = 1;
+            debounceTime = millis();
+        }
+        else if (encoderDir == 0) {
+            lastDir = 0;
+        }
+
+        static bool prevSel = HIGH;
+        bool selNow = digitalRead(SEL_BTN);
+        if (prevSel == HIGH && selNow == LOW) {
+            selPress = true;
+            anykeyPress = true;
+            debounceTime = millis();
+        }
+        prevSel = selNow;
+
+    } else {
+        static bool prevLeft = HIGH;
+        static bool prevRight = HIGH;
+        static bool prevSel = HIGH;
+
+        bool leftNow  = digitalRead(espatsettings.leftBtnPin);
+        bool rightNow = digitalRead(espatsettings.rightBtnPin);
+        bool selNow   = digitalRead(espatsettings.selectBtnPin);
+
+        if (prevLeft == HIGH && leftNow == LOW) {
+            prevPress = true;
+            anykeyPress = true;
+            debounceTime = millis();
+        }
+        if (prevRight == HIGH && rightNow == LOW) {
+            nextPress = true;
+            anykeyPress = true;
+            debounceTime = millis();
+        }
+        if (prevSel == HIGH && selNow == LOW) {
+            selPress = true;
+            anykeyPress = true;
+            debounceTime = millis();
+        }
+
+        prevLeft = leftNow;
+        prevRight = rightNow;
+        prevSel = selNow;
+    }
+	
+}
 
 // https://github.com/pr3y/Bruce/blob/main/src/main.cpp
 void __attribute__((weak)) taskHandleInput(void *parameter) {
 	auto timer = millis();
-	auto timer2 = millis();
 	while (true) {
-		if (millis() - timer > 50) {
+		if (!anykeyPress || millis() - timer > 20) {
 			handleInputs();
 			timer = millis();
+			anykeyPress = false;
 		}
-		vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(10));
 	}
 }
 
@@ -58,6 +122,7 @@ void connectWiFi(void *pvParameters) {
         WiFi.begin(ssid, pwd);
         for (int i = 0; i < 50; i++) {
             if (WiFi.status() == WL_CONNECTED) {
+				wifi_initialized = true;
                 wifi_connected = true;
 				Serial.println("[INFO] Connected WiFi successfully!");
                 break;
@@ -68,8 +133,9 @@ void connectWiFi(void *pvParameters) {
 	vTaskDelay(500 / portTICK_RATE_MS);
 	access_points->clear();
 	timeClock.main();
-	vTaskDelay(500 / portTICK_RATE_MS);
-	WiFi.disconnect();
+	vTaskDelay(1000 / portTICK_RATE_MS);
+	wifi.StartMode(WIFI_SCAN_OFF);
+	wifi_connected = false;
     vTaskDelete(NULL);
     return;
 }
@@ -700,7 +766,7 @@ void displayWiFiSelectMenu() {
 		"Scan First!"
 	};
 
-	menuNode(items, sizeof(items) / sizeof(items[0]), "APs: ", errorText, access_points->size());
+	menuNode(items, GET_SIZE(items), "APs: ", errorText, access_points->size());
 }
 
 void displayWiFiSelectProbeReqSsidsMenu() {
@@ -726,7 +792,7 @@ void displayWiFiSelectProbeReqSsidsMenu() {
 		"Scan First!"
 	};
 
-	menuNode(items, sizeof(items) / sizeof(items[0]), "Ssids: ", errorText, probe_req_ssids->size());
+	menuNode(items, GET_SIZE(items), "Ssids: ", errorText, probe_req_ssids->size());
 }
 
 void displayWiFiSelectAptoSta() {
@@ -775,7 +841,7 @@ void displayWiFiSelectStaInAp() {
 		"Scan First!"
 	};
 
-	menuNode(items, sizeof(items) / sizeof(items[0]), "STA in AP: ", errorText, ap.stations->size());
+	menuNode(items, GET_SIZE(items), "STA in AP: ", errorText, ap.stations->size());
 }
 
 void displayWiFiAttackMenu() {
@@ -1010,7 +1076,7 @@ void displayIrCodeDataInFile() {
 		"Scan First!"
 	};
 
-	menuNode(items, sizeof(items) / sizeof(items[0]), "Codes: ", errorText, ir_codes->size());
+	menuNode(items, GET_SIZE(items), "Codes: ", errorText, ir_codes->size());
 }
 
 void displayIRTvBGoneRegionMenu() {
@@ -1070,7 +1136,7 @@ void displayDeleteSDCard() {
 		"Or Smth Went Wrong!"
 	};
 
-	menuNode(items, sizeof(items) / sizeof(items[0]), "Files: ", error_text, sdcard_buffer->size());
+	menuNode(items, GET_SIZE(items), "Files: ", error_text, sdcard_buffer->size());
 }
 
 void displayBadUSBKeyboardLayout() {
@@ -2030,7 +2096,7 @@ void selectCurrentItem() {
 					}
 					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
+					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
 					if (badusb.isConnected(hid_ble)) {
 						currentState = BLE_MEDIA_MENU;
 						currentSelection = 0;
@@ -2064,7 +2130,7 @@ void selectCurrentItem() {
 					}
 					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
+					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
 					if (badusb.isConnected(hid_ble)) {
 						currentState = BLE_KEYMOTE_MENU;
 						currentSelection = 0;
@@ -2098,7 +2164,7 @@ void selectCurrentItem() {
 					}
 					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true, BLE_KEYBOARD_MODE_MOUSE);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
+					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
 					if (badusb.isConnected(hid_ble)) {
 						currentState = BLE_TT_SCROLL_MENU;
 						currentSelection = 0;
@@ -2599,6 +2665,7 @@ void selectCurrentItem() {
 					display.displayStringwithCoordinates("Select STA first", 0, 21, true);
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
 					displayWiFiAttackMenu();
+					return;
 				}
 
 				if (currentSelection == WIFI_ATK_KARMA &&
@@ -2928,7 +2995,7 @@ void selectCurrentItem() {
 				badusb.beginLayout(hid_ble, badble);
 				displayStatusBar();
 				display.displayStringwithCoordinates("Waiting Victim", 0, 24, true);
-				while (!badusb.isConnected(hid_ble) && !check(prevPress)) yield();
+				while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
 				if (badusb.isConnected(hid_ble)) {
 					display.clearScreen();
 					displayStatusBar();
@@ -2948,7 +3015,7 @@ void selectCurrentItem() {
 					display.displayStringwithCoordinates("BadUSB Launched", 0, 24);
 					display.displayStringwithCoordinates("Press SELECT to", 0, 36);
 					display.displayStringwithCoordinates("go Back", 0, 48, true);
-					while (!check(selPress)) yield();
+					while (!check(selPress)) {yield();}
 					goBack();
 				} else {
 					display.clearScreen();
@@ -3339,6 +3406,7 @@ void goBack() {
 			break;
 		case SD_DELETE_MENU:
 		if (selectforbadusb) {
+			selectforbadusb = false;
 			if (badble) {
 				badble = false;
 				currentState = BLE_MENU;
@@ -3953,6 +4021,9 @@ void redrawTasks() {
 			break;
 		case BLE_TT_SCROLL_MENU:
 			displayTikTokScrollMenu();
+			break;
+		case BADUSB_KEY_LAYOUT_MENU:
+			displayBadUSBKeyboardLayout();
 			break;
 		case IR_READ_MENU:
 			displayIRReadMenu();

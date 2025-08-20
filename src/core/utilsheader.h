@@ -46,17 +46,16 @@ uint8_t hexCharToDecimal(char c);
 extern volatile bool nextPress;
 extern volatile bool prevPress; 
 extern volatile bool selPress;
+extern volatile bool anykeyPress;
 extern bool ble_initialized;
 extern bool wifi_initialized;
 extern bool wifi_connected;
 extern bool low_memory_warning;
 
-#if defined(USING_ENCODER)
 extern RotaryEncoder *encoder;
 IRAM_ATTR void checkPosition();
-#endif
 
-void handleInputs();
+//void handleInputs();
 
 extern TaskHandle_t xHandle;
 

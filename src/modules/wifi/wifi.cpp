@@ -104,7 +104,7 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 	}
 	else if (attack_mode == WIFI_ATTACK_STA_BEACON) {
 		for (int i = 0; i < 7; i++) {
-			for (int x = 0; x < (sizeof(stable_ssid_beacon) / sizeof(char *)); x++) {
+			for (int x = 0; x < GET_SIZE(stable_ssid_beacon); x++) {
 				sendCustomESSIDBeacon(stable_ssid_beacon[x]);
 			}
 		}
@@ -112,7 +112,7 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 	else if (attack_mode == WIFI_ATTACK_RIC_BEACON) {
 		for (int i = 0; i < 7; i++)
 		{
-			for (int x = 0; x < (sizeof(rick_roll)/sizeof(char *)); x++)
+			for (int x = 0; x < GET_SIZE(rick_roll); x++)
 				{
 					sendCustomESSIDBeacon(rick_roll[x]);
 				}

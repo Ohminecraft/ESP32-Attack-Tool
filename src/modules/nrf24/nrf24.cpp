@@ -167,56 +167,56 @@ void NRF24Modules::jammerNRFRadioSetup() {
 void NRF24Modules::jammerNRFRadioMain(NRFJammerMode mode) {
     if (mode == Wifi) {
         //if (jammer_chan_hop >= (sizeof(WiFi_channels) / sizeof(WiFi_channels[0]))) jammer_chan_hop = 0;
-        for (int i = 0; i < sizeof(WiFi_channels) / sizeof(WiFi_channels[0]); i++) { // This way is more effective than using jammer_chan_hop
+        for (int i = 0; i < GET_SIZE(WiFi_channels); i++) { // This way is more effective than using jammer_chan_hop
             NRFRadio.setChannel(WiFi_channels[i]);
         }
         //NRFRadio.setChannel(WiFi_channels[jammer_chan_hop]);
     } else if (mode == BLE) {
         //if (jammer_chan_hop >= (sizeof(ble_channels) / sizeof(ble_channels[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(ble_channels[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(ble_channels) / sizeof(ble_channels[0]); i++) {
+        for (int i = 0; i < GET_SIZE(ble_channels); i++) {
             NRFRadio.setChannel(ble_channels[i]);
         }
     } else if (mode == Bluetooth) {
         //if (jammer_chan_hop >= (sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(bluetooth_channels[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]); i++) {
+        for (int i = 0; i < GET_SIZE(bluetooth_channels); i++) {
             NRFRadio.setChannel(bluetooth_channels[i]);
         }
     } else if (mode == Zigbee) {
         //if (jammer_chan_hop >= (sizeof(zigbee_channels) / sizeof(zigbee_channels[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(zigbee_channels[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(zigbee_channels) / sizeof(zigbee_channels[0]); i++) {
+        for (int i = 0; i < GET_SIZE(zigbee_channels); i++) {
             NRFRadio.setChannel(zigbee_channels[i]);
         }
     } else if (mode == RC) {
         //if (jammer_chan_hop >= (sizeof(rc_channels) / sizeof(rc_channels[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(rc_channels[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(rc_channels) / sizeof(rc_channels[0]); i++) {
+        for (int i = 0; i < GET_SIZE(rc_channels); i++) {
             NRFRadio.setChannel(rc_channels[i]);
         }
     } else if (mode == Video_Transmitter) {
         //if (jammer_chan_hop >= (sizeof(videoTransmitter_channels) / sizeof(videoTransmitter_channels[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(videoTransmitter_channels[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(videoTransmitter_channels) / sizeof(videoTransmitter_channels[0]); i++) {
+        for (int i = 0; i < GET_SIZE(videoTransmitter_channels); i++) {
             NRFRadio.setChannel(videoTransmitter_channels[i]);
         }
     } else if (mode == Usb_Wireless) {
         //if (jammer_chan_hop >= (sizeof(usbWireless_channels) / sizeof(usbWireless_channels[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(usbWireless_channels[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(usbWireless_channels) / sizeof(usbWireless_channels[0]); i++) {
+        for (int i = 0; i < GET_SIZE(usbWireless_channels); i++) {
             NRFRadio.setChannel(usbWireless_channels[i]);
         }
     } else if (mode == Drone) {
         //if (jammer_chan_hop >= (sizeof(drone) / sizeof(drone[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(drone[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(drone) / sizeof(drone[0]); i++) {
+        for (int i = 0; i < GET_SIZE(drone); i++) {
             NRFRadio.setChannel(drone[i]);
         }
     } else if (mode == Full_Channel) {
         //if (jammer_chan_hop >= (sizeof(full_channels) / sizeof(full_channels[0]))) jammer_chan_hop = 0;
         //NRFRadio.setChannel(full_channels[jammer_chan_hop]);
-        for (int i = 0; i < sizeof(full_channels) / sizeof(full_channels[0]); i++) {
+        for (int i = 0; i < GET_SIZE(full_channels); i++) {
             NRFRadio.setChannel(full_channels[i]);
         }
     }
