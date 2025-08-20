@@ -125,11 +125,6 @@ void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usin
     }
 
     if (usingble) {
-        if (hid->isConnected()) {
-            hid->setLayout(layout);
-            Serial.println("[INFO] Set Layout for BadUSB (BLE) Successfully");
-            return;
-        }
         if (!hid->isConnected()) { hid->begin(layout, mode);  currentkbmode = mode;}
     } else {
         #if !defined(BOARD_ESP32_C3_MINI)
@@ -320,40 +315,21 @@ void BadUSBModules::Keymote(HIDInterface *&hid, KeymoteCommand key) {
 }
 
 void BadUSBModules::tiktokScroll(HIDInterface *&hid, TikTokScrollCommand cmd) {
-    hid->move(-100, 0);
-    if (cmd == SCROLL_DOWN) {
-        hid->pressMouse(MOUSE_LEFT);   // Giữ
-        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
-            hid->move(0, -30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(17 / portTICK_PERIOD_MS);
-        }
-        hid->releaseMouse(MOUSE_LEFT); // Thả
-        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
-            hid->move(0, 30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(17 / portTICK_PERIOD_MS);
-        }
+    if (cmd == SCROLL_DOWN) { // Finally Same Flipper Zero :) Support for IOS
+        hid->wheel(-24);
+        hid->wheel(-38);
+        hid->wheel(-24);
     }
     else if (cmd == SCROLL_UP) {
-        hid->pressMouse(MOUSE_LEFT);   // Giữ
-        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
-            hid->move(0, 30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(17 / portTICK_PERIOD_MS);
-        }
-        hid->releaseMouse(MOUSE_LEFT); // Thả
-        for (int i = 0; i < 7; i++) { // Vuốt dài hơn
-            hid->move(0, -30); // Mỗi lần dịch 30 pixel
-            vTaskDelay(17 / portTICK_PERIOD_MS);
-        }
+        hid->wheel(24);
+        hid->wheel(38);
+        hid->wheel(24);
     }
     else if (cmd == LIKE_VIDEO) {
         hid->click();
         hid->releaseMouse();
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(75 / portTICK_PERIOD_MS);
         hid->click();
+        hid->releaseMouse();
     }
-    hid->releaseMouse();
-}
-
-void BadUSBModules::endHID(HIDInterface *&hid) {
-    hid->end();
 }

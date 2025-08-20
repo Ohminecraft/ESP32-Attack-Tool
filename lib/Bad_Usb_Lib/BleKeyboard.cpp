@@ -193,44 +193,44 @@ static const uint8_t _hidReportDescriptor[] = {
 };
 
 static const uint8_t _mouseHidReportDescriptor[] = {
-  USAGE_PAGE(1),       0x01, // USAGE_PAGE (Generic Desktop)
-  USAGE(1),            0x02, // USAGE (Mouse)
-  COLLECTION(1),       0x01, // COLLECTION (Application)
-  USAGE(1),            0x01, //   USAGE (Pointer)
-  COLLECTION(1),       0x00, //   COLLECTION (Physical)
+  USAGE_PAGE(1),       0x01,        // USAGE_PAGE (Generic Desktop)
+  USAGE(1),            0x02,        // USAGE (Mouse)
+  COLLECTION(1),       0x01,        // COLLECTION (Application)
+  USAGE(1),            0x01,        //   USAGE (Pointer)
+  COLLECTION(1),       0x00,        //   COLLECTION (Physical)
   // ------------------------------------------------- Buttons (Left, Right, Middle, Back, Forward)
-  USAGE_PAGE(1),       0x09, //     USAGE_PAGE (Button)
-  USAGE_MINIMUM(1),    0x01, //     USAGE_MINIMUM (Button 1)
-  USAGE_MAXIMUM(1),    0x05, //     USAGE_MAXIMUM (Button 5)
-  LOGICAL_MINIMUM(1),  0x00, //     LOGICAL_MINIMUM (0)
-  LOGICAL_MAXIMUM(1),  0x01, //     LOGICAL_MAXIMUM (1)
-  REPORT_SIZE(1),      0x01, //     REPORT_SIZE (1)
-  REPORT_COUNT(1),     0x05, //     REPORT_COUNT (5)
-  HIDINPUT(1),         0x02, //     INPUT (Data, Variable, Absolute) ;5 button bits
+  USAGE_PAGE(1),       0x09,        //     USAGE_PAGE (Button)
+  USAGE_MINIMUM(1),    0x01,        //     USAGE_MINIMUM (Button 1)
+  USAGE_MAXIMUM(1),    0x05,        //     USAGE_MAXIMUM (Button 5)
+  LOGICAL_MINIMUM(1),  0x00,        //     LOGICAL_MINIMUM (0)
+  LOGICAL_MAXIMUM(1),  0x01,        //     LOGICAL_MAXIMUM (1)
+  REPORT_SIZE(1),      0x01,        //     REPORT_SIZE (1)
+  REPORT_COUNT(1),     0x05,        //     REPORT_COUNT (5)
+  HIDINPUT(1),         0x02,        //     INPUT (Data, Variable, Absolute) ;5 button bits
   // ------------------------------------------------- Padding
-  REPORT_SIZE(1),      0x03, //     REPORT_SIZE (3)
-  REPORT_COUNT(1),     0x01, //     REPORT_COUNT (1)
-  HIDINPUT(1),         0x03, //     INPUT (Constant, Variable, Absolute) ;3 bit padding
+  REPORT_SIZE(1),      0x03,        //     REPORT_SIZE (3)
+  REPORT_COUNT(1),     0x01,        //     REPORT_COUNT (1)
+  HIDINPUT(1),         0x03,        //     INPUT (Constant, Variable, Absolute) ;3 bit padding
   // ------------------------------------------------- X/Y position, Wheel
-  USAGE_PAGE(1),       0x01, //     USAGE_PAGE (Generic Desktop)
-  USAGE(1),            0x30, //     USAGE (X)
-  USAGE(1),            0x31, //     USAGE (Y)
-  USAGE(1),            0x38, //     USAGE (Wheel)
-  LOGICAL_MINIMUM(1),  0x81, //     LOGICAL_MINIMUM (-127)
-  LOGICAL_MAXIMUM(1),  0x7f, //     LOGICAL_MAXIMUM (127)
-  REPORT_SIZE(1),      0x08, //     REPORT_SIZE (8) 
-  REPORT_COUNT(1),     0x03, //     REPORT_COUNT (3)
-  HIDINPUT(1),         0x06, //     INPUT (Data, Variable, Relative) ;3 bytes (X,Y,Wheel)
+  USAGE_PAGE(1),       0x01,        //     USAGE_PAGE (Generic Desktop)
+  USAGE(1),            0x30,        //     USAGE (X)
+  USAGE(1),            0x31,        //     USAGE (Y)
+  USAGE(1),            0x38,        //     USAGE (Wheel)
+  LOGICAL_MINIMUM(1),  0x81,        //     LOGICAL_MINIMUM (-127)
+  LOGICAL_MAXIMUM(1),  0x7f,        //     LOGICAL_MAXIMUM (127)
+  REPORT_SIZE(1),      0x08,        //     REPORT_SIZE (8)
+  REPORT_COUNT(1),     0x03,        //     REPORT_COUNT (3)
+  HIDINPUT(1),         0x06,        //     INPUT (Data, Variable, Relative) ;3 bytes (X,Y,Wheel)
   // ------------------------------------------------- Horizontal wheel
-  USAGE_PAGE(1),       0x0c, //     USAGE PAGE (Consumer Devices)
-  USAGE(2),      0x38, 0x02, //     USAGE (AC Pan)
-  LOGICAL_MINIMUM(1),  0x81, //     LOGICAL_MINIMUM (-127)
-  LOGICAL_MAXIMUM(1),  0x7f, //     LOGICAL_MAXIMUM (127)
-  REPORT_SIZE(1),      0x08, //     REPORT_SIZE (8)
-  REPORT_COUNT(1),     0x01, //     REPORT_COUNT (1)
-  HIDINPUT(1),         0x06, //     INPUT (Data, Var, Rel)
-  END_COLLECTION(0),         //   END_COLLECTION
-  END_COLLECTION(0)          // END_COLLECTION
+  USAGE_PAGE(1),       0x0c,        //     USAGE PAGE (Consumer Devices)
+  USAGE(2),            0x38, 0x02,  //     USAGE (AC Pan)
+  LOGICAL_MINIMUM(1),  0x81,        //     LOGICAL_MINIMUM (-127)
+  LOGICAL_MAXIMUM(1),  0x7f,        //     LOGICAL_MAXIMUM (127)
+  REPORT_SIZE(1),      0x08,        //     REPORT_SIZE (8)
+  REPORT_COUNT(1),     0x01,        //     REPORT_COUNT (1)
+  HIDINPUT(1),         0x06,        //     INPUT (Data, Var, Rel)
+  END_COLLECTION(0),                //   END_COLLECTION
+  END_COLLECTION(0)                 // END_COLLECTION
 };
 
 static const uint8_t _keyboardHidReportDescriptor[] = {
@@ -373,7 +373,7 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   _asciimap = layout;
   NimBLEDevice::init(deviceName);
   NimBLEDevice::setPower(MAX_TX_POWER);
-  NimBLEServer* pServer = NimBLEDevice::createServer();
+  pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(this);
   pServer->advertiseOnDisconnect(true);
 
@@ -394,23 +394,20 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
     inputKeyboard = hid->getInputReport(KEYBOARD_ID);
     outputKeyboard = hid->getOutputReport(KEYBOARD_ID);
     inputMediaKeys = hid->getInputReport(MEDIA_KEYS_ID);
+
     outputKeyboard->setCallbacks(this);
   } else if (mode == BLE_KEYBOARD_MODE_GAMEPAD) {
     inputGamepad = hid->getInputReport(GAMEPAD_ID);
     outputGamepad = hid->getOutputReport(GAMEPAD_ID);
+
     outputGamepad->setCallbacks(this);
   }
   
   hid->setManufacturer(deviceManufacturer);
-
   hid->setPnp(0x02, vid, pid, version);
-  hid->setHidInfo(0x00, 0x01);
+  hid->setHidInfo(0x00, 0x02);
 
   NimBLEDevice::setSecurityAuth(true, false, true); // man in the middle protection (mitm) cause keyboard mouse, etc can't using when device reconnect so disable it
-  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
-
-  NimBLEDevice::setSecurityInitKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
-  NimBLEDevice::setSecurityRespKey(BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID);
   
   if (mode == BLE_KEYBOARD_MODE_ALL)
   hid->setReportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
@@ -438,8 +435,8 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
 }
 
 void BleKeyboard::end(void)
-
 {
+  for (int i = 0; i < pServer->getConnectedCount(); i++) pServer->disconnect(pServer->getPeerInfo(i));
 }
 
 bool BleKeyboard::isConnected(void) {

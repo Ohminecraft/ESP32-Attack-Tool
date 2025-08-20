@@ -35,6 +35,8 @@ class ESP32ATSetting {
         uint16_t sourappleSpamDelay = SOUR_APPLE_SPAM_DELAY;
         uint16_t applejuiceSpamDelay = APPLE_JUICE_SPAM_DELAY;
         uint16_t swiftpairSpamDelay = SWIFTPAIR_SPAM_DELAY;
+        bool useAppleJuicePaired = true; // Show Color of device
+        bool useBleNameasnameofNameFlood = true;
         uint16_t spamAllDelay = 20;
         uint8_t irTxPin = IR_PIN;
         uint8_t irRxPin = IR_RX_PIN;
@@ -52,6 +54,7 @@ class ESP32ATSetting {
         bool autoDeepSleep = true;
         bool autoStandby = true;
 
+        void loadSPIPinsFromJson(JsonObject &_settings);
         void loadSettings();
         void saveSettings();
         void resetSettings(bool useLittleFS);

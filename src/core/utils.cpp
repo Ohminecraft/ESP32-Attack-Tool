@@ -6,15 +6,11 @@
 	* /!\ WARNING: All Code I Wrote In This Is For Education Purpose ONLY! /!\
     * /!\        I NOT RESPONSIBLE ANY DAMAGE USER CAUSE IN PUBLIC         /!\
 	* Author: Shine Nagumo @Ohminecraft (Xun Anh Nguyen)
-	* This file contains utility functions for the ESP32 Attack Tool.
-	* It includes functions for generating random names, checking memory, generating random MAC addresses,
-	* and setting the base MAC address.
-	* It also includes a function to check available memory and print warnings if memory is low.
-	* It is used to ensure the system has enough resources before starting attacks.
+	* Licensed under the MIT License.
 */
 
 String generateRandomName() {
-	int len = rand() % 10 + 1; // Limit length to 3-10 characters
+	int len = rand() % 10 + 1; // Limit length to 1-10 characters
 	String randomName = "";
 	
 	// Reserve memory upfront to prevent fragmentation
@@ -140,6 +136,7 @@ uint8_t hexCharToDecimal(char c) {
 volatile bool nextPress = false;
 volatile bool prevPress = false;
 volatile bool selPress = false;
+volatile bool anykeyPress = false;
 bool ble_initialized = false; // BLE Initialized Flag
 bool wifi_initialized = false; // WiFi Initialized Flag
 bool wifi_connected = false;
@@ -147,7 +144,6 @@ bool low_memory_warning = false; // Low Memory Warning Flag
 
 SPIClass *SDCardSPI;
 
-#ifdef USING_ENCODER
 // Encoder Object
 RotaryEncoder *encoder = nullptr;
 
@@ -155,51 +151,5 @@ IRAM_ATTR void checkPosition() {
     encoder->tick(); // just call tick() to check the state.
 }
 
-void handleInputs() {
-	static unsigned long tm = millis();  // debauce for buttons
-    static unsigned long tm2 = millis(); // delay between Select and encoder (avoid missclick)
-	static int encoderDir = 0; // Encoder direction
-	encoderDir = (int)encoder->getDirection();
-	bool sel = HIGH;
-
-	if (millis() - tm > 300) {
-		sel = digitalRead(SEL_BTN);
-	}
-
-	if (encoderDir < 0) {
-		encoderDir = 0;
-		nextPress = true;
-		tm2 = millis();
-	}
-
-	if (encoderDir > 0) {
-		encoderDir = 0;
-		prevPress = true;
-		tm2 = millis();
-	}
-
-	if (sel == LOW && millis() - tm2 > 300) {
-		encoderDir = 0;
-		selPress = true;
-		tm = millis();
-		tm2 = millis();
-	}
-}
-#elif defined(USING_BUTTON)
-void handleInputs() {
-	static unsigned long tm = 0;
-    if (millis() - tm < 300) return;
-
-    bool leftPressed = (digitalRead(LEFT_BTN) == LOW);
-    bool selPressed = (digitalRead(SEL_BTN) == LOW);
-    bool rightPressed = (digitalRead(RIGHT_BTN) == LOW);
-
-    if (leftPressed || selPressed || rightPressed) tm = millis();
-
-	selPress = selPressed;
-	nextPress = rightPressed;
-	prevPress = leftPressed;
-}
-#endif
 
 TaskHandle_t xHandle;

@@ -115,6 +115,8 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     defaultSetting["applejuiceSpamDelay"] = APPLE_JUICE_SPAM_DELAY; // default Apple Juice spam delay
     defaultSetting["swiftpairSpamDelay"] = SWIFTPAIR_SPAM_DELAY; // default Swift Pair spam delay
     defaultSetting["spamallSpamDelay"] = 20; // default Spam All spam delay
+    defaultSetting["useAppleJuicePaired"] = true; // default use AppleJuice Paired
+    defaultSetting["useBleNameasnameofNameFlood"] = true; // default use Blename as name of Name Flood Exploit Attack
     
     defaultSetting["irTxPin"] = IR_PIN; // default IR TX pin
     defaultSetting["irRxPin"] = IR_RX_PIN; // default IR RX pin
@@ -218,55 +220,122 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     }
 
     Serial.println("[INFO] Settings reset successfully.");
-    Serial.println("[INFO] Loading Config Atempt 2.");
+    Serial.println("[INFO] Loading Config Attempt 2.");
     loadSettings();
 }
 
+void ESP32ATSetting::loadSPIPinsFromJson(JsonObject &_settings) {
+    if (!_settings["spiSckPin"].isNull()) {
+        spiSckPin = _settings["spiSckPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded spiSckPin: " + String(spiSckPin));
+    }
+    if (!_settings["spiMisoPin"].isNull()) {
+        spiMisoPin = _settings["spiMisoPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded spiMisoPin: " + String(spiMisoPin));
+    }
+    if (!_settings["spiMosiPin"].isNull()) {
+        spiMosiPin = _settings["spiMosiPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded spiMosiPin: " + String(spiMosiPin));
+    }
+    if (!_settings["sdCsPin"].isNull()) {
+        sdcardCsPin = _settings["sdCsPin"].as<uint8_t>();
+        Serial.println("[INFO] Loaded sdCsPin: " + String(sdcardCsPin));
+    }
+}
+
 void ESP32ATSetting::loadSettings() {
+    Serial.println("[INFO] Loading settings...");
+
+    // Bước 1: Mount LittleFS trước
+    if (!LittleFS.begin(true)) {
+        Serial.println("[ERROR] Failed to mount LittleFS!");
+        return;
+    }
+
+    bool useLittleFS = true;
+    bool mountSD = false;
+    static bool reloadedOnce = false;
+
     SDCardSPI = &SPI;
     SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin, sdcardCsPin);
-    LittleFS.begin(true);
-    bool useLittleFS = false;
-    Serial.println("[INFO] Loading settings...");
-    if (SD.begin(sdcardCsPin, *SDCardSPI)) {
-        if (!SD.exists("/ESP32AttackTool/ESP32AttackToolconfig.json")) {
-            Serial.println("[WARN] Settings file not found, creating default settings...");
-            resetSettings(false);
+
+    if (!SD.begin(sdcardCsPin, *SDCardSPI)) {
+        Serial.println("[INFO] Failed to mount SD, open LittleFS config file to check sd pin");
+        if (LittleFS.exists("/ESP32AttackToolconfig.json")) {
+            File configfile = LittleFS.open("/ESP32AttackToolconfig.json", FILE_READ);
+            if (configfile) {
+                JsonDocument jsonDoc;
+                if (!deserializeJson(jsonDoc, configfile)) {
+                    JsonObject _settings = jsonDoc.as<JsonObject>();
+                    loadSPIPinsFromJson(_settings);
+                    SDCardSPI->end();
+                }
+                configfile.close();
+            }
+        } else {
+            Serial.println("[WARN] LittleFS config not found, will use default SPI + CS pins");
         }
+    } else {
+        mountSD = true;
+        Serial.println("[INFO] SD Card mounted");
+    }
+
+
+    if (!mountSD) {
+        SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin, sdcardCsPin);
+        if (SD.begin(sdcardCsPin, *SDCardSPI)) {
+            mountSD = true;
+            Serial.println("[INFO] SD Card Attempt 2 mounted successfully");
+        }
+    }
+    
+
+    if (mountSD) {
+        if (!SD.exists("/ESP32AttackTool/ESP32AttackToolconfig.json")) {
+            Serial.println("[WARN] SD config not found");
+            if (LittleFS.exists("/ESP32AttackToolconfig.json")) {
+                Serial.println("[INFO] Found Configuration file in LittleFS, Copy from LittleFS");
+                copyFile(LittleFS, "/ESP32AttackToolconfig.json", SD, "/ESP32AttackTool/ESP32AttackToolconfig.json");
+                if (!reloadedOnce) {
+                    reloadedOnce = true;
+                    Serial.println("[INFO] Reloading config after copy...");
+                    loadSettings();
+                    return;
+                }
+            } else {
+                Serial.println("[INFO] Creating one...");
+                resetSettings(false);
+            }
+        }
+
         if (!filesAreIdentical(SD, "/ESP32AttackTool/ESP32AttackToolconfig.json", LittleFS, "/ESP32AttackToolconfig.json")) {
             Serial.println("[WARN] Config files differ, updating LittleFS from SD");
             copyFile(SD, "/ESP32AttackTool/ESP32AttackToolconfig.json", LittleFS, "/ESP32AttackToolconfig.json");
         }
+        useLittleFS = false;
     } else {
-        Serial.println("[WARN] SD Card is not mounted, use setting in LittleFS");
-        useLittleFS = true;
-        if (!LittleFS.exists("/ESP32AttackToolconfig.json")) {
-            Serial.println("[ERROR] Settings file not found, creating default settings...");
-            resetSettings(true);
-        }
+        Serial.println("[WARN] SD not mounted, fallback to LittleFS");
     }
-    
-    File configfile;
+
+    File finalConfig;
     if (useLittleFS) {
-        configfile = LittleFS.open("/ESP32AttackToolconfig.json", FILE_READ);
+        finalConfig = LittleFS.open("/ESP32AttackToolconfig.json", FILE_READ);
     } else {
-        configfile = SD.open("/ESP32AttackTool/ESP32AttackToolconfig.json", FILE_READ);
+        finalConfig = SD.open("/ESP32AttackTool/ESP32AttackToolconfig.json", FILE_READ);
     }
 
-    if (!configfile) {
-        Serial.println("[ERROR] Failed to open config file!");
+    if (!finalConfig) {
+        Serial.println("[ERROR] Cannot open config file!");
         return;
     }
-    
+
     JsonDocument jsonDoc;
-    if (deserializeJson(jsonDoc, configfile)) {
-        Serial.println("[ERROR] Failed to read config file! using default configuration");
+    if (deserializeJson(jsonDoc, finalConfig)) {
+        Serial.println("[ERROR] Failed to parse config, resetting...");
+        resetSettings(useLittleFS);
         return;
     }
-
-    Serial.println("[INFO] Configuration:");
-
-    configfile.close();
+    finalConfig.close();
 
     JsonObject _settings = jsonDoc.as<JsonObject>();
     int failed_count = 0;
@@ -275,35 +344,35 @@ void ESP32ATSetting::loadSettings() {
         spiSckPin = _settings["spiSckPin"].as<uint8_t>();
         Serial.println("spiSckPin: " + String(spiSckPin));
     } else {
-        Serial.println("[WARN] Failed to get 'spiSckPin' configuration");
+        Serial.println("[WARN] Failed to get 'spiSckPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["spiMisoPin"].isNull()) {
         spiMisoPin = _settings["spiMisoPin"].as<uint8_t>();
         Serial.println("spiMisoPin: " + String(spiMisoPin));
     } else {
-        Serial.println("[WARN] Failed to get 'spiMisoPin' configuration");
+        Serial.println("[WARN] Failed to get 'spiMisoPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["spiMosiPin"].isNull()) {
         spiMosiPin = _settings["spiMosiPin"].as<uint8_t>();
         Serial.println("spiMosiPin: " + String(spiMosiPin));
     } else {
-        Serial.println("[WARN] Failed to get 'spiMosiPin' configuration");
+        Serial.println("[WARN] Failed to get 'spiMosiPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["displayWidth"].isNull()) {
         displayWidth = _settings["displayWidth"].as<uint16_t>();
         Serial.println("displayWidth: " + String(displayWidth));
     } else {
-        Serial.println("[WARN] Failed to get 'displayWidth' configuration");
+        Serial.println("[WARN] Failed to get 'displayWidth' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["displayHeight"].isNull()) {
         displayHeight = _settings["displayHeight"].as<uint16_t>();
         Serial.println("displayHeight: " + String(displayHeight));
     } else {
-        Serial.println("[WARN] Failed to get 'displayHeight' configuration");
+        Serial.println("[WARN] Failed to get 'displayHeight' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["displayInvert"].isNull()) {
@@ -312,56 +381,56 @@ void ESP32ATSetting::loadSettings() {
             Serial.println("displayInvert: true");
         else Serial.println("displayInvert: false");
     } else {
-        Serial.println("[WARN] Failed to get 'displayInvert' configuration");
+        Serial.println("[WARN] Failed to get 'displayInvert' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["maxShowSelection"].isNull()) {
         maxShowSelection = _settings["maxShowSelection"].as<uint8_t>();
         Serial.println("maxShowSelection: " + String(maxShowSelection));
     } else {
-        Serial.println("[WARN] Failed to get 'maxShowSelection' configuration");
+        Serial.println("[WARN] Failed to get 'maxShowSelection' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["graphLineLimit"].isNull()) {
         graphLineLimit = _settings["graphLineLimit"].as<uint16_t>();
         Serial.println("graphLineLimit: " + String(graphLineLimit));
     } else {
-        Serial.println("[WARN] Failed to get 'graphLineLimit' configuration");
+        Serial.println("[WARN] Failed to get 'graphLineLimit' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["displaySdaPin"].isNull()) {
         displaySdaPin = _settings["displaySdaPin"].as<uint8_t>();
         Serial.println("displaySdaPin: " + String(displaySdaPin));
     } else {
-        Serial.println("[WARN] Failed to get 'displaySdaPin' configuration");
+        Serial.println("[WARN] Failed to get 'displaySdaPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["displaySclPin"].isNull()) {
         displaySclPin = _settings["displaySclPin"].as<uint8_t>();
         Serial.println("displaySclPin: " + String(displaySclPin));
     } else {
-        Serial.println("[WARN] Failed to get 'displaySclPin' configuration");
+        Serial.println("[WARN] Failed to get 'displaySclPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["statusLedPin"].isNull()) {
         statusLedPin = _settings["statusLedPin"].as<uint8_t>();
         Serial.println("statusLedPin: " + String(statusLedPin));
     } else {
-        Serial.println("[WARN] Failed to get 'statusLedPin' configuration");
+        Serial.println("[WARN] Failed to get 'statusLedPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["evilportalSSID"].isNull()) {
         evilportalSSID = _settings["evilportalSSID"].as<String>();
         Serial.println("evilportalSSID: " + evilportalSSID);
     } else {
-        Serial.println("[WARN] Failed to get 'evilportalSSID' configuration");
+        Serial.println("[WARN] Failed to get 'evilportalSSID' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["wifi"].isNull()) {
         wifi.clear();
         for (JsonPair kv : _settings["wifi"].as<JsonObject>()) wifi[kv.key().c_str()] = kv.value().as<String>();
     } else {
-        Serial.println("[WARN] Failed to get 'wifiCred' configuration");
+        Serial.println("[WARN] Failed to get 'wifiCred' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["autoConnectWiFi"].isNull()) {
@@ -370,84 +439,106 @@ void ESP32ATSetting::loadSettings() {
         else Serial.println("autoConnectWiFi: false");
 
     } else {
-        Serial.println("[WARN] Failed to get 'autoConnectWiFi' configuration");
+        Serial.println("[WARN] Failed to get 'autoConnectWiFi' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["bleName"].isNull()) {
         bleName = _settings["bleName"].as<String>();
+        if (bleName.length() > 20) {
+            Serial.println("[WARN] Name for BLE is too long, maximum 20 char! | Using default name");
+            bleName = "ESP32AttackTool";
+        }
         Serial.println("bleName: " + bleName);
     } else {
-        Serial.println("[WARN] Failed to get 'bleName' configuration");
+        Serial.println("[WARN] Failed to get 'bleName' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["sourappleSpamDelay"].isNull()) {
         sourappleSpamDelay = _settings["sourappleSpamDelay"].as<uint16_t>();
         Serial.println("sourappleSpamDelay: " + String(sourappleSpamDelay));
     } else {
-        Serial.println("[WARN] Failed to get 'sourappleSpamDelay' configuration");
+        Serial.println("[WARN] Failed to get 'sourappleSpamDelay' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["applejuiceSpamDelay"].isNull()) {
         applejuiceSpamDelay = _settings["applejuiceSpamDelay"].as<uint16_t>();
         Serial.println("applejuiceSpamDelay: " + String(applejuiceSpamDelay));
     } else {
-        Serial.println("[WARN] Failed to get 'applejuiceSpamDelay' configuration");
+        Serial.println("[WARN] Failed to get 'applejuiceSpamDelay' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["swiftpairSpamDelay"].isNull()) {
         swiftpairSpamDelay = _settings["swiftpairSpamDelay"].as<uint16_t>();
         Serial.println("swiftpairSpamDelay: " + String(swiftpairSpamDelay));
     } else {
-        Serial.println("[WARN] Failed to get 'swiftpairSpamDelay' configuration");
+        Serial.println("[WARN] Failed to get 'swiftpairSpamDelay' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["useAppleJuicePaired"].isNull()) {
+        useAppleJuicePaired = _settings["useAppleJuicePaired"].as<bool>();
+        if (useAppleJuicePaired)
+            Serial.println("useAppleJuicePaired: true");
+        else Serial.println("useAppleJuicePaired: false");
+    } else {
+        Serial.println("[WARN] Failed to get 'useAppleJuicePaired' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["useBleNameasnameofNameFlood"].isNull()) {
+        useBleNameasnameofNameFlood = _settings["useBleNameasnameofNameFlood"].as<bool>();
+        if (useBleNameasnameofNameFlood)
+            Serial.println("useBleNameasnameofNameFlood: true");
+        else Serial.println("useBleNameasnameofNameFlood: false");
+    } else {
+        Serial.println("[WARN] Failed to get 'useBleNameasnameofNameFlood' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["spamallSpamDelay"].isNull()) {
         spamAllDelay = _settings["spamallSpamDelay"].as<uint16_t>();
         Serial.println("spamAllDelay: " + String(spamAllDelay));
     } else {
-        Serial.println("[WARN] Failed to get 'spamallSpamDelay' configuration");
+        Serial.println("[WARN] Failed to get 'spamallSpamDelay' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["irTxPin"].isNull()) {
         irTxPin = _settings["irTxPin"].as<uint8_t>();
         Serial.println("irTxPin: " + String(irTxPin));
     } else {
-        Serial.println("[WARN] Failed to get 'irTxPin' configuration");
+        Serial.println("[WARN] Failed to get 'irTxPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["irRxPin"].isNull()) {
         irRxPin = _settings["irRxPin"].as<uint8_t>();
         Serial.println("irRxPin: " + String(irRxPin));
     } else {
-        Serial.println("[WARN] Failed to get 'irRxPin' configuration");
+        Serial.println("[WARN] Failed to get 'irRxPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["irRepeat"].isNull()) {
         irRepeat = _settings["irRepeat"].as<uint8_t>();
         Serial.println("irRepeat: " + String(irRepeat));
     } else {
-        Serial.println("[WARN] Failed to get 'irRepeat' configuration");
+        Serial.println("[WARN] Failed to get 'irRepeat' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["sdCsPin"].isNull()) {
         sdcardCsPin = _settings["sdCsPin"].as<uint8_t>();
         Serial.println("sdcardCsPin: " + String(sdcardCsPin));
     } else {
-        Serial.println("[WARN] Failed to get 'sdCsPin' configuration");
+        Serial.println("[WARN] Failed to get 'sdCsPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["nrf24CePin"].isNull()) {
         nrfCePin = _settings["nrf24CePin"].as<uint8_t>();
         Serial.println("nrfCePin: " + String(nrfCePin));
     } else {
-        Serial.println("[WARN] Failed to get 'nrf24CePin' configuration");
+        Serial.println("[WARN] Failed to get 'nrf24CePin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["nrf24CsPin"].isNull()) {
         nrfCsPin = _settings["nrf24CsPin"].as<uint8_t>();
         Serial.println("nrfCsPin: " + String(nrfCsPin));
     } else {
-        Serial.println("[WARN] Failed to get 'nrf24CsPin' configuration");
+        Serial.println("[WARN] Failed to get 'nrf24CsPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["usingEncoder"].isNull()) {
@@ -455,49 +546,49 @@ void ESP32ATSetting::loadSettings() {
         if (usingEncoder) Serial.println("usingEncoder: true");
         else Serial.println("usingEncoder: false");
     } else {
-        Serial.println("[WARN] Failed to get 'usingEncoder' configuration");
+        Serial.println("[WARN] Failed to get 'usingEncoder' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["encPinA"].isNull()) {
         encPinA = _settings["encPinA"].as<uint8_t>();
         Serial.println("encPinA: " + String(encPinA));
     } else {
-        Serial.println("[WARN] Failed to get 'encPinA' configuration");
+        Serial.println("[WARN] Failed to get 'encPinA' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["encPinB"].isNull()) {
         encPinB = _settings["encPinB"].as<uint8_t>();
         Serial.println("encPinB: " + String(encPinB));
     } else {
-        Serial.println("[WARN] Failed to get 'encPinB' configuration");
+        Serial.println("[WARN] Failed to get 'encPinB' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["leftBtnPin"].isNull()) {
         leftBtnPin = _settings["leftBtnPin"].as<uint8_t>();
         Serial.println("leftBtnPin: " + String(leftBtnPin));
     } else {
-        Serial.println("[WARN] Failed to get 'leftBtnPin' configuration");
+        Serial.println("[WARN] Failed to get 'leftBtnPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["rightBtnPin"].isNull()) {
         rightBtnPin = _settings["rightBtnPin"].as<uint8_t>();
         Serial.println("rightBtnPin: " + String(rightBtnPin));
     } else {
-        Serial.println("[WARN] Failed to get 'rightBtnPin' configuration");
+        Serial.println("[WARN] Failed to get 'rightBtnPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["selBtnPin"].isNull()) {
         selectBtnPin = _settings["selBtnPin"].as<uint8_t>();
         Serial.println("selectBtnPin: " + String(selectBtnPin));
     } else {
-        Serial.println("[WARN] Failed to get 'selBtnPin' configuration");
+        Serial.println("[WARN] Failed to get 'selBtnPin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["timeZone"].isNull()) {
         timeZone = _settings["timeZone"].as<int8_t>();
         Serial.println("timeZone: " + String(timeZone));
     } else {
-        Serial.println("[WARN] Failed to get 'timeZone' configuration");
+        Serial.println("[WARN] Failed to get 'timeZone' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["autoDeepSleep"].isNull()) {
@@ -505,7 +596,7 @@ void ESP32ATSetting::loadSettings() {
         if (autoDeepSleep) Serial.println("autoDeepSleep: true");
         else Serial.println("autoDeepSleep: false");
     } else {
-        Serial.println("[WARN] Failed to get 'autoDeepSleep' configuration");
+        Serial.println("[WARN] Failed to get 'autoDeepSleep' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["autoStandby"].isNull()) {
@@ -513,16 +604,13 @@ void ESP32ATSetting::loadSettings() {
         if (autoStandby) Serial.println("autoStandby: true");
         else Serial.println("autoStandby: false");
     } else {
-        Serial.println("[WARN] Failed to get 'autoStandby' configuration");
+        Serial.println("[WARN] Failed to get 'autoStandby' configuration | Ignoring it using default");
         failed_count++;
     }
 
-    if (failed_count > 0) {
-        Serial.println("[INFO] Found " + String(failed_count) + " missing configuation, rewrite new configuration file");
-        if (useLittleFS)
-        resetSettings(true);
-        else
-        resetSettings(false);
+    if (failed_count > 8) {
+        Serial.println("[INFO] Found over 8 missing configuation, rewrite new configuration file");
+        resetSettings(useLittleFS);
     }
 }
 

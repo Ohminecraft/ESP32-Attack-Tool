@@ -43,7 +43,9 @@ private:
   NimBLECharacteristic *inputMouse;
   NimBLECharacteristic *inputGamepad;
   NimBLECharacteristic *outputGamepad;
-
+  NimBLECharacteristic *inputTouch;
+  NimBLECharacteristic *outputTouch;
+  NimBLEServer *pServer;
   NimBLEAdvertising *advertising;
   KeyReport _keyReport;
   MediaKeyReport _mediaKeyReport;
@@ -55,8 +57,8 @@ private:
   void delay_ms(uint64_t ms);
   void buttons(const uint16_t b);
 
-  uint16_t vid = 0x05ac;
-  uint16_t pid = 0x820a;
+  uint16_t vid = 0xe502;
+  uint16_t pid = 0xa111;
   uint16_t version = 0x0210;
 
   uint16_t appearance = 0x03C1;
