@@ -122,12 +122,12 @@ void connectWiFi(void *pvParameters) {
 		if (pwd == "") continue;
 		Serial.println("[INFO] Connecting to '" + ssid + "' WiFi, " +  "PWD: " + pwd);
 		WiFi.begin(ssid.c_str(), pwd.c_str());
+		wifi_initialized = true;
 		int count = 0;
 		for (int j = 0; j < 20; j++) {
 			if (WiFi.status() == WL_CONNECTED) {
 				Serial.println("[INFO] Successfully connected '" + ssid + "' WiFi");
 				wifi_connected = true;
-				wifi_initialized = true;
 				break;
 			}
 			delay(500);
@@ -3904,12 +3904,13 @@ void handleTasks(MenuState handle_state) {
 				if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
 					static unsigned long lastDeauthTime = 0;
 					if (millis() - lastDeauthTime > 250) {
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, 26, false);
-						vTaskDelay(1 / portTICK_RATE_MS);
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, 26, false);
-						vTaskDelay(1 / portTICK_RATE_MS);
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, 26, false);
-						vTaskDelay(1 / portTICK_RATE_MS);
+						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
+
+						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
 						lastDeauthTime = millis();
 					}
 				}

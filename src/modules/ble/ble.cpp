@@ -526,8 +526,8 @@ void BLEModules::initSpoofer() {
 
 void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode) {
     uint8_t dummy_addr[6] = {0x00};
-      for (int i = 0; i < 6; i++) {
-        dummy_addr[i] = random(256);
+    for (int i = 0; i < 6; i++) {
+       dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
     }
     if (!ble_initialized) {
@@ -537,7 +537,7 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
         esp_ble_gap_set_rand_addr(dummy_addr);
         NimBLEDevice::init(espatsettings.bleName.c_str());
         NimBLEDevice::setPower(MAX_TX_POWER);
-        NimBLEServer *pServer = BLEDevice::createServer();
+        NimBLEServer *pServer = NimBLEDevice::createServer();
         pAdvertising = pServer->getAdvertising();
         ble_initialized = true;
     }
@@ -572,14 +572,14 @@ void BLEModules::initSpam() {
 
 void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
 {
-    uint8_t macAddr[6];
-    generateRandomMac(macAddr);
-    esp_base_mac_addr_set(macAddr);
     uint8_t dummy_addr[6] = {0x00};
       for (int i = 0; i < 6; i++) {
         dummy_addr[i] = random(256);
         if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
     }
+    uint8_t macAddr[6];
+    generateRandomMac(macAddr);
+    esp_base_mac_addr_set(macAddr);
     esp_ble_gap_set_rand_addr(dummy_addr);
     NimBLEDevice::init("");
     NimBLEDevice::setPower(MAX_TX_POWER, NimBLETxPowerType::Advertise);
@@ -589,8 +589,7 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     NimBLEAdvertisementData advertisementData = GetAdvertismentData(type);
     pAdvertising->addServiceUUID(SERVICE_UUID);
     pAdvertising->setAdvertisementData(advertisementData);
-    if (random(2) == 0) pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_NON);
-    else pAdvertising->setConnectableMode(BLE_GAP_CONN_MODE_UND);
+    pAdvertising->setConnectableMode((random(2) == 0) ? BLE_GAP_CONN_MODE_NON : BLE_GAP_CONN_MODE_UND);
     pAdvertising->setDiscoverableMode(random(3));
     pAdvertising->setMinInterval(0x20);
     pAdvertising->setMaxInterval(0x20);
