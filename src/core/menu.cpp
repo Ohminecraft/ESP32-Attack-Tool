@@ -3570,14 +3570,14 @@ void handleInput(MenuState handle_state) {
 void handleTasks(MenuState handle_state) {
 	// Handle WiFi scanning
 	if (handle_state == CLOCK_MENU) {
-		static unsigned long clockRedraw = 0;
-		if (millis() - clockRedraw > 1000) {
-			timeClock.update(rtc.getTimeStruct());
+		static String last_clock = "";
+		timeClock.update(rtc.getTimeStruct());
+		if ((String)timeClock.timechar != last_clock) {
 			display.clearScreen();
 			displayStatusBar();
 			display.drawingCenterString(timeClock.timechar, espatsettings.displayHeight / 2 + 5);
 			display.sendDisplay();
-			clockRedraw = millis();
+			last_clock = (String)timeClock.timechar;
 		}
 	}
 
