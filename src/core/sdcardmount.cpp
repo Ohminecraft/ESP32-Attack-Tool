@@ -9,6 +9,7 @@
 */
 
 LinkedList<String> *sdcard_buffer;
+SPIClass *SDCardSPI;
 
 void SDCardModules::main() {
     SDCardSPI = &SPI;
@@ -38,10 +39,10 @@ File SDCardModules::getFile(String path, String mode) {
     if (mounted) {
         File file = SD.open("/ESP32AttackTool" + path, mode.c_str());
         if (file) {
-            Serial.println("[INFO] File opened successfully: " + path);
+            //Serial.println("[INFO] File opened/created successfully: " + path);
             return file;
         } else {
-            Serial.println("[ERROR] Failed to open file: " + path);
+            Serial.println("[ERROR] Failed to open/created file: " + path);
             return File(); // Return an empty File object if opening failed
         }
     } else {

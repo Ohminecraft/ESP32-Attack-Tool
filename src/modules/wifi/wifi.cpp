@@ -520,6 +520,8 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
 					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ") - Not added to list");
 				}
+
+				if (!first_scan) logutils.pcapAppend(snifferPacket, len);
 			}
 		}
 	}
@@ -617,6 +619,9 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
 				}
 				
+				logutils.pcapAppend(snifferPacket, len);
+
+				return;
 			}
 		}
 	}
@@ -727,14 +732,14 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 		
 		wifiScanRedraw = true;
 
-		AccessPoint ap = access_points->get(ap_index);
-
 		if (!low_memory_warning) {
+			AccessPoint ap = access_points->get(ap_index);
 			ap.stations->add(device_station->size() - 1);
+			
+			access_points->set(ap_index, ap);
 		}
-		
 
-		access_points->set(ap_index, ap);
+		logutils.pcapAppend(snifferPacket, len);
 	}
 }
 
@@ -761,6 +766,8 @@ void WiFiModules::deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t t
 				display_buffer->add("->" + String(dst_addr));
 				wifiScanRedraw = true;
 				Serial.println("[INFO] Deauthentication Frame Detected! " + String(addr) + " -> " + String(dst_addr));
+
+				logutils.pcapAppend(snifferPacket, len);
 			}
 			deauthcheck = millis();
 		}
@@ -820,6 +827,8 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 			wifiScanRedraw = true;
 			Serial.println("[INFO] Probe Detected! Client:" + String(addr) + " Requesting: (CH:" + String(snifferPacket->rx_ctrl.channel) \
 			+ ") " + probe_req_essid + " RSSI: " + String(snifferPacket->rx_ctrl.rssi));
+
+			logutils.pcapAppend(snifferPacket, len);
       	}
 	}
 }
@@ -876,6 +885,8 @@ void WiFiModules::beaconSnifferCallback(void* buf , wifi_promiscuous_pkt_type_t 
 			else
 				 Serial.println("[INFO] Beacon Detected! " + essid + " (Ch:" + String(snifferPacket->rx_ctrl.channel) + ") " \
 				+ "(BSSID:" + String(addr) + ") " + "(RSSI:" + String(snifferPacket->rx_ctrl.rssi) + ")");
+
+			logutils.pcapAppend(snifferPacket, len);
 		}
 	}
 }
@@ -927,6 +938,8 @@ void WiFiModules::eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 		display_buffer->add(addr);
 		wifiScanRedraw = true;
 	}
+
+	logutils.pcapAppend(snifferPacket, len);
 }
 
 void WiFiModules::analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
@@ -985,6 +998,8 @@ void WiFiModules::StartAnalyzerScan() {
 void WiFiModules::StartBeaconScan() {
 	Serial.println("[INFO] Starting Beacon scan...");
 
+	logutils.createFile("beacon", true);
+
 	esp_wifi_init(&cfg2);
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
@@ -1004,6 +1019,8 @@ void WiFiModules::StartProbeReqScan() {
 	
 	Serial.println("[INFO] Starting Probe Request scan...");
 
+	logutils.createFile("probe", true);
+
 	esp_wifi_init(&cfg2);
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
@@ -1021,6 +1038,8 @@ void WiFiModules::StartDeauthScan() {
 
 	Serial.println("[INFO] Starting Deauthentication scan...");
 
+	logutils.createFile("deauth", true);
+
 	esp_wifi_init(&cfg2);
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
@@ -1037,6 +1056,8 @@ void WiFiModules::StartDeauthScan() {
 void WiFiModules::StartEapolScan() {
 
 	Serial.println("[INFO] Starting Eapol scan...");
+
+	logutils.createFile("eapol", true);
 
 	esp_wifi_init(&cfg);
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
@@ -1084,6 +1105,8 @@ void WiFiModules::StartAPStaWiFiScan() {
 
 	Serial.println("[INFO] Starting WiFi/Station scan...");
 
+	logutils.createFile("ap_sta", true);
+
 	esp_wifi_init(&cfg2);
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
@@ -1103,6 +1126,8 @@ void WiFiModules::StartAPWiFiScan() {
     access_points = new LinkedList<AccessPoint>();
 
     Serial.println("[INFO] Starting WiFi scan...");
+
+	if (!first_scan) logutils.createFile("ap", true);
     
 	esp_netif_init();
   	esp_event_loop_create_default();

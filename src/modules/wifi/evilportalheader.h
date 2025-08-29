@@ -22,6 +22,7 @@
 #include "core/settingheader.h"
 #include "wifiheader.h"
 #include "core/utilsheader.h"
+#include "core/logutilsheader.h"
 
 extern ESP32ATSetting espatsettings;
 extern String htmlFile;
@@ -311,6 +312,7 @@ const char default_html[] PROGMEM = R"=====(
 )=====";
 
 extern WiFiModules wifi;
+extern LogUtils logutils;
 extern uint8_t deauth_frame[sizeof(wifi.deauth_frame_packet)];
 extern uint8_t disassoc_frame[sizeof(wifi.disassoc_frame_packet)];
 

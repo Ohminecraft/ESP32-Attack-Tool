@@ -4,12 +4,11 @@
 #define UTILSHEADER_H
 
 /*
-    * utilsheader.h Version 2.0 (with Claude, ChatGPT Help)
+    * utilsheader.h
     * /!\ WARNING: All Code I Wrote In This Is For Education Purpose ONLY! /!\
     * /!\        I NOT RESPONSIBLE ANY DAMAGE USER CAUSE IN PUBLIC         /!\
     * Author: Shine Nagumo @Ohminecraft (Xun Anh Nguyen)
-    * This file contains utility functions for the ESP32 Attack Tool.
-    * It includes functions for generating random names, checking memory, generating random MAC addresses,
+    * Licensed under the MIT License
 */
 
 #include <Arduino.h>
@@ -17,8 +16,6 @@
 #include <SPI.h>
 
 #include "configs.h"
-
-extern SPIClass *SDCardSPI;
 
 #define MEM_LOWER_LIM 20000
 
@@ -50,6 +47,7 @@ extern volatile bool anykeyPress;
 extern bool ble_initialized;
 extern bool wifi_initialized;
 extern bool wifi_connected;
+extern bool first_scan;
 extern bool low_memory_warning;
 
 extern RotaryEncoder *encoder;
@@ -58,6 +56,8 @@ IRAM_ATTR void checkPosition();
 //void handleInputs();
 
 extern TaskHandle_t xHandle;
+
+extern SPIClass *SDCardSPI;
 
 extern inline bool check(volatile bool &btn) {
     if (!btn) return false;

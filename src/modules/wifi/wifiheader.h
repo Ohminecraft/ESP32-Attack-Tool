@@ -21,6 +21,9 @@
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
 #include "core/clockheader.h"
+#include "core/logutilsheader.h"
+
+extern LogUtils logutils;
 
 enum WiFiScanState {
     WIFI_SCAN_OFF,

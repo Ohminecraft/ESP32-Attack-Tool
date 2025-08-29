@@ -279,7 +279,7 @@ bool IRReadModules::saveintoSD() {
     int i = 1;
 
     while(sdcard.isExists("/" + file_name + String(i) + ".ir")) i++;
-    file_name += String(i) ;
+    file_name += String(i);
     file_name += ".ir";
 
     fileName = file_name; // Save the file name for later use

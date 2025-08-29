@@ -16,6 +16,7 @@
 #include "core/assets.h"
 #include "core/settingheader.h"
 #include "core/utilsheader.h"
+#include "core/logutilsheader.h"
 #include "core/displayheader.h"
 #include "core/sdcardmountheader.h"
 #include "core/clockheader.h"
@@ -67,7 +68,6 @@ enum MenuState {
     WIFI_ATTACK_MENU,
     BLE_SCAN_RUNNING,
     BLE_INFO_MENU_LIST,
-    BLE_INFO_MENU_DETAIL,
     BLE_SPOOFER_MAIN_MENU,
     BLE_SPOOFER_APPLE_MENU,
     BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU,
@@ -392,6 +392,7 @@ bool handleStateRunningCheck = false; // Used to check if the handle state is ru
 
 void displayWelcome();
 void displayMainMenu();
+void redrawTasks();
         
 // Menu navigation
 void navigateUp();
