@@ -18,7 +18,7 @@ extern ESP32ATSetting espatsettings;
 extern LinkedList<String> *sdcard_buffer;
 
 class SDCardModules {
-public:
+public: 
     bool mounted = false;
     void main();
     void close();

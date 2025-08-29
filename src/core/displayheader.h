@@ -46,9 +46,10 @@ class DisplayModules
         bool main();
 
         void clearScreen();
-        void drawingRect(int x, int y, int w, int h, bool fill_rect = true, int color = WHITE);
+        void drawingRect(int x, int y, int w, int h, bool fill_rect = true, bool senddisplay = false, int color = WHITE);
         void printString(String msg);
         void displayString(String msg, bool ln = false, bool senddisplay = false, int color = WHITE);
+        void setColor(int color = WHITE);
         void drawingCenterString(String msg, int y, bool senddisplay = false, int color = WHITE);
         void displayInvert(bool invert);
         void displayStringwithCoordinates(String msg, int x, int y, bool senddisplay = false, int color = WHITE);

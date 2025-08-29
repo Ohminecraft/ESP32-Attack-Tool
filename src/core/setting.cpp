@@ -109,6 +109,8 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     for (const auto &pair : wifi) { _wifi[pair.first] = pair.second; }
 
     defaultSetting["autoConnectWiFi"] = false;
+    
+    defaultSetting["savepcap"] = true;
 
     defaultSetting["bleName"] = "ESP32AttackTool"; // default BLE name
     defaultSetting["sourappleSpamDelay"] = SOUR_APPLE_SPAM_DELAY; // default Sour Apple spam delay
@@ -440,6 +442,14 @@ void ESP32ATSetting::loadSettings() {
 
     } else {
         Serial.println("[WARN] Failed to get 'autoConnectWiFi' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["savepcap"].isNull()) { // Save Log or .pcap file
+        savepcap = _settings["savepcap"].as<bool>();
+        if (savepcap)  Serial.println("savepcap: true");
+        else Serial.println("savepcap: false");
+    } else {
+        Serial.println("[WARN] Failed to get 'savepcap' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["bleName"].isNull()) {

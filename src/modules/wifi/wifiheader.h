@@ -21,6 +21,9 @@
 #include "core/utilsheader.h"
 #include "core/displayheader.h"
 #include "core/clockheader.h"
+#include "core/logutilsheader.h"
+
+extern LogUtils logutils;
 
 enum WiFiScanState {
     WIFI_SCAN_OFF,
@@ -220,14 +223,14 @@ class WiFiModules
         const wifi_promiscuous_filter_t filt = {.filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA};
 
         const char* rick_roll[8] = {
-            "01 Never gonna give you up",
-            "02 Never gonna let you down",
-            "03 Never gonna run around",
-            "04 and desert you",
-            "05 Never gonna make you cry",
-            "06 Never gonna say goodbye",
-            "07 Never gonna tell a lie",
-            "08 and hurt you"};
+            "Never gonna give you up",
+            "Never gonna let you down",
+            "Never gonna run around",
+            "and desert you",
+            "Never gonna make you cry",
+            "Never gonna say goodbye",
+            "Never gonna tell a lie",
+            "and hurt you"};
         
         const char* stable_ssid_beacon[50] = {
             "Mom Use This One",
@@ -357,12 +360,23 @@ class WiFiModules
 
         uint8_t deauth_frame_packet[26] = { // Should be in public because evil portal needs it
             /*  0 - 1  */ 0xC0, 0x00,                         // type, subtype c0: deauth (a0: disassociate)
-            /*  2 - 3  */ 0x00, 0x00,                         // duration (SDK takes care of that)
+            /*  2 - 3  */ 0x3A, 0x01,                         // duration (SDK takes care of that)
             /*  4 - 9  */ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // reciever (target)
             /* 10 - 15 */ 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, // source (ap)
             /* 16 - 21 */ 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, // BSSID (ap)
             /* 22 - 23 */ 0x00, 0x00,                         // fragment & squence number
             /* 24 - 25 */ 0x01, 0x00                          // reason code (1 = unspecified reason)
+        };
+
+        // https://github.com/jaylikesbunda/Ghost_ESP/blob/v1.7/main/managers/wifi_manager.c
+        uint8_t disassoc_frame_packet[26] = {
+            0xa0, 0x00,                         // Frame Control (only first byte different)
+            0x3a, 0x01,                         // Duration
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Destination addr
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Source addr
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // BSSID
+            0x00, 0x00,                         // Sequence number
+            0x07, 0x00                          // Reason code
         };
 
         void setMac();

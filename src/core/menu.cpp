@@ -23,6 +23,9 @@ IRSendModules irtx;
 IRReadModules irrx;
 SDCardModules sdcard;
 TimeClock timeClock;
+LogUtils logutils;
+
+int itemoffset = 0;
 
 void handleInputs() {
 	static unsigned long debounceTime = 0;
@@ -110,6 +113,7 @@ void connectWiFi(void *pvParameters) {
 		vTaskDelay(300 / portTICK_PERIOD_MS);
 	}
 	wifi.set_channel = 1;
+	first_scan = false;
 	wifi.StartMode(WIFI_SCAN_OFF);
 	WiFi.disconnect(true);
 	vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -122,12 +126,12 @@ void connectWiFi(void *pvParameters) {
 		if (pwd == "") continue;
 		Serial.println("[INFO] Connecting to '" + ssid + "' WiFi, " +  "PWD: " + pwd);
 		WiFi.begin(ssid.c_str(), pwd.c_str());
+		wifi_initialized = true;
 		int count = 0;
 		for (int j = 0; j < 20; j++) {
 			if (WiFi.status() == WL_CONNECTED) {
 				Serial.println("[INFO] Successfully connected '" + ssid + "' WiFi");
 				wifi_connected = true;
-				wifi_initialized = true;
 				break;
 			}
 			delay(500);
@@ -166,13 +170,14 @@ void menuinit() {
 	wifi.main();
 	ble.main();
 	sdcard.main();
+	logutils.begin();
 	nrf.main();
 	eportal.main();
 	if (espatsettings.autoConnectWiFi) {
 		xTaskCreate(connectWiFi, "wifiConnect", 4096, NULL, 2, NULL);
 	}
 	vTaskDelay(50 / portTICK_PERIOD_MS);
-	Serial.println("[INFO] Menu system initialized");
+	Serial.println("[INFO] All Modules initialized");
 	Serial.printf("[INFO] Total heap: %d bytes\n", String(getHeap(GET_TOTAL_HEAP)).toInt());
 	Serial.printf("[INFO] Free heap: %d bytes\n", String(getHeap(GET_FREE_HEAP)).toInt());
 	Serial.printf("[INFO] Used heap: %d bytes\n", String(getHeap(GET_USED_HEAP)).toInt());
@@ -221,14 +226,14 @@ void displayWelcome() {
 
 void displayStatusBar(bool sendDisplay = false) {
 	display.clearScreen();
+	display.drawingRect(0, 0, espatsettings.displayWidth, 13, true);
+	display.setColor(BLACK);
 	if (currentState == MAIN_MENU)
 		display.displayStringwithCoordinates("Main Menu", 0, 12);
 	else if (currentState == BLE_MENU)
 		display.displayStringwithCoordinates("BLE Menu", 0, 12);
 	else if (currentState == BLE_INFO_MENU_LIST)
 		display.displayStringwithCoordinates("BLE Info", 0, 12);
-	else if (currentState == BLE_INFO_MENU_DETAIL)
-		display.displayStringwithCoordinates("BLE Detail", 0, 12);
 	else if (currentState == BLE_SCAN_RUNNING)
 		display.displayStringwithCoordinates("BLE Scan", 0, 12);
 	else if (currentState == BLE_SPOOFER_MAIN_MENU)
@@ -327,6 +332,7 @@ void displayStatusBar(bool sendDisplay = false) {
 	heapInfo.concat(String(getHeap(GET_USED_HEAP_PERCENT)).toInt());
 	heapInfo.concat("%");
 	display.displayStringwithCoordinates(heapInfo, espatsettings.displayWidth - 38, 12);
+	display.setColor(WHITE);
 	if (sendDisplay) display.sendDisplay();
 }
 
@@ -334,22 +340,30 @@ void menuNode(String items[], int itemCount) {
 	displayStatusBar();
 	
 	// Display only MAX_SHOW_SECLECTION items at a time due to screen height
-	uint8_t startIndex = (currentSelection >= espatsettings.maxShowSelection) ? currentSelection - 1 : 0;
-		
-	for(int i = 0; i < espatsettings.maxShowSelection && (startIndex + i) < itemCount; i++) {
-		String itemText = ((startIndex + i) == currentSelection) ? 
-			"> " + items[startIndex + i] : "  " + items[startIndex + i];
-		display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
-	}
-		
+	for (int i = 0; i < espatsettings.maxShowSelection && i + itemoffset < itemCount; i++) {
+        int itemindex = i + itemoffset;
+        String itemText = items[itemindex];
+
+        if (itemindex == currentSelection) {
+            // highlight
+            display.drawingRect(0, 13 + (i * 12), espatsettings.displayWidth, 13, true);
+            display.setColor(BLACK);
+        } else {
+            display.setColor(WHITE);
+        }
+
+        display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
+    }
 	display.sendDisplay();
 }
 
 void menuNode(String items, String info, String errortext[2], int itemCount, bool showBack = true) {
 	itemCount = itemCount + 1; // Back Option
 	if(currentSelection < itemCount - 1) {
-		String itemText = "> " + items;
-		display.displayStringwithCoordinates(itemText, 0, 24);
+		display.drawingRect(0, 25, espatsettings.displayWidth, 13, true);
+		display.setColor(BLACK);
+		display.displayStringwithCoordinates(items, 0, 24);
+		display.setColor(WHITE);
 	}
 	
 	 else if (itemCount - 1 == 0) {
@@ -368,9 +382,15 @@ void menuNode(String items[], size_t item_size, String info, String errortext[2]
 	if(currentSelection < itemCount) {
 		String itemText;
 		for (int i = 0; i < item_size; i++) {
-			if (i == 0) itemText = "> " + items[i];
-			else itemText = items[i];
-			display.displayStringwithCoordinates(itemText, 0, 24 + (i * 12));
+			if (i == 0) {
+				display.drawingRect(0, 13, espatsettings.displayWidth, 13, true);
+				display.setColor(BLACK);
+				display.displayStringwithCoordinates(items[i], 0, 24);
+			}
+			else {
+				display.setColor(WHITE);
+				display.displayStringwithCoordinates(items[i], 0, 24 + (i * 12));
+			}
 		}
 	} else if (itemCount == 0) {
 		display.displayStringwithCoordinates(errortext[0], 0, 24);
@@ -434,38 +454,19 @@ void displayBLEMenu() {
 
 void displayBLEInfoListMenu() {
 	displayStatusBar();
-	String ble_title;
+	String items[3] = {};
 	if (currentSelection < blescanres->size()) {
 		BLEScanResult bledevice = blescanres->get(currentSelection);
-		ble_title = bledevice.name;
-		if (ble_title == "<no name>") ble_title = bledevice.addr.toString().c_str();
-		// Truncate if too long
-		if (ble_title.length() > 17)
-			ble_title = ble_title.substring(0, 18) + "...";
+
+		items[0] = bledevice.name;
+		items[1] = "Addr: " + (String)bledevice.addr.toString().c_str();
+		items[2] = "RSSI: " +(String)bledevice.rssi;
 	}
 	String errortext[2] = {
 		"No Devices Found!",
 		"Scan First!"
 	};
-	menuNode(ble_title, "Devices: ", errortext, blescanres->size());
-}
-
-void displayBLEInfoDetail() {
-	displayStatusBar();
-
-	if (!blescanres || currentSelection >= blescanres->size()) {
-		display.displayStringwithCoordinates("Invalid device", 0, 24);
-		return;
-	}
-
-	BLEScanResult res = blescanres->get(currentSelection);
-	String nameStr = res.name;
-	String addrStr = res.addr.toString().c_str();
-	String rssiStr = "RSSI: " + String(res.rssi);
-
-	display.displayStringwithCoordinates(nameStr, 0, 24);
-	display.displayStringwithCoordinates("Addr:" + addrStr, 0, 36);
-	display.displayStringwithCoordinates(rssiStr, 0, 48, true);
+	menuNode(items, GET_SIZE(items), "Devices: ", errortext, blescanres->size());
 }
 
 void displayMainSpooferMenu() {
@@ -872,6 +873,7 @@ void displayWiFiAttackMenu() {
 
 void displayRebootConfirm() {
 	display.clearScreen();
+	display.setColor(WHITE);
 	display.displayStringwithCoordinates("====== REBOOT ======", 0, 12);
 	display.displayStringwithCoordinates("Press SELECT to", 0, 24);
 	display.displayStringwithCoordinates("confirm reboot", 0, 36);
@@ -1095,7 +1097,6 @@ void displayIRTvBGoneRegionMenu() {
 }
 
 void displaySDMenu() {
-	displayStatusBar();
 
 	String items[SD_MENU_COUNT] = {
 		"SD Card Update",
@@ -1714,11 +1715,21 @@ void navigateUp() {
 	if (maxSelections <= 1) {
 		return;
 	}
-	
+
 	if (currentSelection > 0) {
 		currentSelection--;
+		if (currentSelection < itemoffset) {
+			itemoffset--;
+		}
 	} else {
-		currentSelection = maxSelections - 1;
+		if (maxSelections < espatsettings.maxShowSelection) {
+			currentSelection = maxSelections - 1;
+			itemoffset = 0;
+		} else {
+			currentSelection = maxSelections - 1;
+			itemoffset = max(0, maxSelections - espatsettings.maxShowSelection);
+
+		}
 	}
 	
 	// Redraw menu
@@ -1732,9 +1743,6 @@ void navigateUp() {
 			break;
 		case BLE_INFO_MENU_LIST:
 			displayBLEInfoListMenu();
-			break;
-		case BLE_INFO_MENU_DETAIL:
-			// Không cuộn trong detail
 			break;
 		case BLE_SPOOFER_MAIN_MENU:
 			displayMainSpooferMenu();
@@ -1833,7 +1841,15 @@ void navigateDown() {
 		return;
 	}
 
-	currentSelection = (currentSelection + 1) % maxSelections;
+	if (currentSelection < maxSelections - 1) {
+    	currentSelection++;
+		if (currentSelection >= itemoffset + espatsettings.maxShowSelection) {
+			itemoffset++;
+		}
+	} else {
+		currentSelection = 0;
+		itemoffset = 0;
+	}
 	
 	// Redraw menu
    
@@ -1846,9 +1862,6 @@ void navigateDown() {
 			break;
 		case BLE_INFO_MENU_LIST:
 			displayBLEInfoListMenu();
-			break;
-		case BLE_INFO_MENU_DETAIL:
-			// Không cuộn trong detail
 			break;
 		case BLE_SPOOFER_MAIN_MENU:
 			displayMainSpooferMenu();
@@ -1972,6 +1985,7 @@ void selectCurrentItem() {
 				maxSelections = SD_MENU_COUNT;
 				displaySDMenu();
 			} else if (currentSelection == MAIN_CLOCK) {
+				display.setColor(WHITE);
 				currentState = CLOCK_MENU;
 				currentSelection = 0;
 			} else if (currentSelection == MAIN_REBOOT) {
@@ -2193,14 +2207,7 @@ void selectCurrentItem() {
 		case BLE_INFO_MENU_LIST:
 			if (!blescanres || blescanres->size() == 0 || currentSelection == blescanres->size()) {
 				goBack();
-			} else {
-				currentState = BLE_INFO_MENU_DETAIL;
-				displayBLEInfoDetail();
 			}
-			break;
-		case BLE_INFO_MENU_DETAIL:
-			currentState = BLE_INFO_MENU_LIST;
-			displayBLEInfoListMenu();
 			break;
 		case BLE_SPOOFER_MAIN_MENU:
 			if (currentSelection == BLE_SPOOFER_BACK) {
@@ -3051,7 +3058,6 @@ void selectCurrentItem() {
 			}
 			break;
 	}
-	
 }
 
 void goBack() {
@@ -3061,12 +3067,14 @@ void goBack() {
 		case WIFI_MENU:
 			currentState = MAIN_MENU;
 			currentSelection = 0;
+			itemoffset = 0;
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
 		case WIFI_GENERAL_MENU:
 			currentState = WIFI_MENU;
 			currentSelection = 0;
+			itemoffset = 0;
 			maxSelections = WIFI_MENU_COUNT;
 			displayWiFiMenu();
 			break;
@@ -3204,10 +3212,6 @@ void goBack() {
 			maxSelections = BLE_MENU_COUNT;
 			ble.StartMode(BLE_SCAN_OFF);
 			displayBLEMenu();
-			break;
-		case BLE_INFO_MENU_DETAIL:
-			currentState = BLE_INFO_MENU_LIST;
-			displayBLEInfoListMenu();
 			break;
 		case BLE_INFO_MENU_LIST:
 			currentState = BLE_MENU;
@@ -3508,6 +3512,10 @@ void handleInput(MenuState handle_state) {
 		}
 		else {
 			selectCurrentItem();
+			if (currentSelection == 0) {
+				itemoffset = 0;
+				redrawTasks();
+			}
 		}
 	}
 
@@ -3570,14 +3578,14 @@ void handleInput(MenuState handle_state) {
 void handleTasks(MenuState handle_state) {
 	// Handle WiFi scanning
 	if (handle_state == CLOCK_MENU) {
-		static unsigned long clockRedraw = 0;
-		if (millis() - clockRedraw > 1000) {
-			timeClock.update(rtc.getTimeStruct());
+		static String last_clock = "";
+		timeClock.update(rtc.getTimeStruct());
+		if ((String)timeClock.timechar != last_clock) {
 			display.clearScreen();
 			displayStatusBar();
 			display.drawingCenterString(timeClock.timechar, espatsettings.displayHeight / 2 + 5);
 			display.sendDisplay();
-			clockRedraw = millis();
+			last_clock = (String)timeClock.timechar;
 		}
 	}
 
@@ -3862,6 +3870,7 @@ void handleTasks(MenuState handle_state) {
 				// Evil Portal handling
 
 				if (!evilPortalOneShot) {
+					logutils.createFile("evilportal", false);
 					bool _ap = false;
 					Serial.println("[INFO] Starting Setup Portal");
 					if (currentWiFiAttackType == WIFI_ATTACK_KARMA) {
@@ -3904,12 +3913,13 @@ void handleTasks(MenuState handle_state) {
 				if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
 					static unsigned long lastDeauthTime = 0;
 					if (millis() - lastDeauthTime > 250) {
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, 26, false);
-						vTaskDelay(1 / portTICK_RATE_MS);
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, 26, false);
-						vTaskDelay(1 / portTICK_RATE_MS);
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, 26, false);
-						vTaskDelay(1 / portTICK_RATE_MS);
+						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
+
+						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
+						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
 						lastDeauthTime = millis();
 					}
 				}
@@ -3954,9 +3964,6 @@ void redrawTasks() {
 			break;
 		case BLE_INFO_MENU_LIST:
 			displayBLEInfoListMenu();
-			break;
-		case BLE_INFO_MENU_DETAIL:
-			displayBLEInfoDetail();
 			break;
 		case BLE_SPOOFER_MAIN_MENU:
 			displayMainSpooferMenu();
@@ -4085,7 +4092,9 @@ void menuloop() {
 	autoSleepCheck();
 	handleInput(currentState);
 	handleTasks(currentState);
+	logutils.save();
 	if (standby) {
+		display.setColor(WHITE);
 		for (int i = 0; i < standby_bitmap_allArray_LEN; i++) {
 			if (check(selPress) || check(prevPress) || check(nextPress)) { // auto deep sleep
 				if (standby) standby = false;

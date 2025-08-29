@@ -144,6 +144,10 @@ void DisplayModules::clearGraph(int16_t *array) {
     }
 }
 
+void DisplayModules::setColor(int color) {
+    u8g2.setDrawColor(color);
+}
+
 
 void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int color)
 {
@@ -214,19 +218,19 @@ void DisplayModules::drawingCenterString(String msg, int y, bool senddisplay, in
     }
 }
 
-void DisplayModules::drawingRect(int x, int y, int w, int h, bool fill_rect, int color)
+void DisplayModules::drawingRect(int x, int y, int w, int h, bool fill_rect, bool senddisplay, int color)
 {
     if (!screenInitialized) {
         Serial.println("[ERROR] Display not initialized, cannot draw rectangle.");
         return;
     }
-    
+    u8g2.setDrawColor(color);
     if (fill_rect) {
         u8g2.drawBox(x, y, w, h);
     } else {
         u8g2.drawFrame(x, y, w, h);
     }
-    u8g2.sendBuffer();
+    if (senddisplay) u8g2.sendBuffer();
 }
 
 void DisplayModules::drawingLine(int x1, int y1, int x2, int y2, bool sendDisplay)

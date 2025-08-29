@@ -31,6 +31,7 @@ class ESP32ATSetting {
         String evilportalSSID = "ESP32AttackTool";
         std::map<String, String> wifi = {};
         bool autoConnectWiFi = false;
+        bool savepcap = true;
         String bleName = "ESP32AttackTool";
         uint16_t sourappleSpamDelay = SOUR_APPLE_SPAM_DELAY;
         uint16_t applejuiceSpamDelay = APPLE_JUICE_SPAM_DELAY;

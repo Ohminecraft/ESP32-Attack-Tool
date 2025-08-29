@@ -140,9 +140,8 @@ volatile bool anykeyPress = false;
 bool ble_initialized = false; // BLE Initialized Flag
 bool wifi_initialized = false; // WiFi Initialized Flag
 bool wifi_connected = false;
+bool first_scan = true;
 bool low_memory_warning = false; // Low Memory Warning Flag
-
-SPIClass *SDCardSPI;
 
 // Encoder Object
 RotaryEncoder *encoder = nullptr;
@@ -151,5 +150,6 @@ IRAM_ATTR void checkPosition() {
     encoder->tick(); // just call tick() to check the state.
 }
 
-
 TaskHandle_t xHandle;
+
+SPIClass *SDCardSPI;
