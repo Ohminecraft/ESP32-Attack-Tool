@@ -116,9 +116,9 @@ const DuckyCommand duckyCmds[]{
 
 void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble, uint8_t mode) {
     if (usingble) {
-        if (hid == nullptr) hid = new BleKeyboard(espatsettings.bleName.c_str(), "ESP32AttackTool", 100);
+        if (hid == nullptr) hid = new BleKeyboard(espatsettings.bleName, "ESP32AttackTool", 100);
     } else {
-        #if !defined(BOARD_ESP32_C3_MINI)
+        #if defined(USE_USB_HID)
         hid = new USBHIDKeyboard();
         USB.begin();
         #endif
@@ -126,9 +126,6 @@ void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usin
 
     if (usingble) {
         if (!hid->isConnected()) { hid->begin(layout, mode);  currentkbmode = mode;}
-    } else {
-        #if !defined(BOARD_ESP32_C3_MINI)
-        #endif
     }
 }
 

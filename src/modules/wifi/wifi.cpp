@@ -510,6 +510,7 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
+					WIFI_BAND_2_4G,
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				if (!low_memory_warning) {
@@ -608,6 +609,7 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
+					WIFI_BAND_2_4G,
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				if (!low_memory_warning) {
@@ -715,7 +717,7 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 		char sta_addr[] = "00:00:00:00:00:00";
 			
 		if (ap_is_src) {
-			getMAC(sta_addr, snifferPacket->payload, 4);;
+			getMAC(sta_addr, snifferPacket->payload, 4);
 		}
 		else {
 			getMAC(sta_addr, snifferPacket->payload, 10);
@@ -1500,7 +1502,6 @@ void WiFiModules::sendProbeAttack() {
       
 			// Build packet
 			// Randomize SRC MAC
-			
 			probe_frame_packet[10] = random(256);
 			probe_frame_packet[11] = random(256);
 			probe_frame_packet[12] = random(256);
@@ -1557,27 +1558,10 @@ void WiFiModules::sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6],
 	vTaskDelay(1 / portTICK_PERIOD_MS);
   
 	// Build packet
-	eapol_packet_bad_msg1[4] = mac[0];
-	eapol_packet_bad_msg1[5] = mac[1];
-	eapol_packet_bad_msg1[6] = mac[2];
+	memcpy(&eapol_packet_bad_msg1[4], mac, 6);
   
-	eapol_packet_bad_msg1[7] = mac[3];
-	eapol_packet_bad_msg1[8] = mac[4];
-	eapol_packet_bad_msg1[9] = mac[5];
-  
-	eapol_packet_bad_msg1[10] = bssid[0];
-	eapol_packet_bad_msg1[11] = bssid[1];
-	eapol_packet_bad_msg1[12] = bssid[2];
-	eapol_packet_bad_msg1[13] = bssid[3];
-	eapol_packet_bad_msg1[14] = bssid[4];
-	eapol_packet_bad_msg1[15] = bssid[5];
-  
-	eapol_packet_bad_msg1[16] = bssid[0];
-	eapol_packet_bad_msg1[17] = bssid[1];
-	eapol_packet_bad_msg1[18] = bssid[2];
-	eapol_packet_bad_msg1[19] = bssid[3];
-	eapol_packet_bad_msg1[20] = bssid[4];
-	eapol_packet_bad_msg1[21] = bssid[5]; 
+	memcpy(&eapol_packet_bad_msg1[10], bssid, 6);
+	memcpy(&eapol_packet_bad_msg1[16], bssid, 6);
   
 	/* Generate random Nonce */
 	for (uint8_t i = 0; i < 32; i++) {

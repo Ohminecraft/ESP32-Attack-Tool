@@ -25,6 +25,8 @@ SDCardModules sdcard;
 TimeClock timeClock;
 LogUtils logutils;
 
+RTL8720DNCommunication* rtl8720dn;
+
 int itemoffset = 0;
 
 void handleInputs() {
@@ -165,6 +167,8 @@ void menuinit() {
 		while(1); // Halt if display fails
 	}
 	if (espatsettings.displayInvert) display.displayInvert(true);
+	rtl8720dn = new RTL8720DNCommunication();
+	rtl8720dn->begin();
 	irtx.main();
 	irrx.main(true); // prevent ir rx get signal from unknown source
 	wifi.main();
@@ -272,6 +276,14 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Gen Menu", 0, 12);
 	else if (currentState == WIFI_ATTACK_MENU)
 		display.displayStringwithCoordinates("WiFi Atk Menu", 0, 12);
+	else if (currentState == WIFI_DUAL_BAND_MENU)
+		display.displayStringwithCoordinates("WiFi DualBand", 0, 12);
+	else if (currentState == WIFI_DUAL_BAND_GENERAL_MENU)
+		display.displayStringwithCoordinates("WiFi DB Gen", 0, 12);
+	else if (currentState == WIFI_DUAL_BAND_SELECT_MENU)
+		display.displayStringwithCoordinates("WiFi DB Sel", 0, 12);
+	else if (currentState == WIFI_DUAL_BAND_ATTACK_MENU)
+		display.displayStringwithCoordinates("WiFi DB Atk", 0, 12);
 	else if (currentState == WIFI_SCAN_RUNNING)
 		display.displayStringwithCoordinates("WiFi Scan", 0, 12);
 	else if (currentState == WIFI_MENU)
@@ -743,7 +755,7 @@ void displayWiFiSelectMenu() {
 
 			for (int i = 0; i < 4; i++) {
 				if (i == 0) items[i] = apInfo;
-				else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi));
+				else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi) + " Band:" + ((ap.band == WIFI_BAND_2_4G) ? "2.4G" : "5G"));
 				else if (i == 2) items[i] = ("B:" + String(bssidStr));
 				else if (i == 3) items[i] = ("Enc:" + ap.wpastr);
 			}
@@ -1970,15 +1982,35 @@ void selectCurrentItem() {
 				maxSelections = WIFI_MENU_COUNT;
 				displayWiFiMenu();
 			} else if (currentSelection == MAIN_NRF24) {
-				currentState = NRF24_MENU;
-				currentSelection = 0;
-				maxSelections = NRF24_MENU_COUNT;
-				displayNRF24Menu();
+				if (NRFRadio.isChipConnected() || (espatsettings.nrfCePin != 99 && espatsettings.nrfCsPin != 99)) {
+					currentState = NRF24_MENU;
+					currentSelection = 0;
+					maxSelections = NRF24_MENU_COUNT;
+					displayNRF24Menu();
+				} else {
+					displayStatusBar();
+					display.displayStringwithCoordinates("Your Device not have", 0, 24);
+					display.displayStringwithCoordinates("NRF24 connected!", 0, 36);
+					display.displayStringwithCoordinates("or was disabled in", 0, 48);
+					display.displayStringwithCoordinates("Config!", 0, 60, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					displayMainMenu();
+					return;
+				}
 			} else if (currentSelection == MAIN_IR) {
-				currentState = IR_MENU;
-				currentSelection = 0;
-				maxSelections = IR_MENU_COUNT;
-				displayIRMenu();
+				if (espatsettings.irRxPin != 99 && espatsettings.irTxPin != 99) {
+					currentState = IR_MENU;
+					currentSelection = 0;
+					maxSelections = IR_MENU_COUNT;
+					displayIRMenu();
+				} else {
+					displayStatusBar();
+					display.displayStringwithCoordinates("IR Mode was disabled", 0, 24);
+					display.displayStringwithCoordinates("in Config!", 0, 36, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					displayMainMenu();
+					return;
+				}
 			} else if (currentSelection == MAIN_SD) {
 				currentState = SD_MENU;
 				currentSelection = 0;
@@ -2420,6 +2452,7 @@ void selectCurrentItem() {
 				}
 				displayWiFiSelectProbeReqSsidsMenu();
 			} else if (currentSelection == WIFI_STA_SELECT) {
+				display.setColor(WHITE);
 				currentState = WIFI_SELECT_STA_AP_MENU;
 				currentSelection = 0;
 				if (access_points && access_points->size() > 0) {
@@ -2482,6 +2515,7 @@ void selectCurrentItem() {
 				displayWiFiSelectMenu();
 			}
 			else if (currentSelection == WIFI_UTILS_SET_STA_MAC) {
+				display.setColor(WHITE);
 				set_mac = true;
 				currentState = WIFI_SELECT_STA_AP_MENU;
 				currentSelection = 0;
@@ -2544,6 +2578,7 @@ void selectCurrentItem() {
 				startSnifferScan(WIFI_GENERAL_EAPOL_DEAUTH_SCAN);
 			} else if (currentSelection == WIFI_GENERAL_CH_ANALYZER) {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				display.setColor(WHITE);
 				startSnifferScan(WIFI_GENERAL_CH_ANALYZER);
 			}
 			wifiSnifferMode = currentSelection;
@@ -2841,6 +2876,7 @@ void selectCurrentItem() {
 			if (!sdcard_buffer || sdcard_buffer->size() == 0) {
 				goBack();
 			} else {
+				display.setColor(WHITE);
 				if (currentSelection < sdcard_buffer->size()) {
 					if (selectforbadusb) {
 						String fileName = sdcard_buffer->get(currentSelection);
@@ -3429,6 +3465,12 @@ void goBack() {
 			currentSelection = 0;
 			maxSelections = IR_MENU_COUNT;
 			displayIRMenu();
+		} else if (selectforevilportal) {
+			selectforevilportal = false;
+			currentState = WIFI_UTILS_MENU;
+			currentSelection = 0;
+			maxSelections = WIFI_UTILS_MENU_COUNT;
+			displayWiFiUtilsMenu();
 		}
 		else {
 			currentState = SD_MENU;
@@ -3514,8 +3556,8 @@ void handleInput(MenuState handle_state) {
 			selectCurrentItem();
 			if (currentSelection == 0) {
 				itemoffset = 0;
-				redrawTasks();
 			}
+			redrawTasks();
 		}
 	}
 

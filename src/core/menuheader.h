@@ -20,6 +20,7 @@
 #include "core/displayheader.h"
 #include "core/sdcardmountheader.h"
 #include "core/clockheader.h"
+#include "core/communicationheader.h"
 #include "modules/ble/bleheader.h"
 #include "modules/wifi/wifiheader.h"
 #include "modules/wifi/evilportalheader.h"
@@ -66,6 +67,10 @@ enum MenuState {
     WIFI_SELECT_STA_AP_MENU,
     WIFI_SELECT_STA_MENU,
     WIFI_ATTACK_MENU,
+    WIFI_DUAL_BAND_MENU,
+    WIFI_DUAL_BAND_GENERAL_MENU,
+    WIFI_DUAL_BAND_SELECT_MENU,
+    WIFI_DUAL_BAND_ATTACK_MENU,
     BLE_SCAN_RUNNING,
     BLE_INFO_MENU_LIST,
     BLE_SPOOFER_MAIN_MENU,
@@ -203,6 +208,7 @@ enum WiFiMenuItem {
     WIFI_PROBE_REQ_SSIDS_SELECT,
     WIFI_UTILS,
     WIFI_ATTACK,
+    WIFI_DUAL_BAND,
     WIFI_BACK,
     WIFI_MENU_COUNT
 };

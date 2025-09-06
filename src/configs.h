@@ -5,7 +5,8 @@
 
 // BOARD CONFIGURATION //
 
-#define BOARD_ESP32_C3_MINI
+//#define BOARD_ESP32_C3_MINI
+#define BOARD_XIAO_ESP32_C3
 
 // BLE Configuration //
 
@@ -13,7 +14,7 @@
 #define APPLE_JUICE_SPAM_DELAY 400
 #define SWIFTPAIR_SPAM_DELAY 20
 
-#define ATTACK_TOOL_VERSION "2.8.0"
+#define ATTACK_TOOL_VERSION "2.8.1"
 
 // SCREEN CONFIGURATION //
 
@@ -30,14 +31,19 @@
     #define SDA_PIN 8
     #define SCL_PIN 9
     #define RST_PIN -1
-
+#elif defined(BOARD_XIAO_ESP32_C3)
+    #define SDA_PIN 6
+    #define SCL_PIN 7
+    #define RST_PIN -1
 #endif
 
 // LED CONFIGURATION //
 
-#ifdef BOARD_ESP32_C3_MINI
-    #define STA_LED 21 // Not Using
-#elif BOARD_ESP32
+#if defined(BOARD_ESP32_C3_MINI)
+    #define STA_LED 29 // Not Using
+#elif defined(BOARD_XIAO_ESP32_C3)
+    #define STA_LED 29
+#elif defined(BOARD_ESP32)
     #define STA_LED 2
 #endif
 
@@ -47,9 +53,9 @@
 #define USING_ENCODER
 //#define USING_BUTTON
 
-#define ENC_PIN_A 2
-#define ENC_PIN_B 1
-#define ENC_BTN 0
+#define ENC_PIN_A 3
+#define ENC_PIN_B 4
+#define ENC_BTN 2
 
 #define LEFT_BTN 1
 #define RIGHT_BTN 2
@@ -70,6 +76,10 @@
     #define SPI_MOSI_PIN 6
     #define SPI_MISO_PIN 5
     #define SPI_SCK_PIN 4
+#elif defined(BOARD_XIAO_ESP32_C3)
+    #define SPI_MOSI_PIN 10
+    #define SPI_MISO_PIN 9
+    #define SPI_SCK_PIN 8
 #endif
 // SD Card Configuration //
 
@@ -77,6 +87,8 @@
     #define SD_CS_PIN 5
 #elif defined(BOARD_ESP32_C3_MINI)
     #define SD_CS_PIN 10
+#elif defined(BOARD_XIAO_ESP32_C3)
+    #define SD_CS_PIN 5
 #endif
 
 // NRF24 CONFIGURATION //
@@ -87,6 +99,9 @@
 #elif defined(BOARD_ESP32_C3_MINI)
     #define NRF24_CE_PIN 3
     #define NRF24_CSN_PIN 7
+#elif defined(BOARD_XIAO_ESP32_C3)
+    #define NRF24_CE_PIN 99
+    #define NRF24_CSN_PIN 99
 #endif
 
 // IR Configuration //
@@ -99,5 +114,16 @@
 #elif defined(BOARD_ESP32_C3_MINI)
     #define IR_PIN 20 // RX PIN in Esp32-C3-MINI
     #define IR_RX_PIN 21 // TX PIN in Esp32-C3-MINI
+#elif defined(BOARD_XIAO_ESP32_C3)
+    #define IR_PIN 99
+    #define IR_RX_PIN 99
+#endif
+
+// Serial Configuration (for RTL8720DN) //
+
+#ifdef BOARD_XIAO_ESP32_C3
+    #define RTL_SERIAL_BAUD 115200
+    #define SERIAL_RX_PIN 20
+    #define SERIAL_TX_PIN 21
 #endif
 #endif // CONFIGS_H

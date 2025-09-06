@@ -75,6 +75,11 @@ struct SSID {
 };
 */
 
+enum WiFiBand {
+    WIFI_BAND_2_4G,
+    WIFI_BAND_5G
+};
+
 struct AccessPoint {
     String essid;
     uint8_t channel;
@@ -84,6 +89,7 @@ struct AccessPoint {
     bool selected;
     LinkedList<uint16_t>* stations;
     char beacon[2];
+    WiFiBand band;
     int8_t rssi;
 };
 
@@ -118,14 +124,14 @@ class WiFiModules
 
         // ESP32 Marauder
         uint8_t beacon_frame_packet[128] = {
-            /*0*/   0x80, 0x00, 0x00, 0x00, //Frame Control, Duration
-            /*4*/   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, //Destination address 
-            /*10*/  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //Source address - overwritten later
-            /*16*/  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //BSSID - overwritten to the same as the source address
-            /*22*/  0xc0, 0x6c, //Seq-ctl
-            /*24*/  0x83, 0x51, 0xf7, 0x8f, 0x0f, 0x00, 0x00, 0x00, //timestamp - the number of microseconds the AP has been active
-            /*32*/  0x64, 0x00, //Beacon interval
-            /*34*/  0x01, 0x04, //Capability info
+            /* 0 - 3 */    0x80, 0x00, 0x00, 0x00, //Frame Control, Duration
+            /* 4 - 9 */    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, //Destination address 
+            /* 10 - 15 */  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //Source address - overwritten later
+            /* 16 - 21 */  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //BSSID - overwritten to the same as the source address
+            /* 22 - 23 */  0xc0, 0x6c, //Seq-ctl
+            /* 24 - 31 */  0x83, 0x51, 0xf7, 0x8f, 0x0f, 0x00, 0x00, 0x00, //timestamp - the number of microseconds the AP has been active
+            /* 32 - 33 */  0x64, 0x00, //Beacon interval
+            /* 34 - 35 */  0x01, 0x04, //Capability info
             /* SSID */
             /*36*/  0x00
             };

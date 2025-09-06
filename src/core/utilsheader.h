@@ -33,6 +33,7 @@ bool checkLeftMemory();
 
 void generateRandomMac(uint8_t* mac);
 void getMAC(char *addr, uint8_t* data, uint16_t offset);
+void stringToMac(const String& macStr, uint8_t macAddr[6]);
 String macToString(uint8_t macAddr[6]);
 void setBaseMacAddress(uint8_t macAddr[6]);
 String uint32ToString(uint32_t value);
@@ -48,6 +49,7 @@ extern bool ble_initialized;
 extern bool wifi_initialized;
 extern bool wifi_connected;
 extern bool first_scan;
+extern bool rtl8720dn_ready;
 extern bool low_memory_warning;
 
 extern RotaryEncoder *encoder;
