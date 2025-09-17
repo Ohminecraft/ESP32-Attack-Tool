@@ -148,7 +148,6 @@ void DisplayModules::setColor(int color) {
     u8g2.setDrawColor(color);
 }
 
-
 void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int color)
 {
     if (!screenInitialized) {

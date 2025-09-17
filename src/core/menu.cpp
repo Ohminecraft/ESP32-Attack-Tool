@@ -169,6 +169,7 @@ void menuinit() {
 	if (espatsettings.displayInvert) display.displayInvert(true);
 	rtl8720dn = new RTL8720DNCommunication();
 	rtl8720dn->begin();
+	rtl8720dn->isReady();
 	irtx.main();
 	irrx.main(true); // prevent ir rx get signal from unknown source
 	wifi.main();
@@ -600,7 +601,6 @@ void displayExploitAttackBLEMenu() {
 	String items[BLE_ATK_MENU_COUNT] = {
 		"Sour Apple",
 		"Apple Juice",
-		"Apple AirDrop",
 		"Swiftpair MS", 
 		"Samsung Spam",
 		"Google Spam",
@@ -670,6 +670,7 @@ void displayWiFiMenu() {
 		"WiFi Probe SSIDs Sel",
 		"WiFi Utils",
 		"WiFi Attack",
+		"WiFi Dual Band",
 		"< Back"
 	};
 	
@@ -1188,9 +1189,6 @@ void displayAttackStatus() {
 			case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
 				attackName = "Apple Juice";
 				break;
-			case BLE_ATTACK_EXPLOIT_APPLE_AIRDROP:
-				attackName = "Apple Airdrop";
-				break;
 			case BLE_ATTACK_EXPLOIT_MICROSOFT:
 				attackName = "Swiftpair MS";
 				break;
@@ -1244,10 +1242,12 @@ void displayAttackStatus() {
 	
 	if (currentState == WIFI_ATTACK_RUNNING) {
 		String packetStr = "packet/sec: ";
-		packetStr.concat(String(wifi.packet_sent).toInt());
+		packetStr.concat(wifi.packet_sent);
 		display.displayStringwithCoordinates(packetStr, 0, 36, true);
 	} else if (currentState == BLE_ATTACK_RUNNING) {
-		display.displayStringwithCoordinates("Advertising...", 0, 36, true);
+		String adpacketstr = "SendedAdv: ";
+		adpacketstr.concat(ble.AdvertisedPacketCount);
+		display.displayStringwithCoordinates(adpacketstr, 0, 36, true);
 	}
 	
 	// Display memory info
@@ -1393,7 +1393,6 @@ void startBLEAttack(BLEScanState attackType) {
 	String strmode = "";
 	if (attackType == BLE_ATTACK_EXPLOIT_SOUR_APPLE) strmode = "Sour Apple";
 	else if (attackType == BLE_ATTACK_EXPLOIT_APPLE_JUICE) strmode = "Apple Juice";
-	else if (attackType == BLE_ATTACK_EXPLOIT_APPLE_AIRDROP) strmode = "Apple Airdrop";
 	else if (attackType == BLE_ATTACK_EXPLOIT_MICROSOFT) strmode = "Swiftpair";
 	else if (attackType == BLE_ATTACK_EXPLOIT_GOOGLE) strmode = "Android (Google)";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SAMSUNG) strmode = "Samsung";
@@ -1740,7 +1739,6 @@ void navigateUp() {
 		} else {
 			currentSelection = maxSelections - 1;
 			itemoffset = max(0, maxSelections - espatsettings.maxShowSelection);
-
 		}
 	}
 	
@@ -1969,6 +1967,7 @@ void navigateDown() {
 }
 
 void selectCurrentItem() {
+	display.setColor(WHITE);
 	switch(currentState) {
 		case MAIN_MENU:
 			if (currentSelection == MAIN_BLE) {
@@ -2372,7 +2371,7 @@ void selectCurrentItem() {
 				need_restart = true;
 				
 				// Start BLE attack
-				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_APPLE_AIRDROP, BLE_ATTACK_EXPLOIT_MICROSOFT, 
+				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
 									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_NAME_FLOOD, BLE_ATTACK_EXPLOIT_SPAM_ALL};
 				startBLEAttack(attackTypes[currentSelection]);
 				}
@@ -3550,6 +3549,7 @@ void handleInput(MenuState handle_state) {
 			handle_state == IR_READ_RUNNING ||
 			handle_state == CLOCK_MENU)
 		{
+			if (handle_state == BLE_ATTACK_RUNNING) ble.AdvertisedPacketCount = 0;
 			goBack();
 		}
 		else {
@@ -3625,7 +3625,9 @@ void handleTasks(MenuState handle_state) {
 		if ((String)timeClock.timechar != last_clock) {
 			display.clearScreen();
 			displayStatusBar();
-			display.drawingCenterString(timeClock.timechar, espatsettings.displayHeight / 2 + 5);
+			display.setFont(u8g2_font_ncenB18_tr);
+			display.displayStringwithCoordinates(timeClock.timechar, (espatsettings.displayWidth - ((strlen(timeClock.timechar) * 6)) / 2) - 90, (espatsettings.displayHeight / 2) + 15);
+			display.setFont(u8g2_font_ncenB08_tr);
 			display.sendDisplay();
 			last_clock = (String)timeClock.timechar;
 		}
@@ -3884,9 +3886,6 @@ void handleTasks(MenuState handle_state) {
 				case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_JUICE);
 					break;
-				case BLE_ATTACK_EXPLOIT_APPLE_AIRDROP:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_AIRDROP);
-					break;
 				case BLE_ATTACK_EXPLOIT_MICROSOFT:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_MICROSOFT);
 					break;
@@ -3985,7 +3984,7 @@ void handleTasks(MenuState handle_state) {
 			currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
 			currentWiFiAttackType != WIFI_ATTACK_DEAUTH_FLOOD &&
 			currentWiFiAttackType != WIFI_ATTACK_KARMA) {
-			if (millis() - lastDisplayUpdate > 2000) {
+			if (millis() - lastDisplayUpdate > 1000) {
 				displayAttackStatus();
 				wifi.packet_sent = 0;
 				lastDisplayUpdate = millis();

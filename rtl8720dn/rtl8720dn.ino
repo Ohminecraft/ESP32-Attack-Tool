@@ -55,8 +55,9 @@ void loop() {
             channel = 1;
 
             wifi_on(RTW_MODE_STA);
+            delay(500);
             int timeout = 0;
-            while (wifi_is_ready_to_transceive(RTW_STA_INTERFACE) != RTW_SUCCESS && timeout < 25) {
+            while (wifi_is_ready_to_transceive(RTW_STA_INTERFACE) != RTW_SUCCESS && timeout < 50) {
                 delay(100);
                 timeout++;
             }
