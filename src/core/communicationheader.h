@@ -19,16 +19,16 @@ class RTL8720DNCommunication {
         QueueHandle_t responseQueue;
         TaskHandle_t readTaskHandle;
         
-        void sendCommand(const char* cmd);
-        void sendCommand(const String cmd);
         static void readResponseTask(void* parameter); // Static task function
-        
     public:
         RTL8720DNCommunication();
         ~RTL8720DNCommunication();
         
         void begin();
         void isReady();
+        void sendCommand(const char* cmd);
+        void sendCommand(const String cmd);
+        String filterRTLData(String mixedLine);
         String waitForResponse(uint32_t timeout_ms = 5000);
         void parseAPScanResponse(String response);
         void parseAPSTAScanResponse(String response);

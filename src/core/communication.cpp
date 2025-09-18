@@ -110,7 +110,7 @@ String RTL8720DNCommunication::waitForResponse(uint32_t timeout_ms) {
 void RTL8720DNCommunication::isReady() {
     this->sendCommand("RTL_READY");
     
-    String response = waitForResponse(2000); // Wait 2 seconds
+    String response = waitForResponse(800); // Wait 0.8 seconds
     
     if (response == "RTL_READY") {
         rtl8720dn_ready = true;
@@ -126,6 +126,38 @@ void RTL8720DNCommunication::stopReading() {
         vTaskDelete(readTaskHandle);
         readTaskHandle = NULL;
     }
+}
+
+String RTL8720DNCommunication::filterRTLData(String mixedLine) {
+    // Tìm vị trí bắt đầu của NETWORK
+    int rtlStart = 0;
+    rtlStart = mixedLine.indexOf("NETWORK:");
+    if (rtlStart == -1) {
+        rtlStart = mixedLine.indexOf("STATION:");
+        if (rtlStart == -1) {
+            return ""; // Không tìm thấy NETWORK hoặc STATION
+        }
+    }
+    
+    // Tìm vị trí kết thúc (trước error message hoặc cuối dòng)
+    int rtlEnd = mixedLine.length();
+    
+    // Các pattern error thường gặp
+    String errorPatterns[] = {
+        "ioctl[RTKIOCSIWFREQ] error"
+    };
+    
+    for (int i = 0; i < GET_SIZE(errorPatterns); i++) {
+        int errorPos = mixedLine.indexOf(errorPatterns[i], rtlStart);
+        if (errorPos != -1 && errorPos < rtlEnd) {
+            rtlEnd = errorPos;
+        }
+    }
+    
+    String rtlData = mixedLine.substring(rtlStart, rtlEnd);
+    rtlData.trim();
+
+    return rtlData;
 }
 
 void RTL8720DNCommunication::parseAPScanResponse(String response) {
@@ -191,10 +223,21 @@ void RTL8720DNCommunication::parseAPScanResponse(String response) {
             ap.wpastr = wpastr;
             ap.band = (band == "2.4G") ? WIFI_BAND_2_4G : WIFI_BAND_5G;
             ap.stations = new LinkedList<uint16_t>();
-    
-            access_points->add(ap);
-            Serial.println("[INFO] Added: " + ssid + "(Ch: " + String(channel) + ")" + " (BSSID: " + bssid \
-                + ")" + " (RSSI: " + String(rssi) + ")" + " (Security: " + wpastr + ")");
+            
+            if (!low_memory_warning)
+				display_buffer->add("Ch:" + String(channel) + " " + ssid);
+			else
+				display_buffer->add("Low Mem! Ignore!");
+            wifiScanRedraw = true;
+
+            if (!low_memory_warning) {
+				access_points->add(ap);
+                Serial.println("[INFO] Added: " + ssid + " (Ch: " + String(channel) + ")" + " (BSSID: " + bssid \
+                    + ")" + " (RSSI: " + String(rssi) + ") (Band: " + band + ") (Security: " + wpastr + ")");
+			} else {
+				Serial.println("[WARN] Low Memory! Ignore AP " + ssid + " (Ch: " + String(channel) + ")" + " (BSSID: " + bssid \
+				+ ")" + " (RSSI: " + String(rssi) + ")" + " (Security: " + wpastr + ") - Not added to list");
+			}
         }
     }
 }
@@ -209,12 +252,10 @@ void RTL8720DNCommunication::parseAPSTAScanResponse(String response) {
         response = response.substring(8); // Remove "STATION:"
         
         int pos1 = response.indexOf(',');
-        int pos2 = response.indexOf(',', pos1 + 1);
         
-        if (pos1 > 0 && pos2 > 0) {
+        if (pos1 > 0) {
             String src_bssid = response.substring(0, pos1);
-            String dst_bssid = response.substring(pos1 + 1, pos2);
-            int8_t rssi = response.substring(pos2 + 1).toInt();
+            String dst_bssid = response.substring(pos1 + 1);
 
             uint8_t src_mac[6];
             uint8_t dst_mac[6];
@@ -226,26 +267,28 @@ void RTL8720DNCommunication::parseAPSTAScanResponse(String response) {
             bool ap_is_src = false;
             bool in_list = false;
             int ap_index = 0;
+            uint8_t _temp_mac[6];
 
-            for (int i = 0; i < access_points->size(); i++) {
-                mac_match = true;
-
-                for (int x = 0; x < 6; x++) {
-                    if (src_mac[x] != access_points->get(i).bssid[x]) {
-                        mac_match = false;
-                        break;
+            for (int y = 0; y < 2; y++) {
+                (y == 0) ? memcpy(_temp_mac, src_mac, 6) : memcpy(_temp_mac, dst_mac, 6);
+                for (int i = 0; i < access_points->size(); i++) {
+                    mac_match = true;
+                    
+                    for (int x = 0; x < 6; x++) {
+                        if (_temp_mac[x] != access_points->get(i).bssid[x]) {
+                            mac_match = false;
+                            break;
+                        }
                     }
-                    if (dst_mac[x] != access_points->get(i).bssid[x]) {
-                        mac_match = false;
+                    if (mac_match) {
+                        matched_ap = true;
+                        if (y == 0) ap_is_src = true;
+                        else ap_is_src = false;
+                        ap_index = i;
                         break;
                     }
                 }
-                if (mac_match) {
-                    matched_ap = true;
-                    ap_is_src = (memcmp(src_mac, access_points->get(i).bssid, 6) == 0);
-                    ap_index = i;
-                    break;
-                }
+                if (matched_ap) break;
             }
 
             if (!matched_ap) {

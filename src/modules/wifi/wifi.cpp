@@ -480,9 +480,9 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 				}
 
 				if (!low_memory_warning)
-				display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+					display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
 				else
-				display_buffer->add("Low Mem! Ignore!");
+					display_buffer->add("Low Mem! Ignore!");
 				wifiScanRedraw = true;
 
 				String wpastr = "";
@@ -644,28 +644,28 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 
 		// Check both addrs for AP addr
 		for (int y = 0; y < 2; y++) {
-		// Iterate through all APs
-		for (int i = 0; i < access_points->size(); i++) {
-			mac_match = true;
-			
-			// Go through each byte in addr
-			for (int x = 0; x < 6; x++) {
-				if (snifferPacket->payload[x + offsets[y]] != access_points->get(i).bssid[x]) {
-					mac_match = false;
+			// Iterate through all APs
+			for (int i = 0; i < access_points->size(); i++) {
+				mac_match = true;
+				
+				// Go through each byte in addr
+				for (int x = 0; x < 6; x++) {
+					if (snifferPacket->payload[x + offsets[y]] != access_points->get(i).bssid[x]) {
+						mac_match = false;
+						break;
+					}
+				}
+				if (mac_match) {
+					matched_ap = true;
+					if (offsets[y] == 10)
+						ap_is_src = true;
+					ap_index = i;
+					getMAC(ap_addr, snifferPacket->payload, offsets[y]);
 					break;
 				}
 			}
-			if (mac_match) {
-				matched_ap = true;
-				if (offsets[y] == 10)
-					ap_is_src = true;
-				ap_index = i;
-				getMAC(ap_addr, snifferPacket->payload, offsets[y]);
+			if (matched_ap)
 				break;
-			}
-		}
-		if (matched_ap)
-			break;
 		}
 
 		// If did not find ap from list in frame, drop frame

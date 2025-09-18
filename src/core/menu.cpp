@@ -277,14 +277,6 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Gen Menu", 0, 12);
 	else if (currentState == WIFI_ATTACK_MENU)
 		display.displayStringwithCoordinates("WiFi Atk Menu", 0, 12);
-	else if (currentState == WIFI_DUAL_BAND_MENU)
-		display.displayStringwithCoordinates("WiFi DualBand", 0, 12);
-	else if (currentState == WIFI_DUAL_BAND_GENERAL_MENU)
-		display.displayStringwithCoordinates("WiFi DB Gen", 0, 12);
-	else if (currentState == WIFI_DUAL_BAND_SELECT_MENU)
-		display.displayStringwithCoordinates("WiFi DB Sel", 0, 12);
-	else if (currentState == WIFI_DUAL_BAND_ATTACK_MENU)
-		display.displayStringwithCoordinates("WiFi DB Atk", 0, 12);
 	else if (currentState == WIFI_SCAN_RUNNING)
 		display.displayStringwithCoordinates("WiFi Scan", 0, 12);
 	else if (currentState == WIFI_MENU)
@@ -373,7 +365,7 @@ void menuNode(String items[], int itemCount) {
 void menuNode(String items, String info, String errortext[2], int itemCount, bool showBack = true) {
 	itemCount = itemCount + 1; // Back Option
 	if(currentSelection < itemCount - 1) {
-		display.drawingRect(0, 25, espatsettings.displayWidth, 13, true);
+		display.drawingRect(0, 13, espatsettings.displayWidth, 13, true);
 		display.setColor(BLACK);
 		display.displayStringwithCoordinates(items, 0, 24);
 		display.setColor(WHITE);
@@ -670,7 +662,6 @@ void displayWiFiMenu() {
 		"WiFi Probe SSIDs Sel",
 		"WiFi Utils",
 		"WiFi Attack",
-		"WiFi Dual Band",
 		"< Back"
 	};
 	
@@ -697,8 +688,10 @@ void displayWiFiGeneralMenu() {
 
 	String items[WIFI_GENERAL_MENU_COUNT] = {
 		"Scan AP",
+		"Scan Dual-Band AP",
 		"Scan AP (Old)",
 		"Scan AP/STA",
+		"Scan DualB.. AP/STA",
 		"Probe Req Scan",
 		"Deauth Scan",
 		"Beacon Scan",
@@ -718,9 +711,9 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 			wifiScanDisplay = true;
 			display.displayStringwithCoordinates("Scan complete", 0, 24);
 			display.displayStringwithCoordinates("SELECT->back", 0, 36);
-			if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_SCAN_OLD)
+			if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_SCAN_OLD || mode == WIFI_GENERAL_DUAL_BAND_AP_SCAN)
 				display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
-			else if (mode == WIFI_GENERAL_AP_STA_SCAN) {
+			else if (mode == WIFI_GENERAL_AP_STA_SCAN || mode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 				display.displayStringwithCoordinates("AP Found: " + String(access_points ? access_points->size() : 0), 0, 48);
 				display.displayStringwithCoordinates("STA Found: " + String(device_station ? device_station->size() : 0), 0, 60, true);
 			}
@@ -1515,6 +1508,18 @@ void startWiFiScan(WiFiGeneralItem mode) {
 			displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 			wifi.StartMode(WIFI_SCAN_AP_STA);
 		}
+	} else if (mode == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+		wifiScanInProgress = true;
+		display.clearBuffer();
+		wifiScanOneShot = true;
+		displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
+		rtl8720dn->sendCommand("RTL_START_AP_SCAN");
+	} else if (mode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+		wifiScanInProgress = true;
+		display.clearBuffer();
+		wifiScanOneShot = true;
+		displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
+		rtl8720dn->sendCommand("RTL_START_AP_STA_SCAN");
 	} else {
 		wifiScanInProgress = true;
 		displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
@@ -2546,6 +2551,10 @@ void selectCurrentItem() {
 				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 				//startWiFiScan(WIFI_GENERAL_AP_SCAN);
 			}
+			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
+			}
 			else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
@@ -2554,6 +2563,10 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 				//startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
+			}
+			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 			}
 			else if (currentSelection == WIFI_GENERAL_PROBE_REQ_SCAN) {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
@@ -2587,11 +2600,19 @@ void selectCurrentItem() {
 				if (currentSelection == WIFI_GENERAL_AP_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN);
 				}
+				else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+					access_points->clear();
+					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
+				}
 				else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN_OLD);
 				}
 				else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
+				}
+				else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+					access_points->clear();
+					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 				}
 			} else wifiScanRunning = false;
 			break;
@@ -3114,14 +3135,19 @@ void goBack() {
 			displayWiFiMenu();
 			break;
 		case WIFI_SCAN_RUNNING:
-			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN) {
+			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
 				if (wifiScanRunning && wifiScanInProgress) {
 					wifiScanInProgress = false;
-					wifi.StartMode(WIFI_SCAN_OFF);
-					if (currentSelection == WIFI_GENERAL_AP_SCAN) {
+					if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN) {
+						wifi.StartMode(WIFI_SCAN_OFF);
+					}
+					else {
+						rtl8720dn->sendCommand("RTL_STOP_SCAN");
+					}
+					if (currentSelection == WIFI_GENERAL_AP_SCAN || currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
 						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()));
 						displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
-					} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
+					} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN || currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()) + " Station in list: " + String(device_station->size()));
 						displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 					}
@@ -3133,7 +3159,7 @@ void goBack() {
 					maxSelections = WIFI_GENERAL_MENU_COUNT;
 					displayWiFiGeneralMenu();
 				}
-				else if (wifiScanRunning && wifiScanOneShot &&wifiScanDisplay)  {
+				else if (wifiScanRunning && wifiScanOneShot && wifiScanDisplay)  {
 					wifiScanRunning = false;
 					wifiScanOneShot = false;
 					wifiScanDisplay = false;
@@ -3643,11 +3669,15 @@ void handleTasks(MenuState handle_state) {
 				startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 			}
 		}
-		if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
+		if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 		}
 		else {
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
+		}
+
+		if (wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+			rtl8720dn->parseAPSTAScanResponse(rtl8720dn->filterRTLData(rtl8720dn->waitForResponse(5)));
 		}
 
 		if (wifiScanInProgress && wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
@@ -3659,7 +3689,7 @@ void handleTasks(MenuState handle_state) {
 			}
 		}
 
-		if (wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
+		if (wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD && wifiSnifferMode != WIFI_GENERAL_DUAL_BAND_AP_SCAN && wifiSnifferMode != WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 			static unsigned long channelhoptimer = 0;
 			if (wifiScanRunning && wifiScanInProgress) {
 				if (millis() - channelhoptimer > 500) {
