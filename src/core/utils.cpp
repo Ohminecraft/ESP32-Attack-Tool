@@ -67,6 +67,19 @@ void generateRandomMac(uint8_t* mac) {
 	}
 }
 
+void stringToMac(const String& macStr, uint8_t macAddr[6]) {
+    // Ensure the input string is in the format "XX:XX:XX:XX:XX:XX"
+    if (macStr.length() != 17) {
+        Serial.println("[ERROR] Invalid MAC address format");
+        return;
+    }
+
+    // Parse the MAC address string and fill the uint8_t array
+    for (int i = 0; i < 6; i++) {
+        macAddr[i] = (uint8_t)strtol(macStr.substring(i * 3, i * 3 + 2).c_str(), nullptr, 16);
+    }
+}
+
 String macToString(uint8_t macAddr[6]) {
 	char macStr[18]; // 17 characters for "XX:XX:XX:XX:XX:XX" + 1 null terminator
 	snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
@@ -141,6 +154,7 @@ bool ble_initialized = false; // BLE Initialized Flag
 bool wifi_initialized = false; // WiFi Initialized Flag
 bool wifi_connected = false;
 bool first_scan = true;
+bool rtl8720dn_ready = false; // RTL8720DN Ready Flag
 bool low_memory_warning = false; // Low Memory Warning Flag
 
 // Encoder Object

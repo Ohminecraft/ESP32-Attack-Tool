@@ -361,17 +361,17 @@ static const uint8_t _gamepadHidReportDescriptor[] = {
 };
 
 
-BleKeyboard::BleKeyboard(std::string deviceName, std::string deviceManufacturer, uint8_t batteryLevel) 
+BleKeyboard::BleKeyboard(String deviceName, String deviceManufacturer, uint8_t batteryLevel) 
     : hid(0)
-    , deviceName(std::string(deviceName).substr(0, 15))
-    , deviceManufacturer(std::string(deviceManufacturer).substr(0,15))
+    , deviceName(deviceName.substring(0, 15))
+    , deviceManufacturer(deviceManufacturer.substring(0,15))
     , batteryLevel(batteryLevel) {}
 
 void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
 {
   appearance = showAs;
   _asciimap = layout;
-  NimBLEDevice::init(deviceName);
+  NimBLEDevice::init(deviceName.c_str());
   NimBLEDevice::setPower(MAX_TX_POWER);
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(this);
@@ -403,7 +403,7 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
     outputGamepad->setCallbacks(this);
   }
   
-  hid->setManufacturer(deviceManufacturer);
+  hid->setManufacturer(deviceManufacturer.c_str());
   hid->setPnp(0x02, vid, pid, version);
   hid->setHidInfo(0x00, 0x02);
 
@@ -450,7 +450,7 @@ void BleKeyboard::setBatteryLevel(uint8_t level) {
 }
 
 //must be called before begin in order to set the name
-void BleKeyboard::setName(std::string deviceName) {
+void BleKeyboard::setName(String deviceName) {
   this->deviceName = deviceName;
 }
 

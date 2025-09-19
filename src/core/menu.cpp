@@ -25,6 +25,8 @@ SDCardModules sdcard;
 TimeClock timeClock;
 LogUtils logutils;
 
+RTL8720DNCommunication* rtl8720dn;
+
 int itemoffset = 0;
 
 void handleInputs() {
@@ -165,6 +167,9 @@ void menuinit() {
 		while(1); // Halt if display fails
 	}
 	if (espatsettings.displayInvert) display.displayInvert(true);
+	rtl8720dn = new RTL8720DNCommunication();
+	rtl8720dn->begin();
+	rtl8720dn->isReady();
 	irtx.main();
 	irrx.main(true); // prevent ir rx get signal from unknown source
 	wifi.main();
@@ -360,7 +365,7 @@ void menuNode(String items[], int itemCount) {
 void menuNode(String items, String info, String errortext[2], int itemCount, bool showBack = true) {
 	itemCount = itemCount + 1; // Back Option
 	if(currentSelection < itemCount - 1) {
-		display.drawingRect(0, 25, espatsettings.displayWidth, 13, true);
+		display.drawingRect(0, 13, espatsettings.displayWidth, 13, true);
 		display.setColor(BLACK);
 		display.displayStringwithCoordinates(items, 0, 24);
 		display.setColor(WHITE);
@@ -588,7 +593,6 @@ void displayExploitAttackBLEMenu() {
 	String items[BLE_ATK_MENU_COUNT] = {
 		"Sour Apple",
 		"Apple Juice",
-		"Apple AirDrop",
 		"Swiftpair MS", 
 		"Samsung Spam",
 		"Google Spam",
@@ -684,8 +688,10 @@ void displayWiFiGeneralMenu() {
 
 	String items[WIFI_GENERAL_MENU_COUNT] = {
 		"Scan AP",
+		"Scan Dual-Band AP",
 		"Scan AP (Old)",
 		"Scan AP/STA",
+		"Scan DualB.. AP/STA",
 		"Probe Req Scan",
 		"Deauth Scan",
 		"Beacon Scan",
@@ -705,9 +711,9 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 			wifiScanDisplay = true;
 			display.displayStringwithCoordinates("Scan complete", 0, 24);
 			display.displayStringwithCoordinates("SELECT->back", 0, 36);
-			if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_SCAN_OLD)
+			if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_SCAN_OLD || mode == WIFI_GENERAL_DUAL_BAND_AP_SCAN)
 				display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
-			else if (mode == WIFI_GENERAL_AP_STA_SCAN) {
+			else if (mode == WIFI_GENERAL_AP_STA_SCAN || mode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 				display.displayStringwithCoordinates("AP Found: " + String(access_points ? access_points->size() : 0), 0, 48);
 				display.displayStringwithCoordinates("STA Found: " + String(device_station ? device_station->size() : 0), 0, 60, true);
 			}
@@ -743,7 +749,7 @@ void displayWiFiSelectMenu() {
 
 			for (int i = 0; i < 4; i++) {
 				if (i == 0) items[i] = apInfo;
-				else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi));
+				else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi) + " Band:" + ((ap.band == WIFI_BAND_2_4G) ? "2.4G" : "5G"));
 				else if (i == 2) items[i] = ("B:" + String(bssidStr));
 				else if (i == 3) items[i] = ("Enc:" + ap.wpastr);
 			}
@@ -1176,9 +1182,6 @@ void displayAttackStatus() {
 			case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
 				attackName = "Apple Juice";
 				break;
-			case BLE_ATTACK_EXPLOIT_APPLE_AIRDROP:
-				attackName = "Apple Airdrop";
-				break;
 			case BLE_ATTACK_EXPLOIT_MICROSOFT:
 				attackName = "Swiftpair MS";
 				break;
@@ -1232,10 +1235,12 @@ void displayAttackStatus() {
 	
 	if (currentState == WIFI_ATTACK_RUNNING) {
 		String packetStr = "packet/sec: ";
-		packetStr.concat(String(wifi.packet_sent).toInt());
+		packetStr.concat(wifi.packet_sent);
 		display.displayStringwithCoordinates(packetStr, 0, 36, true);
 	} else if (currentState == BLE_ATTACK_RUNNING) {
-		display.displayStringwithCoordinates("Advertising...", 0, 36, true);
+		String adpacketstr = "SendedAdv: ";
+		adpacketstr.concat(ble.AdvertisedPacketCount);
+		display.displayStringwithCoordinates(adpacketstr, 0, 36, true);
 	}
 	
 	// Display memory info
@@ -1381,7 +1386,6 @@ void startBLEAttack(BLEScanState attackType) {
 	String strmode = "";
 	if (attackType == BLE_ATTACK_EXPLOIT_SOUR_APPLE) strmode = "Sour Apple";
 	else if (attackType == BLE_ATTACK_EXPLOIT_APPLE_JUICE) strmode = "Apple Juice";
-	else if (attackType == BLE_ATTACK_EXPLOIT_APPLE_AIRDROP) strmode = "Apple Airdrop";
 	else if (attackType == BLE_ATTACK_EXPLOIT_MICROSOFT) strmode = "Swiftpair";
 	else if (attackType == BLE_ATTACK_EXPLOIT_GOOGLE) strmode = "Android (Google)";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SAMSUNG) strmode = "Samsung";
@@ -1437,6 +1441,15 @@ void startWiFiAttack(WiFiScanState attackType) {
 	}
 	else if (attackType == WIFI_ATTACK_BAD_MSG_ALL) {
 		strmode = "Bad Msg";
+	}
+	if (dualBandInList && attackType != WIFI_ATTACK_DEAUTH && attackType != WIFI_ATTACK_STA_DEAUTH && attackType != WIFI_ATTACK_DEAUTH_FLOOD) {
+		displayStatusBar();
+		display.displayStringwithCoordinates("This Feature In This", 0, 24);
+		display.displayStringwithCoordinates("Version Can't Run", 0, 36);
+		display.displayStringwithCoordinates("With 5Ghz Band WiFi!", 0, 48, true);
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		displayWiFiAttackMenu();
+		return;
 	}
 	Serial.println("[INFO] Starting WiFi attack: " + strmode);
 	
@@ -1504,6 +1517,18 @@ void startWiFiScan(WiFiGeneralItem mode) {
 			displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 			wifi.StartMode(WIFI_SCAN_AP_STA);
 		}
+	} else if (mode == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+		wifiScanInProgress = true;
+		display.clearBuffer();
+		wifiScanOneShot = true;
+		displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
+		rtl8720dn->sendCommand("RTL_START_AP_SCAN");
+	} else if (mode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+		wifiScanInProgress = true;
+		display.clearBuffer();
+		wifiScanOneShot = true;
+		displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
+		rtl8720dn->sendCommand("RTL_START_AP_STA_SCAN");
 	} else {
 		wifiScanInProgress = true;
 		displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
@@ -1560,14 +1585,18 @@ void stopCurrentAttack() {
 			fixDeauthFloodDisplayLoop = false;
 			wifi.deauth_flood_scan_one_shot = false;
 			wifi.deauth_flood_target = "";
-			delete deauth_flood_ap;
-			deauth_flood_ap = new LinkedList<AccessPoint>(); // Free Memory
+			deauth_flood_ap->clear(); // Free Memory
 		}
 		else {
 			wifiAttackOneShot = false;
 		}
 		display.setFont(u8g2_font_ncenB08_tr);
-		wifi.StartMode(WIFI_SCAN_OFF);
+		if (dualBandInList) {
+			rtl8720dn->sendCommand("RTL_STOP_SCAN");
+			dualBandInList = false;
+		} else {
+			wifi.StartMode(WIFI_SCAN_OFF);
+		}
 	}
 		
 	digitalWrite(espatsettings.statusLedPin, LOW);
@@ -1728,7 +1757,6 @@ void navigateUp() {
 		} else {
 			currentSelection = maxSelections - 1;
 			itemoffset = max(0, maxSelections - espatsettings.maxShowSelection);
-
 		}
 	}
 	
@@ -1957,6 +1985,7 @@ void navigateDown() {
 }
 
 void selectCurrentItem() {
+	display.setColor(WHITE);
 	switch(currentState) {
 		case MAIN_MENU:
 			if (currentSelection == MAIN_BLE) {
@@ -1970,15 +1999,35 @@ void selectCurrentItem() {
 				maxSelections = WIFI_MENU_COUNT;
 				displayWiFiMenu();
 			} else if (currentSelection == MAIN_NRF24) {
-				currentState = NRF24_MENU;
-				currentSelection = 0;
-				maxSelections = NRF24_MENU_COUNT;
-				displayNRF24Menu();
+				if (NRFRadio.isChipConnected() || (espatsettings.nrfCePin != 99 && espatsettings.nrfCsPin != 99)) {
+					currentState = NRF24_MENU;
+					currentSelection = 0;
+					maxSelections = NRF24_MENU_COUNT;
+					displayNRF24Menu();
+				} else {
+					displayStatusBar();
+					display.displayStringwithCoordinates("Your Device not have", 0, 24);
+					display.displayStringwithCoordinates("NRF24 connected!", 0, 36);
+					display.displayStringwithCoordinates("or was disabled in", 0, 48);
+					display.displayStringwithCoordinates("Config!", 0, 60, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					displayMainMenu();
+					return;
+				}
 			} else if (currentSelection == MAIN_IR) {
-				currentState = IR_MENU;
-				currentSelection = 0;
-				maxSelections = IR_MENU_COUNT;
-				displayIRMenu();
+				if (espatsettings.irRxPin != 99 && espatsettings.irTxPin != 99) {
+					currentState = IR_MENU;
+					currentSelection = 0;
+					maxSelections = IR_MENU_COUNT;
+					displayIRMenu();
+				} else {
+					displayStatusBar();
+					display.displayStringwithCoordinates("IR Mode was disabled", 0, 24);
+					display.displayStringwithCoordinates("in Config!", 0, 36, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					displayMainMenu();
+					return;
+				}
 			} else if (currentSelection == MAIN_SD) {
 				currentState = SD_MENU;
 				currentSelection = 0;
@@ -2340,7 +2389,7 @@ void selectCurrentItem() {
 				need_restart = true;
 				
 				// Start BLE attack
-				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_APPLE_AIRDROP, BLE_ATTACK_EXPLOIT_MICROSOFT, 
+				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
 									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_NAME_FLOOD, BLE_ATTACK_EXPLOIT_SPAM_ALL};
 				startBLEAttack(attackTypes[currentSelection]);
 				}
@@ -2420,6 +2469,7 @@ void selectCurrentItem() {
 				}
 				displayWiFiSelectProbeReqSsidsMenu();
 			} else if (currentSelection == WIFI_STA_SELECT) {
+				display.setColor(WHITE);
 				currentState = WIFI_SELECT_STA_AP_MENU;
 				currentSelection = 0;
 				if (access_points && access_points->size() > 0) {
@@ -2482,6 +2532,7 @@ void selectCurrentItem() {
 				displayWiFiSelectMenu();
 			}
 			else if (currentSelection == WIFI_UTILS_SET_STA_MAC) {
+				display.setColor(WHITE);
 				set_mac = true;
 				currentState = WIFI_SELECT_STA_AP_MENU;
 				currentSelection = 0;
@@ -2513,6 +2564,19 @@ void selectCurrentItem() {
 				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 				//startWiFiScan(WIFI_GENERAL_AP_SCAN);
 			}
+			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+				if (!rtl8720dn_ready) {
+					displayStatusBar();
+					display.displayStringwithCoordinates("RTL8720DN Not Insta-", 0, 24);
+					display.displayStringwithCoordinates("lled Or Something", 0, 36);
+					display.displayStringwithCoordinates("Went Wrong!", 0, 48, true);
+					vTaskDelay(2000 / portTICK_PERIOD_MS);
+					displayWiFiGeneralMenu();
+					return;
+				}
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
+			}
 			else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
@@ -2521,6 +2585,19 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 				//startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
+			}
+			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+				if (!rtl8720dn_ready) {
+					displayStatusBar();
+					display.displayStringwithCoordinates("RTL8720DN Not Insta-", 0, 24);
+					display.displayStringwithCoordinates("lled Or Something", 0, 36);
+					display.displayStringwithCoordinates("Went Wrong!", 0, 48, true);
+					vTaskDelay(2000 / portTICK_PERIOD_MS);
+					displayWiFiGeneralMenu();
+					return;
+				}
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 			}
 			else if (currentSelection == WIFI_GENERAL_PROBE_REQ_SCAN) {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
@@ -2544,6 +2621,7 @@ void selectCurrentItem() {
 				startSnifferScan(WIFI_GENERAL_EAPOL_DEAUTH_SCAN);
 			} else if (currentSelection == WIFI_GENERAL_CH_ANALYZER) {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				display.setColor(WHITE);
 				startSnifferScan(WIFI_GENERAL_CH_ANALYZER);
 			}
 			wifiSnifferMode = currentSelection;
@@ -2553,11 +2631,20 @@ void selectCurrentItem() {
 				if (currentSelection == WIFI_GENERAL_AP_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN);
 				}
+				else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+					access_points->clear();
+					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
+				}
 				else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN_OLD);
 				}
 				else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
+				}
+				else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+					access_points->clear();
+					device_station->clear();
+					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 				}
 			} else wifiScanRunning = false;
 			break;
@@ -2700,6 +2787,14 @@ void selectCurrentItem() {
 					displayWiFiAttackMenu();
 					return;
 				}
+				for (int i = 0; i < access_points->size(); i++) {
+					if (access_points->get(i).selected && access_points->get(i).band == WIFI_BAND_5G) {
+						dualBandInList = true;
+						break;
+					} else {
+						dualBandInList = false;
+					}
+				}
 				
 				// Start WiFi attack
 				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_STA_BEACON,
@@ -2841,6 +2936,7 @@ void selectCurrentItem() {
 			if (!sdcard_buffer || sdcard_buffer->size() == 0) {
 				goBack();
 			} else {
+				display.setColor(WHITE);
 				if (currentSelection < sdcard_buffer->size()) {
 					if (selectforbadusb) {
 						String fileName = sdcard_buffer->get(currentSelection);
@@ -3079,14 +3175,19 @@ void goBack() {
 			displayWiFiMenu();
 			break;
 		case WIFI_SCAN_RUNNING:
-			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN) {
+			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
 				if (wifiScanRunning && wifiScanInProgress) {
 					wifiScanInProgress = false;
-					wifi.StartMode(WIFI_SCAN_OFF);
-					if (currentSelection == WIFI_GENERAL_AP_SCAN) {
+					if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN) {
+						wifi.StartMode(WIFI_SCAN_OFF);
+					}
+					else {
+						rtl8720dn->sendCommand("RTL_STOP_SCAN");
+					}
+					if (currentSelection == WIFI_GENERAL_AP_SCAN || currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
 						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()));
 						displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
-					} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
+					} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN || currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()) + " Station in list: " + String(device_station->size()));
 						displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 					}
@@ -3098,7 +3199,7 @@ void goBack() {
 					maxSelections = WIFI_GENERAL_MENU_COUNT;
 					displayWiFiGeneralMenu();
 				}
-				else if (wifiScanRunning && wifiScanOneShot &&wifiScanDisplay)  {
+				else if (wifiScanRunning && wifiScanOneShot && wifiScanDisplay)  {
 					wifiScanRunning = false;
 					wifiScanOneShot = false;
 					wifiScanDisplay = false;
@@ -3429,6 +3530,12 @@ void goBack() {
 			currentSelection = 0;
 			maxSelections = IR_MENU_COUNT;
 			displayIRMenu();
+		} else if (selectforevilportal) {
+			selectforevilportal = false;
+			currentState = WIFI_UTILS_MENU;
+			currentSelection = 0;
+			maxSelections = WIFI_UTILS_MENU_COUNT;
+			displayWiFiUtilsMenu();
 		}
 		else {
 			currentState = SD_MENU;
@@ -3508,14 +3615,15 @@ void handleInput(MenuState handle_state) {
 			handle_state == IR_READ_RUNNING ||
 			handle_state == CLOCK_MENU)
 		{
+			if (handle_state == BLE_ATTACK_RUNNING) ble.AdvertisedPacketCount = 0;
 			goBack();
 		}
 		else {
 			selectCurrentItem();
 			if (currentSelection == 0) {
 				itemoffset = 0;
-				redrawTasks();
 			}
+			redrawTasks();
 		}
 	}
 
@@ -3583,7 +3691,9 @@ void handleTasks(MenuState handle_state) {
 		if ((String)timeClock.timechar != last_clock) {
 			display.clearScreen();
 			displayStatusBar();
-			display.drawingCenterString(timeClock.timechar, espatsettings.displayHeight / 2 + 5);
+			display.setFont(u8g2_font_ncenB18_tr);
+			display.displayStringwithCoordinates(timeClock.timechar, (espatsettings.displayWidth - ((strlen(timeClock.timechar) * 6)) / 2) - 90, (espatsettings.displayHeight / 2) + 15);
+			display.setFont(u8g2_font_ncenB08_tr);
 			display.sendDisplay();
 			last_clock = (String)timeClock.timechar;
 		}
@@ -3599,11 +3709,15 @@ void handleTasks(MenuState handle_state) {
 				startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 			}
 		}
-		if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
+		if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 		}
 		else {
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
+		}
+
+		if (wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+			rtl8720dn->parseAPSTAScanResponse(rtl8720dn->filterRTLData(rtl8720dn->waitForResponse(5)));
 		}
 
 		if (wifiScanInProgress && wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
@@ -3615,7 +3729,7 @@ void handleTasks(MenuState handle_state) {
 			}
 		}
 
-		if (wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
+		if (wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD && wifiSnifferMode != WIFI_GENERAL_DUAL_BAND_AP_SCAN && wifiSnifferMode != WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 			static unsigned long channelhoptimer = 0;
 			if (wifiScanRunning && wifiScanInProgress) {
 				if (millis() - channelhoptimer > 500) {
@@ -3842,9 +3956,6 @@ void handleTasks(MenuState handle_state) {
 				case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_JUICE);
 					break;
-				case BLE_ATTACK_EXPLOIT_APPLE_AIRDROP:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_AIRDROP);
-					break;
 				case BLE_ATTACK_EXPLOIT_MICROSOFT:
 					ble.StartMode(BLE_ATTACK_EXPLOIT_MICROSOFT);
 					break;
@@ -3931,10 +4042,77 @@ void handleTasks(MenuState handle_state) {
 			else {
 				// Regular WiFi attacks
 				if (!wifiAttackOneShot) {
-					wifi.StartMode(currentWiFiAttackType);
+					if (!dualBandInList) wifi.StartMode(currentWiFiAttackType);
+					else {
+						String src_macs = "";
+						String dst_groups = "";
+						String channels = "";
+						bool has_stations = false;
+						bool first_ap = true;
+						
+						for (int x = 0; x < access_points->size(); x++) {
+							if (access_points->get(x).selected) {
+								AccessPoint sel_ap = access_points->get(x);
+								
+								String current_group = "{";
+								bool group_has_stations = false;
+								
+								// Check if this AP has selected stations
+								for (int i = 0; i < sel_ap.stations->size(); i++) {
+									if (device_station->get(sel_ap.stations->get(i)).selected) {
+										Station sel_sta = device_station->get(sel_ap.stations->get(i));
+										
+										if (group_has_stations) {
+											current_group += ",";
+										}
+										current_group += macToString(sel_sta.mac);
+										group_has_stations = true;
+										has_stations = true;
+									}
+								}
+								current_group += "}";
+								
+								if (!first_ap) {
+									src_macs += ",";
+									dst_groups += ",";
+									channels += ",";
+								}
+								
+								src_macs += macToString(sel_ap.bssid);
+								
+								// If no stations, use empty group or wildcard
+								if (!group_has_stations) {
+									dst_groups += "{}";
+								} else {
+									dst_groups += current_group;
+								}
+								
+								channels += String(sel_ap.channel);
+								first_ap = false;
+							}
+						}
+						if (src_macs != "") {
+							if (has_stations) {
+								Serial.println("[INFO] Starting [Dual Band Station Deauth] Attack!");
+								rtl8720dn->sendCommand("RTL_DEAUTH_STA -am {" + src_macs + "} -sm " + dst_groups + " -c {" + channels + "}");
+							} else {
+								// All APs have no stations - use AP_ONLY command
+								Serial.println("[INFO] Starting [Dual Band Deauth] Attack!");
+								rtl8720dn->sendCommand("RTL_DEAUTH -am {" + src_macs + "} -c {" + channels + "}");
+							}
+						}
+					}
 					wifiAttackOneShot = true;
 				}
-				wifi.mainAttackLoop(currentWiFiAttackType);
+				if (!dualBandInList) wifi.mainAttackLoop(currentWiFiAttackType); // this can handle only 2.4Ghz band
+				else {
+					String packet_res = rtl8720dn->waitForResponse(10);
+					packet_res.trim();
+					if (packet_res.startsWith("PACKET:")) {
+						packet_res = packet_res.substring(7);
+						wifi.packet_sent = packet_res.toInt();
+					}
+				}
 			}
 		}
 
@@ -3943,7 +4121,7 @@ void handleTasks(MenuState handle_state) {
 			currentWiFiAttackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
 			currentWiFiAttackType != WIFI_ATTACK_DEAUTH_FLOOD &&
 			currentWiFiAttackType != WIFI_ATTACK_KARMA) {
-			if (millis() - lastDisplayUpdate > 2000) {
+			if (millis() - lastDisplayUpdate > 1000) {
 				displayAttackStatus();
 				wifi.packet_sent = 0;
 				lastDisplayUpdate = millis();

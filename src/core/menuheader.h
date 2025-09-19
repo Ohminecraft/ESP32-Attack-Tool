@@ -20,6 +20,7 @@
 #include "core/displayheader.h"
 #include "core/sdcardmountheader.h"
 #include "core/clockheader.h"
+#include "core/communicationheader.h"
 #include "modules/ble/bleheader.h"
 #include "modules/wifi/wifiheader.h"
 #include "modules/wifi/evilportalheader.h"
@@ -155,7 +156,6 @@ enum BLESpooferBrandType {
 enum BLEExploitAttackMenuItem {
     BLE_ATK_SOUR_APPLE,
     BLE_ATK_APPLE_JUICE,
-    BLE_ATK_APPLE_AIRDROP,
     BLE_ATK_SWIFTPAIR_MS,
     BLE_ATK_SAMSUNG_SPAM,
     BLE_ATK_GOOGLE_SPAM,
@@ -219,8 +219,10 @@ enum WiFiUtils {
 
 enum WiFiGeneralItem {
     WIFI_GENERAL_AP_SCAN,
+    WIFI_GENERAL_DUAL_BAND_AP_SCAN,
     WIFI_GENERAL_AP_SCAN_OLD,
     WIFI_GENERAL_AP_STA_SCAN,
+    WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN,
     WIFI_GENERAL_PROBE_REQ_SCAN,
     WIFI_GENERAL_DEAUTH_SCAN,
     WIFI_GENERAL_BEACON_SCAN,
@@ -328,6 +330,7 @@ unsigned long attackStartTime;
 BLEScanState currentBLEAttackType = BLE_SCAN_OFF;
 WiFiScanState currentWiFiAttackType = WIFI_SCAN_OFF;
 NRFJammerMode currentNRFJammerMode;
+bool dualBandInList = false;
 
 // BLE Scan State
 bool bleScanRunning = false;

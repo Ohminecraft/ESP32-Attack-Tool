@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"
 #include "esp_system.h"
+#include "esp_log.h"
 
 #include "core/displayheader.h"
 #include "core/menuheader.h"
@@ -17,6 +18,7 @@ void setup() {
     Serial.begin(115200);
     Serial.println(" ");
     Serial.println("[INFO] Starting ESP32 Attack Tool v2...");
+    esp_log_level_set("*", ESP_LOG_NONE); // Disable all ESP logs
     
     espatsettings.loadSettings();
     
@@ -31,7 +33,6 @@ void setup() {
 		pinMode(espatsettings.sdcardCsPin, OUTPUT);
 		digitalWrite(espatsettings.sdcardCsPin, HIGH);
 	}
-    esp_log_level_set("sd_diskio", ESP_LOG_NONE);
     menuinit();
     
     Serial.println("[INFO] System ready!");

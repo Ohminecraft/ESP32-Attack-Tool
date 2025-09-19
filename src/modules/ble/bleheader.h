@@ -45,7 +45,6 @@ enum BLEScanState {
     BLE_ATTACK_EXPLOIT_INIT,
     BLE_ATTACK_EXPLOIT_SOUR_APPLE,
     BLE_ATTACK_EXPLOIT_APPLE_JUICE,
-    BLE_ATTACK_EXPLOIT_APPLE_AIRDROP,
     BLE_ATTACK_EXPLOIT_MICROSOFT,
     BLE_ATTACK_EXPLOIT_SAMSUNG,
     BLE_ATTACK_EXPLOIT_GOOGLE,
@@ -60,7 +59,6 @@ enum EBLEPayloadType
     Microsoft,
     SourApple,
     AppleJuice,
-    AppleAirDrop,
     Samsung,
     Google,
     NameFlood
@@ -84,47 +82,6 @@ struct BLEScanResult {
 };
 
 extern LinkedList<BLEScanResult>* blescanres;
-
-// https://github.com/pr3y/Bruce/blob/main/src/modules/ble/ble_spam.cpp
-const uint8_t IOS1[]{
-    /* Airpods[31] = */ 0x02,
-    /* AirpodsPro[31] = */ 0x0e,
-    /*AirpodsMax[31] = */ 0x0a,
-    /* AirpodsGen2[31] = */ 0x0f,
-    /* AirpodsGen3[31] = */ 0x13,
-    /*AirpodsProGen2[31]=*/0x14,
-    /* PowerBeats[31] =*/0x03,
-    /* PowerBeatsPro[31]=*/0x0b,
-    /* BeatsSoloPro[31] = */ 0x0c,
-    /* BeatsStudioBuds[31] =*/0x11,
-    /*BeatsFlex[31] =*/0x10,
-    /* BeatsX[31] =*/0x05,
-    /* BeatsSolo3[31] =*/0x06,
-    /* BeatsStudio3[31] =*/0x09,
-    /* BeatsStudioPro[31] =*/0x17,
-    /* BeatsFitPro[31] =*/0x12,
-    /* BeatsStdBudsPlus[31] */ 0x16,
-}; // --0  ---1  ---2  ---3  ---4  ---5  ---6  xxx7  ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-   // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----
-
-const uint8_t IOS2[]{
-    // 0000  ---1  ---2  ---3  ---4  ---5  ---6  ---7  ---8  ---9  --10  --11  --12  xx13  ----  ----  ----
-    // ----  ----  ----  ----  ----  ----
-    /* AppleTVSetup[23] */ 0x01,
-    /* AppleTVPair[23] */ 0x06,
-    /* AppleTVNewUser[23] */ 0x20,
-    /* AppleTVAppleIDSetup[23] */ 0x2b,
-    /* AppleTVWirelessAudioSync[23] */ 0xc0,
-    /* AppleTVHomekitSetup[23] */ 0x0d,
-    /* AppleTVKeyboard[23] */ 0x13,
-    /*AppleTVConnectingNetwork[23]*/ 0x27,
-    /* HomepodSetup[23] */ 0x0b,
-    /* SetupNewPhone[23] */ 0x09,
-    /* TransferNumber[23] */ 0x02,
-    /* TVColorBalance[23] */ 0x1e,
-    /* AppleVisionPro[23] */ 0x24,
-};
-
 
 // https://github.com/Flipper-XFW/Xtreme-Apps/blob/dev/ble_spam/protocols/continuity.c
 typedef struct {
@@ -933,6 +890,8 @@ class BLEModules {
         ~BLEModules() {
             ShutdownBLE();
         }
+
+        uint32_t AdvertisedPacketCount = 0;
 
         int16_t ble_analyzer_frames[SCR_WIDTH];
         uint8_t ble_analyzer_frames_recvd = 0;
