@@ -8,8 +8,6 @@
 
 // RTL8720DN
 
-extern int packet_sent;
-
 static uint8_t deauth_frame_packet[26] = {
     0xC0, 0x00,                         // type, subtype c0: deauth (a0: disassociate)
     0x3A, 0x01,                         // duration (SDK takes care of that)

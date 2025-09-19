@@ -322,7 +322,7 @@ class WiFiModules
 
         uint8_t ap_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
         uint8_t sta_mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-        uint8_t packet_sent = 0;
+        uint32_t packet_sent = 0;
         uint8_t set_channel = 1;
         int16_t wifi_analyzer_frames[SCR_WIDTH];
         uint8_t wifi_analyzer_frames_recvd = 0;

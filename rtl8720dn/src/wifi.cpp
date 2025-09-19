@@ -97,7 +97,7 @@ void channelHop() {
         } else {
             dual_band_channel_index++;
         }
-        wifi_set_channel(channel);
+        wext_set_channel(WLAN0_NAME, channel);
     }
 }
 

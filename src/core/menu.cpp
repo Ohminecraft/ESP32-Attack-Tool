@@ -1442,6 +1442,15 @@ void startWiFiAttack(WiFiScanState attackType) {
 	else if (attackType == WIFI_ATTACK_BAD_MSG_ALL) {
 		strmode = "Bad Msg";
 	}
+	if (dualBandInList && attackType != WIFI_ATTACK_DEAUTH && attackType != WIFI_ATTACK_STA_DEAUTH && attackType != WIFI_ATTACK_DEAUTH_FLOOD) {
+		displayStatusBar();
+		display.displayStringwithCoordinates("This Feature In This", 0, 24);
+		display.displayStringwithCoordinates("Version Can't Run", 0, 36);
+		display.displayStringwithCoordinates("With 5Ghz Band WiFi!", 0, 48, true);
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		displayWiFiAttackMenu();
+		return;
+	}
 	Serial.println("[INFO] Starting WiFi attack: " + strmode);
 	
 	currentWiFiAttackType = attackType;
@@ -1576,14 +1585,18 @@ void stopCurrentAttack() {
 			fixDeauthFloodDisplayLoop = false;
 			wifi.deauth_flood_scan_one_shot = false;
 			wifi.deauth_flood_target = "";
-			delete deauth_flood_ap;
-			deauth_flood_ap = new LinkedList<AccessPoint>(); // Free Memory
+			deauth_flood_ap->clear(); // Free Memory
 		}
 		else {
 			wifiAttackOneShot = false;
 		}
 		display.setFont(u8g2_font_ncenB08_tr);
-		wifi.StartMode(WIFI_SCAN_OFF);
+		if (dualBandInList) {
+			rtl8720dn->sendCommand("RTL_STOP_SCAN");
+			dualBandInList = false;
+		} else {
+			wifi.StartMode(WIFI_SCAN_OFF);
+		}
 	}
 		
 	digitalWrite(espatsettings.statusLedPin, LOW);
@@ -2552,6 +2565,15 @@ void selectCurrentItem() {
 				//startWiFiScan(WIFI_GENERAL_AP_SCAN);
 			}
 			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+				if (!rtl8720dn_ready) {
+					displayStatusBar();
+					display.displayStringwithCoordinates("RTL8720DN Not Insta-", 0, 24);
+					display.displayStringwithCoordinates("lled Or Something", 0, 36);
+					display.displayStringwithCoordinates("Went Wrong!", 0, 48, true);
+					vTaskDelay(2000 / portTICK_PERIOD_MS);
+					displayWiFiGeneralMenu();
+					return;
+				}
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
 			}
@@ -2565,6 +2587,15 @@ void selectCurrentItem() {
 				//startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 			}
 			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+				if (!rtl8720dn_ready) {
+					displayStatusBar();
+					display.displayStringwithCoordinates("RTL8720DN Not Insta-", 0, 24);
+					display.displayStringwithCoordinates("lled Or Something", 0, 36);
+					display.displayStringwithCoordinates("Went Wrong!", 0, 48, true);
+					vTaskDelay(2000 / portTICK_PERIOD_MS);
+					displayWiFiGeneralMenu();
+					return;
+				}
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 			}
@@ -2612,6 +2643,7 @@ void selectCurrentItem() {
 				}
 				else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 					access_points->clear();
+					device_station->clear();
 					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 				}
 			} else wifiScanRunning = false;
@@ -2754,6 +2786,14 @@ void selectCurrentItem() {
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
 					displayWiFiAttackMenu();
 					return;
+				}
+				for (int i = 0; i < access_points->size(); i++) {
+					if (access_points->get(i).selected && access_points->get(i).band == WIFI_BAND_5G) {
+						dualBandInList = true;
+						break;
+					} else {
+						dualBandInList = false;
+					}
 				}
 				
 				// Start WiFi attack
@@ -4002,10 +4042,77 @@ void handleTasks(MenuState handle_state) {
 			else {
 				// Regular WiFi attacks
 				if (!wifiAttackOneShot) {
-					wifi.StartMode(currentWiFiAttackType);
+					if (!dualBandInList) wifi.StartMode(currentWiFiAttackType);
+					else {
+						String src_macs = "";
+						String dst_groups = "";
+						String channels = "";
+						bool has_stations = false;
+						bool first_ap = true;
+						
+						for (int x = 0; x < access_points->size(); x++) {
+							if (access_points->get(x).selected) {
+								AccessPoint sel_ap = access_points->get(x);
+								
+								String current_group = "{";
+								bool group_has_stations = false;
+								
+								// Check if this AP has selected stations
+								for (int i = 0; i < sel_ap.stations->size(); i++) {
+									if (device_station->get(sel_ap.stations->get(i)).selected) {
+										Station sel_sta = device_station->get(sel_ap.stations->get(i));
+										
+										if (group_has_stations) {
+											current_group += ",";
+										}
+										current_group += macToString(sel_sta.mac);
+										group_has_stations = true;
+										has_stations = true;
+									}
+								}
+								current_group += "}";
+								
+								if (!first_ap) {
+									src_macs += ",";
+									dst_groups += ",";
+									channels += ",";
+								}
+								
+								src_macs += macToString(sel_ap.bssid);
+								
+								// If no stations, use empty group or wildcard
+								if (!group_has_stations) {
+									dst_groups += "{}";
+								} else {
+									dst_groups += current_group;
+								}
+								
+								channels += String(sel_ap.channel);
+								first_ap = false;
+							}
+						}
+						if (src_macs != "") {
+							if (has_stations) {
+								Serial.println("[INFO] Starting [Dual Band Station Deauth] Attack!");
+								rtl8720dn->sendCommand("RTL_DEAUTH_STA -am {" + src_macs + "} -sm " + dst_groups + " -c {" + channels + "}");
+							} else {
+								// All APs have no stations - use AP_ONLY command
+								Serial.println("[INFO] Starting [Dual Band Deauth] Attack!");
+								rtl8720dn->sendCommand("RTL_DEAUTH -am {" + src_macs + "} -c {" + channels + "}");
+							}
+						}
+					}
 					wifiAttackOneShot = true;
 				}
-				wifi.mainAttackLoop(currentWiFiAttackType);
+				if (!dualBandInList) wifi.mainAttackLoop(currentWiFiAttackType); // this can handle only 2.4Ghz band
+				else {
+					String packet_res = rtl8720dn->waitForResponse(10);
+					packet_res.trim();
+					if (packet_res.startsWith("PACKET:")) {
+						packet_res = packet_res.substring(7);
+						wifi.packet_sent = packet_res.toInt();
+					}
+				}
 			}
 		}
 

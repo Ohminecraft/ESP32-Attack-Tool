@@ -9,6 +9,7 @@
 #include "wifi_util.h"
 #include "wifi_structures.h"
 #include "wifi_conf.h"
+#include <LinkedList.h>
 
 #define WIFI_SECURITY_OPEN   0
 #define WIFI_SECURITY_WEP    1
@@ -28,6 +29,16 @@ static uint8_t dual_band_channels[DUAL_BAND_CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8,
 struct BssidToDeauth {
     uint8_t bssid[6];
     uint8_t channel;
+};
+
+struct Station {
+    uint8_t mac[6];
+};
+
+struct BssidToDeauthWithStaion {
+    uint8_t bssid[6];
+    uint8_t channel;
+    LinkedList<Station>* stations;
 };
 
 void rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param);
