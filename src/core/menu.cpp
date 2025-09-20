@@ -1447,6 +1447,9 @@ void startWiFiAttack(WiFiScanState attackType) {
 						  attackType != WIFI_ATTACK_DEAUTH_FLOOD && 
 						  attackType != WIFI_ATTACK_EVIL_PORTAL &&
 						  attackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
+						  attackType != WIFI_ATTACK_RIC_BEACON &&
+						  attackType != WIFI_ATTACK_STA_BEACON &&
+						  attackType != WIFI_ATTACK_RND_BEACON &&
 						  attackType != WIFI_ATTACK_KARMA) {
 		displayStatusBar();
 		display.displayStringwithCoordinates("This Feature In This", 0, 24);
