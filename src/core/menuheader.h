@@ -330,7 +330,6 @@ unsigned long attackStartTime;
 BLEScanState currentBLEAttackType = BLE_SCAN_OFF;
 WiFiScanState currentWiFiAttackType = WIFI_SCAN_OFF;
 NRFJammerMode currentNRFJammerMode;
-bool dualBandInList = false;
 
 // BLE Scan State
 bool bleScanRunning = false;

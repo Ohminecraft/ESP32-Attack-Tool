@@ -71,7 +71,6 @@ void RTL8720DNCommunication::readResponseTask(void* parameter) {
                 
                 if (xQueueSend(comm->responseQueue, &responsePtr, 0) != pdTRUE) {
                     delete responsePtr;
-                    Serial.println("[WARN] Response queue full, dropping message");
                 }
             }
         }
@@ -82,12 +81,10 @@ void RTL8720DNCommunication::readResponseTask(void* parameter) {
 
 void RTL8720DNCommunication::sendCommand(const char* cmd) {
     this->RTLSerial->println(cmd);
-    Serial.println("[DEBUG] Sent: " + String(cmd));
 }
 
 void RTL8720DNCommunication::sendCommand(const String cmd) {
     this->RTLSerial->println(cmd);
-    Serial.println("[DEBUG] Sent: " + cmd);
 }
 
 // Chờ response với timeout

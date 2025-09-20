@@ -334,6 +334,8 @@ class WiFiModules
         bool deauth_flood_found_ap = false;
         bool deauth_flood_scan_one_shot = false;
         String deauth_flood_target = "";
+
+        bool dualBandInList = false;
         
         wifi_config_t ap_config;
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();

@@ -86,8 +86,8 @@ void channelHop() {
     // Channel hopping
     if (millis() - lastHop >= HOP_INTERVAL) {
         lastHop =  millis();
-        channel = dual_band_channels[dual_band_channel_index];
-        if (channel > 14) {
+        uint16_t channel = dual_band_channels[dual_band_channel_index];
+        if (channel > 13) {
             band5ghz_scan = true;
         } else {
             band5ghz_scan = false;
@@ -113,7 +113,7 @@ void rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (frame_type == 0 && frame_subtype == 8) {  // Beacon frame
         // Check if AP already in list
         String essid = "";
-        uint8_t channel_from_beacon = channel;
+        uint8_t channel_from_beacon = 0;
         
         // Parse Information Elements
         if (length > 36) {
@@ -167,7 +167,7 @@ void rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (frame_type == 0 && frame_subtype == 8) {  // Beacon frame
         // Check if AP already in list
         String essid = "";
-        uint8_t channel_from_beacon = channel;
+        uint8_t channel_from_beacon = 0;
         
         // Parse Information Elements
         if (length > 36) {

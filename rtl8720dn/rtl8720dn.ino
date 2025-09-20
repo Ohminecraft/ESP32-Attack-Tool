@@ -27,7 +27,7 @@ bool sta_deauth_attack = false;
 bool auth_attack = false;
 
 String ssid_to_probe_req = "";
-uint8_t channel = 1;
+//uint8_t channel = 1;
 static uint16_t packet_sent = 0;
 
 void loop() {
@@ -57,7 +57,7 @@ void loop() {
             digitalWrite(LED_G, HIGH);
             ap_scan = true;
             band5ghz_scan = false;
-            channel = 1;
+            //channel = 1;
 
             //LwIP_Init();
             wifi_on(RTW_MODE_STA);
@@ -69,7 +69,7 @@ void loop() {
             digitalWrite(LED_B, HIGH);
             ap_sta_scan = true;
             band5ghz_scan = false;
-            channel = 1;
+            //channel = 1;
 
             //LwIP_Init();
             wifi_on(RTW_MODE_STA);
@@ -276,7 +276,7 @@ void loop() {
         }
     }
     else if (auth_attack) {
-        sendDualBandProbeReqFrame(ssid_to_probe_req, channel);
-        delay(1);
+        //sendDualBandProbeReqFrame(ssid_to_probe_req, channel);
+        //delay(1);
     }
 }

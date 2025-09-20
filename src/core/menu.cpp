@@ -1442,11 +1442,17 @@ void startWiFiAttack(WiFiScanState attackType) {
 	else if (attackType == WIFI_ATTACK_BAD_MSG_ALL) {
 		strmode = "Bad Msg";
 	}
-	if (dualBandInList && attackType != WIFI_ATTACK_DEAUTH && attackType != WIFI_ATTACK_STA_DEAUTH && attackType != WIFI_ATTACK_DEAUTH_FLOOD) {
+	if (wifi.dualBandInList && attackType != WIFI_ATTACK_DEAUTH &&
+						  attackType != WIFI_ATTACK_STA_DEAUTH &&
+						  attackType != WIFI_ATTACK_DEAUTH_FLOOD && 
+						  attackType != WIFI_ATTACK_EVIL_PORTAL &&
+						  attackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
+						  attackType != WIFI_ATTACK_KARMA) {
 		displayStatusBar();
 		display.displayStringwithCoordinates("This Feature In This", 0, 24);
 		display.displayStringwithCoordinates("Version Can't Run", 0, 36);
 		display.displayStringwithCoordinates("With 5Ghz Band WiFi!", 0, 48, true);
+		Serial.println("[WARN] Can't run this attack with dual-band APs in list!");
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
 		displayWiFiAttackMenu();
 		return;
@@ -1591,9 +1597,9 @@ void stopCurrentAttack() {
 			wifiAttackOneShot = false;
 		}
 		display.setFont(u8g2_font_ncenB08_tr);
-		if (dualBandInList) {
+		if (wifi.dualBandInList) {
 			rtl8720dn->sendCommand("RTL_STOP_SCAN");
-			dualBandInList = false;
+			wifi.dualBandInList = false;
 		} else {
 			wifi.StartMode(WIFI_SCAN_OFF);
 		}
@@ -2789,10 +2795,10 @@ void selectCurrentItem() {
 				}
 				for (int i = 0; i < access_points->size(); i++) {
 					if (access_points->get(i).selected && access_points->get(i).band == WIFI_BAND_5G) {
-						dualBandInList = true;
+						wifi.dualBandInList = true;
 						break;
 					} else {
-						dualBandInList = false;
+						wifi.dualBandInList = false;
 					}
 				}
 				
@@ -4012,6 +4018,9 @@ void handleTasks(MenuState handle_state) {
 						display.displayString("Failed To Init", true);
 						display.displayString("Initialized Portal", true, true);
 					}
+					if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH && wifi.dualBandInList) {
+						rtl8720dn->sendCommand(str_deauth_frame);
+					}
 					evilPortalOneShot = true;
 				}
 
@@ -4021,7 +4030,7 @@ void handleTasks(MenuState handle_state) {
 				eportal.loop();
 				
 				// Deauth handling for Evil Portal + Deauth
-				if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
+				if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH && !wifi.dualBandInList) {
 					static unsigned long lastDeauthTime = 0;
 					if (millis() - lastDeauthTime > 250) {
 						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
@@ -4042,7 +4051,7 @@ void handleTasks(MenuState handle_state) {
 			else {
 				// Regular WiFi attacks
 				if (!wifiAttackOneShot) {
-					if (!dualBandInList) wifi.StartMode(currentWiFiAttackType);
+					if (!wifi.dualBandInList) wifi.StartMode(currentWiFiAttackType);
 					else {
 						String src_macs = "";
 						String dst_groups = "";
@@ -4104,7 +4113,7 @@ void handleTasks(MenuState handle_state) {
 					}
 					wifiAttackOneShot = true;
 				}
-				if (!dualBandInList) wifi.mainAttackLoop(currentWiFiAttackType); // this can handle only 2.4Ghz band
+				if (!wifi.dualBandInList) wifi.mainAttackLoop(currentWiFiAttackType); // this can handle only 2.4Ghz band
 				else {
 					String packet_res = rtl8720dn->waitForResponse(10);
 					packet_res.trim();
