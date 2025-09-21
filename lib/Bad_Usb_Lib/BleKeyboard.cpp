@@ -423,6 +423,22 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   onStarted(pServer);
 
   advertising = pServer->getAdvertising();
+  ///////////////////////// Swiftpair ///////////////////////////////
+  NimBLEAdvertisementData AdvData = NimBLEAdvertisementData();
+  int i = 0;
+  uint8_t AdvData_Raw[7 + deviceName.length()];
+  AdvData_Raw[i++] = 7 + deviceName.length() - 1;
+  AdvData_Raw[i++] = 0xFF;
+  AdvData_Raw[i++] = 0x06;
+  AdvData_Raw[i++] = 0x00;
+  AdvData_Raw[i++] = 0x03;
+  AdvData_Raw[i++] = 0x00;
+  AdvData_Raw[i++] = 0x80;
+  memcpy(&AdvData_Raw[i], deviceName.c_str(), deviceName.length());
+  i += deviceName.length();
+  AdvData.addData(AdvData_Raw, 7 + deviceName.length());
+  advertising->setAdvertisementData(AdvData);
+  ///////////////////////////////////////////////////////////////////////
   advertising->setAppearance(appearance);
   if (_randUUID) {
     advertising->addServiceUUID(BLEUUID((uint16_t)(ESP.getEfuseMac() & 0xFFFF)));

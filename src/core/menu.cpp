@@ -2184,6 +2184,7 @@ void selectCurrentItem() {
 						displayStatusBar();
 						display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						selPress = false; // Prevent immediate re-entry
 						displayBLEMenu();
 					}
 				} else if (currentSelection == BLE_KEYMOTE) {
@@ -2218,6 +2219,7 @@ void selectCurrentItem() {
 						displayStatusBar();
 						display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						selPress = false; // Prevent immediate re-entry
 						displayBLEMenu();
 					}
 				} else if (currentSelection == BLE_TT_SCROLL) {
@@ -2252,6 +2254,7 @@ void selectCurrentItem() {
 						displayStatusBar();				
 						display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 						vTaskDelay(1000 / portTICK_PERIOD_MS);
+						selPress = false; // Prevent immediate re-entry
 						displayBLEMenu();
 					}
 				}
@@ -2414,7 +2417,7 @@ void selectCurrentItem() {
 			else if (currentSelection == BLE_KEYMOTE_LEFT) badusb.Keymote(hid_ble, KEYMOTE_LEFT); 
 			else if (currentSelection == BLE_KEYMOTE_RIGHT) badusb.Keymote(hid_ble, KEYMOTE_RIGHT);
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
-			vTaskDelay(150 / portTICK_PERIOD_MS);
+			vTaskDelay(80 / portTICK_PERIOD_MS);
 			displayKeymoteBLEMenu();
 			break;
 		case BLE_MEDIA_MENU:
@@ -2432,7 +2435,7 @@ void selectCurrentItem() {
 			else if (currentSelection == BLE_MEDIA_VOL_DOWN) badusb.mediaController(hid_ble, MEDIA_VOL_DOWN);
 			else if (currentSelection == BLE_MEDIA_MUTE) badusb.mediaController(hid_ble, MEDIA_MUTE);
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
-			vTaskDelay(150 / portTICK_PERIOD_MS);
+			vTaskDelay(80 / portTICK_PERIOD_MS);
 			displayMediaCtrlBLEMenu();
 			break;
 		case BLE_TT_SCROLL_MENU:
@@ -2445,7 +2448,7 @@ void selectCurrentItem() {
 			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_ble, SCROLL_DOWN);
 			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_ble, LIKE_VIDEO);
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
-			vTaskDelay(150 / portTICK_PERIOD_MS);
+			vTaskDelay(80 / portTICK_PERIOD_MS);
 			displayTikTokScrollMenu();
 			break;
 		case WIFI_MENU:
@@ -3139,6 +3142,7 @@ void selectCurrentItem() {
 					displayStatusBar();
 					display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					selPress = false; // Prevent immediate re-entry
 					if (badble) {
 						goBack();
 					}
