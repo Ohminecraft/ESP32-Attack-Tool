@@ -79,29 +79,16 @@ void getMAC(char *addr, uint8_t* data, uint16_t offset) {
 
 #define HOP_INTERVAL 100 // milliseconds
 uint32_t lastHop = 0;
-uint8_t dual_band_channel_index = 0;
-bool band5ghz_scan = false;
 
-void channelHop() {
-    // Channel hopping
-    if (millis() - lastHop >= HOP_INTERVAL) {
-        lastHop =  millis();
-        uint16_t channel = dual_band_channels[dual_band_channel_index];
-        if (channel > 13) {
-            band5ghz_scan = true;
-        } else {
-            band5ghz_scan = false;
-        }
-        if (dual_band_channel_index >= DUAL_BAND_CHANNELS) {
-            dual_band_channel_index = 0;
-        } else {
-            dual_band_channel_index++;
-        }
-        wext_set_channel(WLAN0_NAME, channel);
-    }
+void WiFiCallback::start_rtl_ap_scan_callback(bool sta_scan_enable) {
+    wifi_on(RTW_MODE_STA);
+
+    wifi_enter_promisc_mode();
+    if (sta_scan_enable) wifi_set_promisc(RTW_PROMISC_ENABLE_2, rtl_ap_sta_sniffer_callback, 1);
+    else wifi_set_promisc(RTW_PROMISC_ENABLE_2, rtl_ap_sniffer_callback, 1);
 }
 
-void rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param) {
+void WiFiCallback::rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (packet == NULL || length < 24) return;
     
     ieee80211_frame_info_t* frame_info = (ieee80211_frame_info_t *)param;
@@ -113,7 +100,7 @@ void rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (frame_type == 0 && frame_subtype == 8) {  // Beacon frame
         // Check if AP already in list
         String essid = "";
-        uint8_t channel_from_beacon = 0;
+        uint16_t channel_from_beacon = 0;
         
         // Parse Information Elements
         if (length > 36) {
@@ -150,12 +137,12 @@ void rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param) {
         
         // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security
         Serial.println("NETWORK:" + essid + "," + String(frame_info->rssi) + "," + 
-                       String(channel_from_beacon) + ((band5ghz_scan) ? ",5G," : ",2.4G,") + 
+                       String(channel_from_beacon) + ((channel_from_beacon > 13) ? ",5G," : ",2.4G,") + 
                        macToString(&packet[16]) + "," + String(security_type));
     }
 }
 
-void rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param) {
+void WiFiCallback::rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (packet == NULL || length < 24) return;
     
     ieee80211_frame_info_t* frame_info = (ieee80211_frame_info_t *)param;
@@ -167,7 +154,7 @@ void rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (frame_type == 0 && frame_subtype == 8) {  // Beacon frame
         // Check if AP already in list
         String essid = "";
-        uint8_t channel_from_beacon = 0;
+        uint16_t channel_from_beacon = 0;
         
         // Parse Information Elements
         if (length > 36) {
@@ -204,7 +191,7 @@ void rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param) {
         
         // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security
         Serial.println("NETWORK:" + essid + "," + String(frame_info->rssi) + "," + 
-                       String(channel_from_beacon) + ((band5ghz_scan) ? ",5G," : ",2.4G,") + 
+                       String(channel_from_beacon) + ((channel_from_beacon > 13) ? ",5G," : ",2.4G,") + 
                        macToString(&packet[16]) + "," + String(security_type));
     }
     

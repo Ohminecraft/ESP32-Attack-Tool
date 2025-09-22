@@ -55,7 +55,7 @@ void sendDualBandDeauthFrame(uint8_t bssid[6], uint8_t channel, uint8_t sta_mac[
 }
 
 void sendDualBandDeauthFrame(uint8_t bssid[6], uint8_t channel) {
-    wifi_set_channel(channel);
+    wext_set_channel(WLAN0_NAME, channel);
 
     memcpy(&deauth_frame_packet[10], bssid, 6);
     memcpy(&deauth_frame_packet[16], bssid, 6);
@@ -73,7 +73,7 @@ void sendDualBandDeauthFrame(uint8_t bssid[6], uint8_t channel) {
 }
   
 void sendDualBandProbeReqFrame(String ssid, uint8_t channel) {
-    wext_set_channel(WLAN0_NAME, channel);
+  wext_set_channel(WLAN0_NAME, channel);
 
 	int ssid_len = ssid.length();
 

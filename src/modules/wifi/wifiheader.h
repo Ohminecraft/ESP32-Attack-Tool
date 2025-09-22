@@ -37,7 +37,7 @@ enum WiFiScanState {
     WIFI_SCAN_EAPOL_DEAUTH,
     WIFI_SCAN_CH_ANALYZER,
     WIFI_ATTACK_RND_BEACON,
-    WIFI_ATTACK_STA_BEACON, // ATTACK STABLE SSID
+    WIFI_ATTACK_FUN_BEACON,
     WIFI_ATTACK_RIC_BEACON,
     WIFI_ATTACK_AP_BEACON,
     WIFI_ATTACK_DEAUTH,
@@ -48,7 +48,9 @@ enum WiFiScanState {
     WIFI_ATTACK_EVIL_PORTAL_DEAUTH,
     WIFI_ATTACK_KARMA,
     WIFI_ATTACK_BAD_MSG,
-    WIFI_ATTACK_BAD_MSG_ALL
+    WIFI_ATTACK_BAD_MSG_ALL,
+    WIFI_ATTACK_SLEEP,
+    WIFI_ATTACK_SLEEP_ALL,
 };
 
 #define WIFI_SECURITY_OPEN   0
@@ -208,6 +210,18 @@ class WiFiModules
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
         };
 
+        uint8_t association_packet[200] = {
+            0x00, 0x10, // Frame Control (Association Request) PM=1
+            0x3a, 0x01, // Duration
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // Destination (Broadcast)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Source (Fake Source or BSSID)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // BSSID
+            0x00, 0x00,                         // Sequence Control
+            0x31, 0x00,                         // Capability Information (PM=1)
+            0x0a, 0x00,                         // Listen Interval
+            0x00,                               // SSID tag
+            0x00,                               // SSID length      
+        };
 
         typedef struct
         {
@@ -238,7 +252,7 @@ class WiFiModules
             "Never gonna tell a lie",
             "and hurt you"};
         
-        const char* stable_ssid_beacon[50] = {
+        const char* funny_ssid_beacon[50] = {
             "Mom Use This One",
             "Abraham Linksys",
             "Benjamin FrankLAN",
@@ -311,6 +325,7 @@ class WiFiModules
         void sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]);
         void sendProbeAttack();
         void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);
+        void sendAssociationSleep(const char* ESSID, uint8_t bssid[6], int channel, uint8_t sta_mac[6]);
 
     public:
 

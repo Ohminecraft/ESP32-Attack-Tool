@@ -863,7 +863,7 @@ void displayWiFiAttackMenu() {
 		"Deauth Flood",
 		"Probe Attack",
 		"Rickroll Beacon",
-		"Stable SSID Beacon",
+		"Funny Beacon",
 		"Random Beacon",
 		"AP Beacon",
 		"Evil Portal",
@@ -871,6 +871,8 @@ void displayWiFiAttackMenu() {
 		"Karma",
 		"Target Bad Msg",
 		"Bad Msg",
+		"Target Assoc Sleep",
+		"Assoc Sleep",
 		"< Back"
 	};
 	
@@ -1212,8 +1214,8 @@ void displayAttackStatus() {
 			case WIFI_ATTACK_RIC_BEACON:
 				attackName = "Rickroll Beacon";
 				break;
-			case WIFI_ATTACK_STA_BEACON:
-				attackName = "Stable SSID Beacon";
+			case WIFI_ATTACK_FUN_BEACON:
+				attackName = "Funny SSID Beacon";
 				break;
 			case WIFI_ATTACK_RND_BEACON:
 				attackName = "Random Beacon";
@@ -1226,6 +1228,12 @@ void displayAttackStatus() {
 				break;
 			case WIFI_ATTACK_BAD_MSG_ALL:
 				attackName = "Bad Msg";
+				break;
+			case WIFI_ATTACK_SLEEP:
+				attackName = "Target Assoc Sleep";
+				break;
+			case WIFI_ATTACK_SLEEP_ALL:
+				attackName = "Assoc Sleep All";
 				break;
 		}
 	}
@@ -1418,8 +1426,8 @@ void startWiFiAttack(WiFiScanState attackType) {
 	else if (attackType == WIFI_ATTACK_RND_BEACON) {	
 		strmode = "Random Beacon";
 	}
-	else if (attackType == WIFI_ATTACK_STA_BEACON) {	
-		strmode = "Static Beacon";
+	else if (attackType == WIFI_ATTACK_FUN_BEACON) {	
+		strmode = "Funny Beacon";
 	}
 	else if (attackType == WIFI_ATTACK_RIC_BEACON) {
 		strmode = "Rick Roll Beacon";
@@ -1442,13 +1450,19 @@ void startWiFiAttack(WiFiScanState attackType) {
 	else if (attackType == WIFI_ATTACK_BAD_MSG_ALL) {
 		strmode = "Bad Msg";
 	}
+	else if (attackType == WIFI_ATTACK_SLEEP) {
+		strmode = "Target Assoc Sleep";
+	}
+	else if (attackType == WIFI_ATTACK_SLEEP_ALL) {
+		strmode = "Assoc Sleep All";
+	}
 	if (wifi.dualBandInList && attackType != WIFI_ATTACK_DEAUTH &&
 						  attackType != WIFI_ATTACK_STA_DEAUTH &&
 						  attackType != WIFI_ATTACK_DEAUTH_FLOOD && 
 						  attackType != WIFI_ATTACK_EVIL_PORTAL &&
 						  attackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
 						  attackType != WIFI_ATTACK_RIC_BEACON &&
-						  attackType != WIFI_ATTACK_STA_BEACON &&
+						  attackType != WIFI_ATTACK_FUN_BEACON &&
 						  attackType != WIFI_ATTACK_RND_BEACON &&
 						  attackType != WIFI_ATTACK_KARMA) {
 		displayStatusBar();
@@ -2758,7 +2772,9 @@ void selectCurrentItem() {
 					 currentSelection == WIFI_ATK_AP_BEACON ||
 					 currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH ||
 					 currentSelection == WIFI_ATK_BAD_MSG ||
-					 currentSelection == WIFI_ATK_BAD_MSG_ALL) && 
+					 currentSelection == WIFI_ATK_BAD_MSG_ALL ||
+					 currentSelection == WIFI_ATK_SLEEP ||
+					 currentSelection == WIFI_ATK_SLEEP_ALL) && 
 					(!access_points || !hasSelectedAPs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO AP SELECTED!", 0, 12);
@@ -2769,7 +2785,8 @@ void selectCurrentItem() {
 				}
 
 				if ((currentSelection == WIFI_ATK_STA_DEAUTH ||
-				 	 currentSelection == WIFI_ATK_BAD_MSG) &&
+				 	 currentSelection == WIFI_ATK_BAD_MSG ||
+					 currentSelection == WIFI_ATK_SLEEP) &&
 					(!device_station || !hasSelectedSTAs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO STA SELECTED!", 0, 12);
@@ -2809,8 +2826,9 @@ void selectCurrentItem() {
 				}
 				
 				// Start WiFi attack
-				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_STA_BEACON,
-									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH, WIFI_ATTACK_KARMA, WIFI_ATTACK_BAD_MSG, WIFI_ATTACK_BAD_MSG_ALL};
+				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_FUN_BEACON,
+									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH, WIFI_ATTACK_KARMA, WIFI_ATTACK_BAD_MSG,
+									   WIFI_ATTACK_BAD_MSG_ALL, WIFI_ATTACK_SLEEP, WIFI_ATTACK_SLEEP_ALL};
 				startWiFiAttack(attackTypes[currentSelection]);
 			}
 			break;

