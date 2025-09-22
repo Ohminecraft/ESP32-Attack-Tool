@@ -3667,7 +3667,7 @@ void handleInput(MenuState handle_state) {
 		else if ((wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN ||
 				 wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN ||
 				 wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) && currentState == WIFI_SCAN_SNIFFER_RUNNING) {
-			if (wifi.set_channel < 2) wifi.set_channel = 14;
+			if (wifi.set_channel < 2) wifi.set_channel = 13;
 			else wifi.set_channel = wifi.set_channel - 1;
 			wifi.changeChannel();
 			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) {
@@ -3692,7 +3692,7 @@ void handleInput(MenuState handle_state) {
 		if ((wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN ||
 			wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN ||
 			wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) && currentState == WIFI_SCAN_SNIFFER_RUNNING) {
-			if (wifi.set_channel > 13) wifi.set_channel = 1;
+			if (wifi.set_channel > 12) wifi.set_channel = 1;
 			else wifi.set_channel = wifi.set_channel + 1;
 			wifi.changeChannel();
 			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) {
