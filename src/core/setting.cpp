@@ -469,7 +469,7 @@ void ESP32ATSetting::loadSettings() {
         if (usingSwiftpairForBLEUtilty)  Serial.println("usingSwiftpairForBLEUtilty: true");
         else Serial.println("usingSwiftpairForBLEUtilty: false");
     } else {
-        Serial.println("[WARN] Failed to get 'bleName' configuration | Ignoring it using default");
+        Serial.println("[WARN] Failed to get 'usingSwiftpairForBLEUtilty' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["sourappleSpamDelay"].isNull()) {
