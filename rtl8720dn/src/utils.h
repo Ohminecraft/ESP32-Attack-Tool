@@ -8,6 +8,6 @@
 
 bool stringToMac(const String& macStr, uint8_t macAddr[6]);
 String macToString(uint8_t macAddr[6]);
-int splitStringToVector(String str, char delimiter, std::vector<String>& result);
+int splitStringToVector(String str, String delimiter, std::vector<String>& result);
 
 #endif

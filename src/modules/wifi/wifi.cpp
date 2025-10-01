@@ -1330,12 +1330,10 @@ void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
 	vTaskDelay(1 / portTICK_PERIOD_MS);  
 
 	// Randomize SRC MAC
-	beacon_frame_packet[10] = beacon_frame_packet[16] = random(256);
-	beacon_frame_packet[11] = beacon_frame_packet[17] = random(256);
-	beacon_frame_packet[12] = beacon_frame_packet[18] = random(256);
-	beacon_frame_packet[13] = beacon_frame_packet[19] = random(256);
-	beacon_frame_packet[14] = beacon_frame_packet[20] = random(256);
-	beacon_frame_packet[15] = beacon_frame_packet[21] = random(256);
+	for (int i = 0; i < 6; i++) {
+		beacon_frame_packet[10 + i] = random(256);
+		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
+	}
 
 	char ESSID[custom_ssid.essid.length() + 1] = {};
 	custom_ssid.essid.toCharArray(ESSID, custom_ssid.essid.length() + 1);
@@ -1386,12 +1384,10 @@ void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 	channelRandom();
 
 	// Randomize SRC MAC
-	beacon_frame_packet[10] = beacon_frame_packet[16] = random(256);
-	beacon_frame_packet[11] = beacon_frame_packet[17] = random(256);
-	beacon_frame_packet[12] = beacon_frame_packet[18] = random(256);
-	beacon_frame_packet[13] = beacon_frame_packet[19] = random(256);
-	beacon_frame_packet[14] = beacon_frame_packet[20] = random(256);
-	beacon_frame_packet[15] = beacon_frame_packet[21] = random(256);
+	for (int i = 0; i < 6; i++) {
+		beacon_frame_packet[10 + i] = random(256);
+		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
+	}
 
 	int ssidLen = strlen(ESSID);
 	beacon_frame_packet[37] = ssidLen;
@@ -1437,12 +1433,10 @@ void WiFiModules::sendBeaconRandomSSID() {
 	channelRandom();  
 
 	// Randomize SRC MAC
-	beacon_frame_packet[10] = beacon_frame_packet[16] = random(256);
-	beacon_frame_packet[11] = beacon_frame_packet[17] = random(256);
-	beacon_frame_packet[12] = beacon_frame_packet[18] = random(256);
-	beacon_frame_packet[13] = beacon_frame_packet[19] = random(256);
-	beacon_frame_packet[14] = beacon_frame_packet[20] = random(256);
-	beacon_frame_packet[15] = beacon_frame_packet[21] = random(256);
+	for (int i = 0; i < 6; i++) {
+		beacon_frame_packet[10 + i] = random(256);
+		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
+	}
 
 	beacon_frame_packet[37] = 6;
 	
@@ -1603,12 +1597,9 @@ void WiFiModules::sendProbeAttack() {
       
 			// Build packet
 			// Randomize SRC MAC
-			probe_frame_packet[10] = random(256);
-			probe_frame_packet[11] = random(256);
-			probe_frame_packet[12] = random(256);
-			probe_frame_packet[13] = random(256);
-			probe_frame_packet[14] = random(256);
-			probe_frame_packet[15] = random(256);
+			for (int i = 0; i < 6; i++) {
+				probe_frame_packet[10 + i] = random(256);
+			}
 
 			// Set SSID length
 			int ssidLen = access_points->get(i).essid.length();
@@ -1656,7 +1647,6 @@ void WiFiModules::sendProbeAttack() {
 void WiFiModules::sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec) {
 	this->set_channel = channel;
 	changeChannel();
-	vTaskDelay(1 / portTICK_PERIOD_MS);
   
 	// Build packet
 	memcpy(&eapol_packet_bad_msg1[4], mac, 6);

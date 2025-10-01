@@ -14,6 +14,7 @@
 #include <Arduino.h>
 #include <RotaryEncoder.h>
 #include <SPI.h>
+#include <vector>
 
 #include "configs.h"
 
@@ -35,6 +36,8 @@ void generateRandomMac(uint8_t* mac);
 void getMAC(char *addr, uint8_t* data, uint16_t offset);
 void stringToMac(const String& macStr, uint8_t macAddr[6]);
 String macToString(uint8_t macAddr[6]);
+uint8_t stringToHex(const String& hex_str);
+int splitStringToVector(String str, char delimiter, std::vector<String>& result);
 void setBaseMacAddress(uint8_t macAddr[6]);
 String uint32ToString(uint32_t value);
 String uint32ToStringInverted(uint32_t value);

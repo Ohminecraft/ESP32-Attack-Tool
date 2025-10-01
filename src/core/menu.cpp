@@ -1421,7 +1421,7 @@ void startWiFiAttack(WiFiScanState attackType) {
 		strmode = "Deauth Flood";
 	}
 	else if (attackType == WIFI_ATTACK_AUTH) {	
-		strmode = "Probe";
+		strmode = "Probe Request";
 	}
 	else if (attackType == WIFI_ATTACK_RND_BEACON) {	
 		strmode = "Random Beacon";
@@ -1458,6 +1458,7 @@ void startWiFiAttack(WiFiScanState attackType) {
 	}
 	if (wifi.dualBandInList && attackType != WIFI_ATTACK_DEAUTH &&
 						  attackType != WIFI_ATTACK_STA_DEAUTH &&
+						  attackType != WIFI_ATTACK_AUTH &&
 						  attackType != WIFI_ATTACK_DEAUTH_FLOOD && 
 						  attackType != WIFI_ATTACK_EVIL_PORTAL &&
 						  attackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
@@ -2784,6 +2785,17 @@ void selectCurrentItem() {
 					return;
 				}
 
+				if ((currentSelection == WIFI_ATK_BAD_MSG_ALL ||
+					 currentSelection == WIFI_ATK_SLEEP_ALL) &&
+					(!device_station || device_station->size() == 0)) {
+					display.clearScreen();
+					display.displayStringwithCoordinates("NO STA DETECTED!", 0, 12);
+					display.displayStringwithCoordinates("Scan STA first", 0, 21, true);
+					vTaskDelay(2000 / portTICK_PERIOD_MS);
+					displayWiFiAttackMenu();
+					return;
+				}
+
 				if ((currentSelection == WIFI_ATK_STA_DEAUTH ||
 				 	 currentSelection == WIFI_ATK_BAD_MSG ||
 					 currentSelection == WIFI_ATK_SLEEP) &&
@@ -4078,62 +4090,83 @@ void handleTasks(MenuState handle_state) {
 				if (!wifiAttackOneShot) {
 					if (!wifi.dualBandInList) wifi.StartMode(currentWiFiAttackType);
 					else {
-						String src_macs = "";
-						String dst_groups = "";
-						String channels = "";
-						bool has_stations = false;
-						bool first_ap = true;
-						
-						for (int x = 0; x < access_points->size(); x++) {
-							if (access_points->get(x).selected) {
-								AccessPoint sel_ap = access_points->get(x);
-								
-								String current_group = "{";
-								bool group_has_stations = false;
-								
-								// Check if this AP has selected stations
-								for (int i = 0; i < sel_ap.stations->size(); i++) {
-									if (device_station->get(sel_ap.stations->get(i)).selected) {
-										Station sel_sta = device_station->get(sel_ap.stations->get(i));
-										
-										if (group_has_stations) {
-											current_group += ",";
+						if (currentWiFiAttackType == WIFI_ATTACK_STA_DEAUTH || currentWiFiAttackType == WIFI_ATTACK_DEAUTH) {
+							String src_macs = "";
+							String dst_groups = "";
+							String channels = "";
+							bool has_stations = false;
+							bool first_ap = true;
+							
+							for (int x = 0; x < access_points->size(); x++) {
+								if (access_points->get(x).selected) {
+									AccessPoint sel_ap = access_points->get(x);
+									
+									String current_group = "{";
+									bool group_has_stations = false;
+									
+									// Check if this AP has selected stations
+									for (int i = 0; i < sel_ap.stations->size(); i++) {
+										if (device_station->get(sel_ap.stations->get(i)).selected) {
+											Station sel_sta = device_station->get(sel_ap.stations->get(i));
+											
+											if (group_has_stations) {
+												current_group += ",";
+											}
+											current_group += macToString(sel_sta.mac);
+											group_has_stations = true;
+											has_stations = true;
 										}
-										current_group += macToString(sel_sta.mac);
-										group_has_stations = true;
-										has_stations = true;
 									}
+									current_group += "}";
+									
+									if (!first_ap) {
+										src_macs += ",";
+										dst_groups += ",";
+										channels += ",";
+									}
+									
+									src_macs += macToString(sel_ap.bssid);
+									
+									// If no stations, use empty group or wildcard
+									if (!group_has_stations) {
+										dst_groups += "{}";
+									} else {
+										dst_groups += current_group;
+									}
+									
+									channels += String(sel_ap.channel);
+									first_ap = false;
 								}
-								current_group += "}";
-								
-								if (!first_ap) {
-									src_macs += ",";
-									dst_groups += ",";
-									channels += ",";
-								}
-								
-								src_macs += macToString(sel_ap.bssid);
-								
-								// If no stations, use empty group or wildcard
-								if (!group_has_stations) {
-									dst_groups += "{}";
+							}
+							if (src_macs != "") {
+								if (has_stations) {
+									Serial.println("[INFO] Starting [Dual Band Station Deauth] Attack!");
+									rtl8720dn->sendCommand("RTL_DEAUTH_STA -am {" + src_macs + "} -sm " + dst_groups + " -c {" + channels + "}");
 								} else {
-									dst_groups += current_group;
+									// All APs have no stations - use AP_ONLY command
+									Serial.println("[INFO] Starting [Dual Band Deauth] Attack!");
+									rtl8720dn->sendCommand("RTL_DEAUTH -am {" + src_macs + "} -c {" + channels + "}");
 								}
-								
-								channels += String(sel_ap.channel);
-								first_ap = false;
 							}
-						}
-						if (src_macs != "") {
-							if (has_stations) {
-								Serial.println("[INFO] Starting [Dual Band Station Deauth] Attack!");
-								rtl8720dn->sendCommand("RTL_DEAUTH_STA -am {" + src_macs + "} -sm " + dst_groups + " -c {" + channels + "}");
-							} else {
-								// All APs have no stations - use AP_ONLY command
-								Serial.println("[INFO] Starting [Dual Band Deauth] Attack!");
-								rtl8720dn->sendCommand("RTL_DEAUTH -am {" + src_macs + "} -c {" + channels + "}");
+						} else if (currentWiFiAttackType == WIFI_ATTACK_AUTH) {
+							String ssids = "";
+							String channels = "";
+							bool first_ssid = true;
+							for (int i = 0; i < access_points->size(); i++) {
+								if (access_points->get(i).selected) {
+									if (!first_ssid) { ssids += "(,)"; channels += ",";}
+									ssids += access_points->get(i).essid; 
+									channels += String(access_points->get(i).channel);
+									first_ssid = false;
+								}
 							}
+							if (ssids != "") {
+								// RTL_AUTH -s {<SSID>} -c {<CHANNEL>}
+								Serial.println("[INFO] Starting [Dual Band Auth] Attack!");
+								rtl8720dn->sendCommand("RTL_AUTH -s {" + ssids + "} -c {" + channels + "}");
+							}
+						} else {
+							Serial.println("[WARN] (Dualband) Not Mode Selected!");
 						}
 					}
 					wifiAttackOneShot = true;

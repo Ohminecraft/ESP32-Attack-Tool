@@ -361,11 +361,12 @@ static const uint8_t _gamepadHidReportDescriptor[] = {
 };
 
 
-BleKeyboard::BleKeyboard(String deviceName, String deviceManufacturer, uint8_t batteryLevel) 
+BleKeyboard::BleKeyboard(String deviceName, String deviceManufacturer, uint8_t batteryLevel, bool usingSwiftpair) 
     : hid(0)
     , deviceName(deviceName.substring(0, 15))
     , deviceManufacturer(deviceManufacturer.substring(0,15))
-    , batteryLevel(batteryLevel) {}
+    , batteryLevel(batteryLevel)
+    , usingSwiftpair(usingSwiftpair) {}
 
 void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
 {
@@ -437,7 +438,7 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   memcpy(&AdvData_Raw[i], deviceName.c_str(), deviceName.length());
   i += deviceName.length();
   AdvData.addData(AdvData_Raw, 7 + deviceName.length());
-  advertising->setAdvertisementData(AdvData);
+  if (usingSwiftpair) advertising->setAdvertisementData(AdvData);
   ///////////////////////////////////////////////////////////////////////
   advertising->setAppearance(appearance);
   if (_randUUID) {

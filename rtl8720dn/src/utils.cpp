@@ -23,7 +23,7 @@ String macToString(uint8_t macAddr[6]) {
 	return String(macStr);
 }
 
-int splitStringToVector(String str, char delimiter, std::vector<String>& result) {
+int splitStringToVector(String str, String delimiter, std::vector<String>& result) {
     result.clear();
     int count = 0;
     int pos = 0;
@@ -35,12 +35,12 @@ int splitStringToVector(String str, char delimiter, std::vector<String>& result)
     while (pos < str.length()) {
         int nextDelim = str.indexOf(delimiter, pos);
         String element;
-        
+
         if (nextDelim == -1) {
-            // Last element
+            // Last element - no more delimiter found
             element = str.substring(pos);
         } else {
-            // Regular element  
+            // Regular element - extract from pos to nextDelim
             element = str.substring(pos, nextDelim);
         }
         
@@ -52,7 +52,8 @@ int splitStringToVector(String str, char delimiter, std::vector<String>& result)
         }
         
         if (nextDelim == -1) break;
-        pos = nextDelim + 1;
+        // Move position past the delimiter
+        pos = nextDelim + delimiter.length();
     }
     
     return count;

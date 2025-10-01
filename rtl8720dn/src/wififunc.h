@@ -37,6 +37,11 @@ struct BssidToDeauthWithStaion {
     LinkedList<Station>* stations;
 };
 
+struct StringToProbeReq {
+    String ssid;
+    uint8_t channel;
+};
+
 class WiFiCallback {
     public:
         void start_rtl_ap_scan_callback(bool sta_scan_enable);

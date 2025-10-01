@@ -33,6 +33,7 @@ class ESP32ATSetting {
         bool autoConnectWiFi = false;
         bool savepcap = true;
         String bleName = "ESP32AttackTool";
+        bool usingSwiftpairForBLEUtilty = true;
         uint16_t sourappleSpamDelay = SOUR_APPLE_SPAM_DELAY;
         uint16_t applejuiceSpamDelay = APPLE_JUICE_SPAM_DELAY;
         uint16_t swiftpairSpamDelay = SWIFTPAIR_SPAM_DELAY;

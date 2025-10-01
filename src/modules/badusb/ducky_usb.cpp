@@ -8,7 +8,6 @@
     * Licensed under the MIT License.
 */
 
-HIDInterface *hid_usb = nullptr;
 HIDInterface *hid_ble = nullptr;
 uint8_t currentkbmode = 0;
 
@@ -116,7 +115,7 @@ const DuckyCommand duckyCmds[]{
 
 void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble, uint8_t mode) {
     if (usingble) {
-        if (hid == nullptr) hid = new BleKeyboard(espatsettings.bleName, "ESP32AttackTool", 100);
+        if (hid == nullptr) hid = new BleKeyboard(espatsettings.bleName, "ESP32AttackTool", 100, espatsettings.usingSwiftpairForBLEUtilty);
     }
 
     if (usingble) {

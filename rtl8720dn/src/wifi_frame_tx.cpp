@@ -20,6 +20,7 @@ void rtl_tx_raw_frame(void* frame, size_t length) {
   
 void sendDualBandDeauthFrame(uint8_t bssid[6], uint8_t channel, uint8_t sta_mac[6]) {
     wext_set_channel(WLAN0_NAME, channel);
+    delay(1);
 
     memcpy(&deauth_frame_packet[4], sta_mac, 6);
     memcpy(&deauth_frame_packet[10], bssid, 6);
@@ -56,6 +57,7 @@ void sendDualBandDeauthFrame(uint8_t bssid[6], uint8_t channel, uint8_t sta_mac[
 
 void sendDualBandDeauthFrame(uint8_t bssid[6], uint8_t channel) {
     wext_set_channel(WLAN0_NAME, channel);
+    delay(1);
 
     memcpy(&deauth_frame_packet[10], bssid, 6);
     memcpy(&deauth_frame_packet[16], bssid, 6);
@@ -74,15 +76,13 @@ void sendDualBandDeauthFrame(uint8_t bssid[6], uint8_t channel) {
   
 void sendDualBandProbeReqFrame(String ssid, uint8_t channel) {
   wext_set_channel(WLAN0_NAME, channel);
+  delay(1);
 
 	int ssid_len = ssid.length();
 
-	probe_frame_packet[10] = random(256);
-	probe_frame_packet[11] = random(256);
-	probe_frame_packet[12] = random(256);
-	probe_frame_packet[13] = random(256);
-	probe_frame_packet[14] = random(256);
-	probe_frame_packet[15] = random(256);
+  for (int i = 0; i < 6; i++) {
+    probe_frame_packet[10 + i] = random(256);
+  }
 
 	probe_frame_packet[25] = ssid_len;
 

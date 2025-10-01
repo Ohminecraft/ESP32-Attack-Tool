@@ -52,6 +52,7 @@ private:
   String deviceName;
   String deviceManufacturer;
   uint8_t batteryLevel;
+  bool usingSwiftpair;
   bool connected = false;
   uint32_t _delay_ms = 7;
   void delay_ms(uint64_t ms);
@@ -66,7 +67,7 @@ private:
   const uint8_t *_asciimap;
 
 public:
-  BleKeyboard(String deviceName = "ESP32 Keyboard", String deviceManufacturer = "Espressif", uint8_t batteryLevel = 100);
+  BleKeyboard(String deviceName = "ESP32 Keyboard", String deviceManufacturer = "Espressif", uint8_t batteryLevel = 100, bool usingSwiftpair = true);
   void begin(const uint8_t *layout = KeyboardLayout_en_US, uint8_t mode = BLE_KEYBOARD_MODE_ALL) override { begin(layout, HID_KEYBOARD, mode); };
   void begin(const uint8_t *layout, uint16_t showAs, uint8_t mode);
   void end(void);
