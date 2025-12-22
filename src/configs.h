@@ -15,7 +15,7 @@
 #define APPLE_JUICE_SPAM_DELAY 400
 #define SWIFTPAIR_SPAM_DELAY 20
 
-#define ATTACK_TOOL_VERSION "2.9.0"
+#define ATTACK_TOOL_VERSION "3.0.0-CANARY"
 
 // WiFi Configuration //
 
