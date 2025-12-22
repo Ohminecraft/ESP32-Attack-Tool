@@ -17,27 +17,42 @@
 void setup() {
     Serial.begin(115200);
     Serial.println(" ");
-    Serial.println("[INFO] Starting ESP32 Attack Tool v2...");
-    esp_log_level_set("*", ESP_LOG_NONE); // Disable all ESP logs
+    Serial.println("[INFO] Starting ESP32 Attack Tool...");
     
     espatsettings.loadSettings();
     
     // Initialize status LED
-    pinMode(espatsettings.statusLedPin, OUTPUT);
-    digitalWrite(espatsettings.statusLedPin, HIGH);
+    #ifndef BUILTIN_RGB_LED
+        pinMode(espatsettings.statusLedPin, OUTPUT);
+        digitalWrite(espatsettings.statusLedPin, HIGH);
+    #else
+        pixels.setPin(espatsettings.statusLedPin);
+        pixels.begin();
+        pixels.setBrightness(50);
+        pixels.setPixelColor(0, pixels.Color(255, 255, 255));
+        pixels.show();
+        Serial.println("[INFO] RGB LED Enable");
+    #endif
     
     // Initialize menu system
+    #ifndef BOARD_ESP32_C5_DEVKIT_C1
     if (espatsettings.sdcardCsPin > 0) {
 		pinMode(espatsettings.nrfCsPin, OUTPUT);
 		digitalWrite(espatsettings.nrfCsPin, HIGH);
 		pinMode(espatsettings.sdcardCsPin, OUTPUT);
 		digitalWrite(espatsettings.sdcardCsPin, HIGH);
 	}
+    #endif
     menuinit();
     
     Serial.println("[INFO] System ready!");
-    digitalWrite(espatsettings.statusLedPin, LOW);
-    Serial.println("[SYSTEM_WELCOME] Welcome to ESP32 Attack Tool v2!");
+    #ifndef BUILTIN_RGB_LED
+        digitalWrite(espatsettings.statusLedPin, LOW);
+    #else
+        pixels.clear();
+        pixels.show();
+    #endif
+    Serial.println("[SYSTEM_WELCOME] Welcome to ESP32 Attack Tool!");
 
 }
 

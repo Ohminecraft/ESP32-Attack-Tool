@@ -113,6 +113,7 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     defaultSetting["savepcap"] = true;
 
     defaultSetting["bleName"] = "ESP32AttackTool"; // default BLE name
+    defaultSetting["usingSwiftpairForBLEUtilty"] = true; // default using MS SwiftPair for BLE Utility
     defaultSetting["sourappleSpamDelay"] = SOUR_APPLE_SPAM_DELAY; // default Sour Apple spam delay
     defaultSetting["applejuiceSpamDelay"] = APPLE_JUICE_SPAM_DELAY; // default Apple Juice spam delay
     defaultSetting["swiftpairSpamDelay"] = SWIFTPAIR_SPAM_DELAY; // default Swift Pair spam delay
@@ -259,7 +260,7 @@ void ESP32ATSetting::loadSettings() {
     static bool reloadedOnce = false;
 
     SDCardSPI = &SPI;
-    SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin, sdcardCsPin);
+    SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin);
 
     if (!SD.begin(sdcardCsPin, *SDCardSPI)) {
         Serial.println("[INFO] Failed to mount SD, open LittleFS config file to check sd pin");
@@ -461,6 +462,14 @@ void ESP32ATSetting::loadSettings() {
         Serial.println("bleName: " + bleName);
     } else {
         Serial.println("[WARN] Failed to get 'bleName' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["usingSwiftpairForBLEUtilty"].isNull()) {
+        usingSwiftpairForBLEUtilty = _settings["usingSwiftpairForBLEUtilty"].as<bool>();
+        if (usingSwiftpairForBLEUtilty)  Serial.println("usingSwiftpairForBLEUtilty: true");
+        else Serial.println("usingSwiftpairForBLEUtilty: false");
+    } else {
+        Serial.println("[WARN] Failed to get 'usingSwiftpairForBLEUtilty' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["sourappleSpamDelay"].isNull()) {

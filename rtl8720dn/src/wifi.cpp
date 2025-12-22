@@ -79,133 +79,104 @@ void getMAC(char *addr, uint8_t* data, uint16_t offset) {
 
 #define HOP_INTERVAL 100 // milliseconds
 uint32_t lastHop = 0;
-uint8_t dual_band_channel_index = 0;
-bool band5ghz_scan = false;
 
-void channelHop() {
-    // Channel hopping
-    if (millis() - lastHop >= HOP_INTERVAL) {
-        lastHop =  millis();
-        channel = dual_band_channels[dual_band_channel_index];
-        if (channel > 14) {
-            band5ghz_scan = true;
-        } else {
-            band5ghz_scan = false;
-        }
-        if (dual_band_channel_index >= DUAL_BAND_CHANNELS) {
-            dual_band_channel_index = 0;
-        } else {
-            dual_band_channel_index++;
-        }
-        wext_set_channel(WLAN0_NAME, channel);
-    }
+void WiFiCallback::start_rtl_ap_scan_callback(bool sta_scan_enable) {
+    wifi_on(RTW_MODE_STA);
+
+    wifi_enter_promisc_mode();
+    if (sta_scan_enable) wifi_set_promisc(RTW_PROMISC_ENABLE_2, rtl_ap_sta_sniffer_callback, 1);
+    else wifi_set_promisc(RTW_PROMISC_ENABLE_2, rtl_ap_sniffer_callback, 1);
 }
 
-void rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param) {
+void WiFiCallback::rtl_ap_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (packet == NULL || length < 24) return;
     
     ieee80211_frame_info_t* frame_info = (ieee80211_frame_info_t *)param;
     
     uint8_t frame_type = (packet[0] >> 2) & 0x3;
-    uint8_t frame_subtype = (packet[0] >> 4) & 0xF;
     
     // Management frames - Beacon processing
-    if (frame_type == 0 && frame_subtype == 8) {  // Beacon frame
-        // Check if AP already in list
+    if (frame_type == 0 && packet[0] == 0x80) {  // Beacon frame
         String essid = "";
-        uint8_t channel_from_beacon = channel;
+        uint8_t channel_from_beacon = 0;
         
-        // Parse Information Elements
-        if (length > 36) {
-            uint32_t ie_offset = 36;
+        uint32_t ie_offset = 36;
             
-            while (ie_offset + 2 < length) {
-                uint8_t ie_type = packet[ie_offset];
-                uint8_t ie_length = packet[ie_offset + 1];
+        while (ie_offset + 2 < length) {
+            uint8_t ie_type = packet[ie_offset];
+            uint8_t ie_length = packet[ie_offset + 1];
                 
-                if (ie_offset + 2 + ie_length > length) break;
+            if (ie_offset + 2 + ie_length > length) break;
                 
-                if (ie_type == 0) {  // SSID IE
-                    for (int i = 0; i < ie_length && i < 32; i++) {
-                        if (packet[ie_offset + 2 + i] != 0) {
-                            essid += (char)packet[ie_offset + 2 + i];
-                        }
-                    }
-                }
-                else if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
-                    channel_from_beacon = packet[ie_offset + 2];
-                }
-                
-                ie_offset += 2 + ie_length;
+            if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
+                channel_from_beacon = packet[ie_offset + 2];
             }
+            ie_offset += 2 + ie_length;
         }
         
-        if (essid == "") {
+        if (packet[37] <= 0) {
             char bssid_str[18];
             getMAC(bssid_str, packet, 16);
             essid = String(bssid_str);
+        } else {
+            for (int i = 0; i < packet[37]; i++) {
+                essid += (char)packet[38 + i];
+            }
         }
         
         uint8_t security_type = getSecurityType(packet, length);
         
-        // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security
+        // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security,{Beacon}
         Serial.println("NETWORK:" + essid + "," + String(frame_info->rssi) + "," + 
-                       String(channel_from_beacon) + ((band5ghz_scan) ? ",5G," : ",2.4G,") + 
-                       macToString(&packet[16]) + "," + String(security_type));
+                       String(channel_from_beacon) + ((channel_from_beacon > 13) ? ",5G," : ",2.4G,") + 
+                       macToString(&packet[16]) + "," + String(security_type) + ",{" + (char)packet[34] + "," +
+                       (char)packet[35] + "}");
     }
 }
 
-void rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param) {
+void WiFiCallback::rtl_ap_sta_sniffer_callback(uint8_t *packet, uint length, void* param) {
     if (packet == NULL || length < 24) return;
     
     ieee80211_frame_info_t* frame_info = (ieee80211_frame_info_t *)param;
     
     uint8_t frame_type = (packet[0] >> 2) & 0x3;
-    uint8_t frame_subtype = (packet[0] >> 4) & 0xF;
     
     // Management frames - Beacon processing
-    if (frame_type == 0 && frame_subtype == 8) {  // Beacon frame
-        // Check if AP already in list
+    if (frame_type == 0 && packet[0] == 0x80) {  // Beacon frame
         String essid = "";
-        uint8_t channel_from_beacon = channel;
+        uint8_t channel_from_beacon = 0;
         
-        // Parse Information Elements
-        if (length > 36) {
-            uint32_t ie_offset = 36;
+        uint32_t ie_offset = 36;
             
-            while (ie_offset + 2 < length) {
-                uint8_t ie_type = packet[ie_offset];
-                uint8_t ie_length = packet[ie_offset + 1];
+        while (ie_offset + 2 < length) {
+            uint8_t ie_type = packet[ie_offset];
+            uint8_t ie_length = packet[ie_offset + 1];
                 
-                if (ie_offset + 2 + ie_length > length) break;
+            if (ie_offset + 2 + ie_length > length) break;
                 
-                if (ie_type == 0) {  // SSID IE
-                    for (int i = 0; i < ie_length && i < 32; i++) {
-                        if (packet[ie_offset + 2 + i] != 0) {
-                            essid += (char)packet[ie_offset + 2 + i];
-                        }
-                    }
-                }
-                else if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
-                    channel_from_beacon = packet[ie_offset + 2];
-                }
-                
-                ie_offset += 2 + ie_length;
+            if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
+                channel_from_beacon = packet[ie_offset + 2];
             }
+            ie_offset += 2 + ie_length;
         }
         
-        if (essid == "") {
+        if (packet[37] <= 0) {
             char bssid_str[18];
             getMAC(bssid_str, packet, 16);
             essid = String(bssid_str);
+        } else {
+            for (int i = 0; i < packet[37]; i++) {
+                essid += (char)packet[38 + i];
+            }
         }
         
         uint8_t security_type = getSecurityType(packet, length);
         
-        // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security
+        // Format: NETWORK:SSID,RSSI,Channel,Band,BSSID,Security,{Beacon}
         Serial.println("NETWORK:" + essid + "," + String(frame_info->rssi) + "," + 
-                       String(channel_from_beacon) + ((band5ghz_scan) ? ",5G," : ",2.4G,") + 
-                       macToString(&packet[16]) + "," + String(security_type));
+                       String(channel_from_beacon) + ((channel_from_beacon > 13) ? ",5G," : ",2.4G,") + 
+                       macToString(&packet[16]) + "," + String(security_type) + ",{" + (char)packet[34] + "," +
+                       (char)packet[35] + "}");
     }
     
     // Data frames - Station detection

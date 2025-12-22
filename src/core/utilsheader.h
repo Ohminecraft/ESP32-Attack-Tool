@@ -14,8 +14,25 @@
 #include <Arduino.h>
 #include <RotaryEncoder.h>
 #include <SPI.h>
+#include <vector>
+
+#include "esp_wifi.h"
+#include "esp_wifi_types.h"
 
 #include "configs.h"
+
+#ifdef BOARD_ESP32_C5_DEVKIT_C1
+  extern "C" {
+    #include "esp_netif.h"
+    #include "esp_netif_net_stack.h"
+  }
+  #include "esp_system.h"
+#endif
+
+#ifdef BUILTIN_RGB_LED
+  #include <Adafruit_NeoPixel.h>
+#endif
+
 
 #define MEM_LOWER_LIM 20000
 
@@ -26,6 +43,10 @@
 
 #define GET_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
+#ifdef BOARD_ESP32_C5_DEVKIT_C1
+  extern "C" esp_err_t esp_base_mac_addr_set(uint8_t *Mac);
+#endif
+
 uint32_t getHeap(uint8_t type);
 const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
 String generateRandomName();
@@ -35,6 +56,8 @@ void generateRandomMac(uint8_t* mac);
 void getMAC(char *addr, uint8_t* data, uint16_t offset);
 void stringToMac(const String& macStr, uint8_t macAddr[6]);
 String macToString(uint8_t macAddr[6]);
+uint8_t stringToHex(const String& hex_str);
+int splitStringToVector(String str, char delimiter, std::vector<String>& result);
 void setBaseMacAddress(uint8_t macAddr[6]);
 String uint32ToString(uint32_t value);
 String uint32ToStringInverted(uint32_t value);

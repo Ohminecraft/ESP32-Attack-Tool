@@ -1826,8 +1826,8 @@ const unsigned char startup_bitmap_frame_26_delay_0 [] PROGMEM = {
 };
 
 // Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 28080)
-const int startup_bitmap_allArray_LEN = 27;
-const unsigned char* startup_bitmap_allArray[27] = {
+const int startup_bitmap_Array_LEN = 27;
+const unsigned char* startup_bitmap_Array[27] = {
 	startup_bitmap_frame_00_delay_0,
 	startup_bitmap_frame_01_delay_0,
 	startup_bitmap_frame_02_delay_0,

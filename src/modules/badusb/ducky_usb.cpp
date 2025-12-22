@@ -8,7 +8,6 @@
     * Licensed under the MIT License.
 */
 
-HIDInterface *hid_usb = nullptr;
 HIDInterface *hid_ble = nullptr;
 uint8_t currentkbmode = 0;
 
@@ -116,12 +115,7 @@ const DuckyCommand duckyCmds[]{
 
 void BadUSBModules::beginKB(HIDInterface *&hid, const uint8_t *layout, bool usingble, uint8_t mode) {
     if (usingble) {
-        if (hid == nullptr) hid = new BleKeyboard(espatsettings.bleName, "ESP32AttackTool", 100);
-    } else {
-        #if defined(USE_USB_HID)
-        hid = new USBHIDKeyboard();
-        USB.begin();
-        #endif
+        if (hid == nullptr) hid = new BleKeyboard(espatsettings.bleName, "ESP32AttackTool", 100, espatsettings.usingSwiftpairForBLEUtilty);
     }
 
     if (usingble) {
@@ -312,7 +306,7 @@ void BadUSBModules::Keymote(HIDInterface *&hid, KeymoteCommand key) {
 }
 
 void BadUSBModules::tiktokScroll(HIDInterface *&hid, TikTokScrollCommand cmd) {
-    if (cmd == SCROLL_DOWN) { // Finally Same Flipper Zero :) Support for IOS
+    if (cmd == SCROLL_DOWN) { // Finally Same Flipper Zero :) Support for IOS (below 17 or 18 :/)
         hid->wheel(-24);
         hid->wheel(-38);
         hid->wheel(-24);

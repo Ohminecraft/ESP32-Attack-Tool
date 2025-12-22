@@ -35,6 +35,10 @@
 #undef WIFI_SCAN_RUNNING
 #endif
 
+#ifdef BUILTIN_RGB_LED
+    Adafruit_NeoPixel pixels(1, espatsettings.statusLedPin, NEO_GRB + NEO_KHZ800);
+#endif
+
 // Menu states
 enum MenuState {
     MAIN_MENU,
@@ -219,10 +223,14 @@ enum WiFiUtils {
 
 enum WiFiGeneralItem {
     WIFI_GENERAL_AP_SCAN,
+    #ifndef BOARD_ESP32_C5_DEVKIT_C1
     WIFI_GENERAL_DUAL_BAND_AP_SCAN,
+    #endif
     WIFI_GENERAL_AP_SCAN_OLD,
     WIFI_GENERAL_AP_STA_SCAN,
+    #ifndef BOARD_ESP32_C5_DEVKIT_C1
     WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN,
+    #endif
     WIFI_GENERAL_PROBE_REQ_SCAN,
     WIFI_GENERAL_DEAUTH_SCAN,
     WIFI_GENERAL_BEACON_SCAN,
@@ -240,7 +248,7 @@ enum WiFiAttackMenuItem {
     WIFI_ATK_DEAUTH_FLOOD,
     WIFI_ATK_AUTH,
     WIFI_ATK_RIC_BEACON,
-    WIFI_ATK_STA_BEACON,
+    WIFI_ATK_FUN_BEACON,
     WIFI_ATK_RND_BEACON,
     WIFI_ATK_AP_BEACON,
     WIFI_ATK_EVIL_PORTAL,
@@ -248,6 +256,8 @@ enum WiFiAttackMenuItem {
     WIFI_ATK_KARMA,
     WIFI_ATK_BAD_MSG,
     WIFI_ATK_BAD_MSG_ALL,
+    WIFI_ATK_SLEEP,
+    WIFI_ATK_SLEEP_ALL,
     WIFI_ATK_BACK,
     WIFI_ATK_MENU_COUNT
 };
@@ -330,7 +340,6 @@ unsigned long attackStartTime;
 BLEScanState currentBLEAttackType = BLE_SCAN_OFF;
 WiFiScanState currentWiFiAttackType = WIFI_SCAN_OFF;
 NRFJammerMode currentNRFJammerMode;
-bool dualBandInList = false;
 
 // BLE Scan State
 bool bleScanRunning = false;

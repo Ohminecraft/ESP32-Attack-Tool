@@ -15,7 +15,7 @@
 #include "configs.h"
 
 #include <NimBLEDevice.h>
-#include "esp_gap_ble_api.h"
+#include "esp_bt.h"
 
 #include <LinkedList.h>
 
@@ -32,8 +32,6 @@ DisplayModules ble_display_obj;
 #else
 #define MAX_TX_POWER ESP_PWR_LVL_P9 // Default
 #endif
-
-
 enum BLEScanState {
     BLE_SCAN_OFF,
     BLE_SCAN_DEVICE,
@@ -75,10 +73,23 @@ enum EBLEPayloadType
 #define BLE_SPOOFER_DEVICE_BRAND_APPLE 0
 #define BLE_SPOOFER_DEVICE_BRAND_SAMSUNG 1
 
+struct Flipper {
+    String name;
+    String variant;
+};
+
+struct Airtags {
+    uint32_t last_seen;
+};
+
 struct BLEScanResult {
     String name;
     int rssi;
     BLEAddress addr;
+    bool isFlipper;
+    Flipper flipperdata;
+    bool isAirtags;
+    Airtags airtagsdata;
 };
 
 extern LinkedList<BLEScanResult>* blescanres;

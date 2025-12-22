@@ -87,6 +87,16 @@ String macToString(uint8_t macAddr[6]) {
 	  macAddr[3], macAddr[4], macAddr[5]);
 	return String(macStr);
 }
+
+uint8_t stringToHex(const String& hex_str) {
+	if (hex_str.length() != 2) {
+		Serial.println("[ERROR] Invalid hex string format");
+		return 0;
+	}
+	return (uint8_t)strtol(hex_str.c_str(), nullptr, 16);
+}
+
+
 	
 void setBaseMacAddress(uint8_t macAddr[6]) {
 	esp_err_t err = esp_base_mac_addr_set(macAddr);
@@ -100,6 +110,41 @@ void setBaseMacAddress(uint8_t macAddr[6]) {
 	} else {
 		Serial.printf("[ERROR] Error: Failed to set MAC address. Code: %d\n", err);
 	}
+}
+
+int splitStringToVector(String str, char delimiter, std::vector<String>& result) {
+    result.clear();
+    int count = 0;
+    int pos = 0;
+    
+    if (str.length() == 0) {
+        return 0;
+    }
+    
+    while (pos < str.length()) {
+        int nextDelim = str.indexOf(delimiter, pos);
+        String element;
+        
+        if (nextDelim == -1) {
+            // Last element
+            element = str.substring(pos);
+        } else {
+            // Regular element  
+            element = str.substring(pos, nextDelim);
+        }
+        
+        element.trim();
+        if (element.length() > 0) {
+            result.push_back(element);
+            count++;
+            //Serial.println("DEBUG: Split element[" + String(count-1) + "] = '" + element + "'");
+        }
+        
+        if (nextDelim == -1) break;
+        pos = nextDelim + 1;
+    }
+    
+    return count;
 }
 
 String uint32ToString(uint32_t value) {

