@@ -77,9 +77,9 @@ struct SSID {
 };
 */
 
-enum WiFiBand {
-    WIFI_BAND_2_4G,
-    WIFI_BAND_5G
+enum WiFiScanBand {
+    WIFI_BAND_2_4Ghz,
+    WIFI_BAND_5Ghz
 };
 
 struct AccessPoint {
@@ -91,7 +91,7 @@ struct AccessPoint {
     bool selected;
     LinkedList<uint16_t>* stations;
     char beacon[2];
-    WiFiBand band;
+    WiFiScanBand band;
     int8_t rssi;
 };
 
@@ -118,12 +118,11 @@ extern bool wifiScanRedraw;
 
 esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *buffer, int len, bool en_sys_seq);
 
+#define DUAL_BAND_CHANNELS 51
+
 class WiFiModules
 {
     private:
-        uint32_t initTime = 0;
-        uint8_t channel_hop_delay = 1;
-
         // ESP32 Marauder
         uint8_t beacon_frame_packet[128] = {
             /* 0 - 3 */    0x80, 0x00, 0x00, 0x00, //Frame Control, Duration
@@ -350,36 +349,53 @@ class WiFiModules
         bool deauth_flood_scan_one_shot = false;
         String deauth_flood_target = "";
 
+        uint8_t dual_band_channels[DUAL_BAND_CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165, 169, 173, 177};
+
+        uint8_t dual_band_channels_index = 0;
+
+        #ifndef BOARD_ESP32_C5_DEVKIT_C1
         bool dualBandInList = false;
+        #endif
         
         wifi_config_t ap_config;
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    
-        wifi_init_config_t cfg2 = { \
-            .event_handler = &esp_event_send_internal, \
-            .osi_funcs = &g_wifi_osi_funcs, \
-            .wpa_crypto_funcs = g_wifi_default_wpa_crypto_funcs, \
-            .static_rx_buf_num = 6,\
-            .dynamic_rx_buf_num = 6,\
-            .tx_buf_type = 0,\
-            .static_tx_buf_num = 1,\
-            .dynamic_tx_buf_num = WIFI_DYNAMIC_TX_BUFFER_NUM,\
-            .cache_tx_buf_num = 0,\
-            .csi_enable = false,\
-            .ampdu_rx_enable = false,\
-            .ampdu_tx_enable = false,\
-            .amsdu_tx_enable = false,\
-            .nvs_enable = false,\
-            .nano_enable = WIFI_NANO_FORMAT_ENABLED,\
-            .rx_ba_win = 6,\
-            .wifi_task_core_id = WIFI_TASK_CORE_ID,\
-            .beacon_max_len = 752, \
-            .mgmt_sbuf_num = 8, \
-            .feature_caps = g_wifi_feature_caps, \
-            .sta_disconnected_pm = WIFI_STA_DISCONNECTED_PM_ENABLED,  \
-            .espnow_max_encrypt_num = 0, \
-            .magic = WIFI_INIT_CONFIG_MAGIC\
+        
+        #ifndef BOARD_ESP32_C5_DEVKIT_C1
+            wifi_init_config_t cfg2 = { \
+                .event_handler = &esp_event_send_internal, \
+                .osi_funcs = &g_wifi_osi_funcs, \
+                .wpa_crypto_funcs = g_wifi_default_wpa_crypto_funcs, \
+                .static_rx_buf_num = 6,\
+                .dynamic_rx_buf_num = 6,\
+                .tx_buf_type = 0,\
+                .static_tx_buf_num = 1,\
+                .dynamic_tx_buf_num = WIFI_DYNAMIC_TX_BUFFER_NUM,\
+                .cache_tx_buf_num = 0,\
+                .csi_enable = false,\
+                .ampdu_rx_enable = false,\
+                .ampdu_tx_enable = false,\
+                .amsdu_tx_enable = false,\
+                .nvs_enable = false,\
+                .nano_enable = WIFI_NANO_FORMAT_ENABLED,\
+                .rx_ba_win = 6,\
+                .wifi_task_core_id = WIFI_TASK_CORE_ID,\
+                .beacon_max_len = 752, \
+                .mgmt_sbuf_num = 8, \
+                .feature_caps = g_wifi_feature_caps, \
+                .sta_disconnected_pm = WIFI_STA_DISCONNECTED_PM_ENABLED,  \
+                .espnow_max_encrypt_num = 0, \
+                .magic = WIFI_INIT_CONFIG_MAGIC\
+            };
+        #else
+            wifi_country_t country = {
+            .cc = "PH",
+            .schan = 1,
+            .nchan = 13,
+            .policy = WIFI_COUNTRY_POLICY_AUTO,
         };
+
+        wifi_init_config_t cfg2 = WIFI_INIT_CONFIG_DEFAULT();
+    #endif
 
         uint8_t deauth_frame_packet[26] = { // Should be in public because evil portal needs it
             /*  0 - 1  */ 0xC0, 0x00,                         // type, subtype c0: deauth (a0: disassociate)
@@ -412,6 +428,8 @@ class WiFiModules
         void StartMode(WiFiScanState mode);
         void mainAttackLoop(WiFiScanState mode);
         void StartDeauthFlood();
+
+        void sendDeauthFrame(uint8_t bssid[6], int channel);
         // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.h
         static void apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);

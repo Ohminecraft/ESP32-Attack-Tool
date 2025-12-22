@@ -227,7 +227,7 @@ void RTL8720DNCommunication::parseAPScanResponse(String response) {
                 false,
                 new LinkedList<uint16_t>(),
                 {stringToHex(beacon_info[0]), stringToHex(beacon_info[1])},
-                (band == "2.4G") ? WIFI_BAND_2_4G : WIFI_BAND_5G,
+                (band == "2.4G") ? WIFI_BAND_2_4Ghz : WIFI_BAND_5Ghz,
                 rssi
             };
             

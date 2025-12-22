@@ -35,6 +35,10 @@
 #undef WIFI_SCAN_RUNNING
 #endif
 
+#ifdef BUILTIN_RGB_LED
+    Adafruit_NeoPixel pixels(1, espatsettings.statusLedPin, NEO_GRB + NEO_KHZ800);
+#endif
+
 // Menu states
 enum MenuState {
     MAIN_MENU,
@@ -219,10 +223,14 @@ enum WiFiUtils {
 
 enum WiFiGeneralItem {
     WIFI_GENERAL_AP_SCAN,
+    #ifndef BOARD_ESP32_C5_DEVKIT_C1
     WIFI_GENERAL_DUAL_BAND_AP_SCAN,
+    #endif
     WIFI_GENERAL_AP_SCAN_OLD,
     WIFI_GENERAL_AP_STA_SCAN,
+    #ifndef BOARD_ESP32_C5_DEVKIT_C1
     WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN,
+    #endif
     WIFI_GENERAL_PROBE_REQ_SCAN,
     WIFI_GENERAL_DEAUTH_SCAN,
     WIFI_GENERAL_BEACON_SCAN,

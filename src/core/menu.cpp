@@ -109,11 +109,21 @@ void __attribute__((weak)) taskHandleInput(void *parameter) {
 
 void connectWiFi(void *pvParameters) {
 	wifi.StartMode(WIFI_SCAN_AP); // using new style (marauder style) to scan wifi because old scan too stupid
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
 	while (wifi.set_channel < 15) {
 		wifi.set_channel++;
 		wifi.changeChannel();
 		vTaskDelay(300 / portTICK_PERIOD_MS);
 	}
+	#else
+	while (wifi.dual_band_channels_index < DUAL_BAND_CHANNELS) {
+		wifi.set_channel = wifi.dual_band_channels[wifi.dual_band_channels_index];
+		wifi.changeChannel();
+		wifi.dual_band_channels_index++;
+		vTaskDelay(CHANNEL_HOP_DELAY / portTICK_PERIOD_MS);
+	}
+	wifi.dual_band_channels_index = 0;
+	#endif
 	wifi.set_channel = 1;
 	first_scan = false;
 	wifi.StartMode(WIFI_SCAN_OFF);
@@ -167,9 +177,13 @@ void menuinit() {
 		while(1); // Halt if display fails
 	}
 	if (espatsettings.displayInvert) display.displayInvert(true);
-	rtl8720dn = new RTL8720DNCommunication();
-	rtl8720dn->begin();
-	rtl8720dn->isReady();
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
+		rtl8720dn = new RTL8720DNCommunication();
+		rtl8720dn->begin();
+		rtl8720dn->isReady();
+	#else 
+		Serial.println("[INFO] C5 Support Enable");
+	#endif
 	irtx.main();
 	irrx.main(true); // prevent ir rx get signal from unknown source
 	wifi.main();
@@ -215,10 +229,10 @@ void displayWelcome() {
 	else display.displayInvert(false);
 	//display.clearScreen();
 	for (int i = 0; i < 9; i++) {
-		for (int x = 0; x < startup_bitmap_allArray_LEN; x++) {
+		for (int x = 0; x < startup_bitmap_Array_LEN; x++) {
 			if (selPress) break;
 			display.clearScreen();
-			display.drawBipmap(0, 0, espatsettings.displayWidth, espatsettings.displayHeight, startup_bitmap_allArray[x], true);
+			display.drawBipmap(0, 0, espatsettings.displayWidth, espatsettings.displayHeight, startup_bitmap_Array[x], true);
 			vTaskDelay(1 / portTICK_PERIOD_MS);
 		}
 		if (check(selPress)) break;
@@ -429,9 +443,16 @@ void displayBLEScanMenu() {
 	if (bleScanRunning) {
 		if (!bleScanInProgress) {
 			bleScanDisplay = true;
+			#ifndef BUILTIN_RGB_LED
+				digialWrite(espatsettings.statusLedPin, LOW);
+			#else
+				pixels.clear();
+				pixels.show();
+			#endif
 			display.displayStringwithCoordinates("Scan complete", 0, 24);
 			display.displayStringwithCoordinates("SELECT->back", 0, 36);
 			display.displayStringwithCoordinates("Found: " + String(blescanres ? blescanres->size() : 0), 0, 48, true);
+			
 		}
 	} else {
 		display.displayStringwithCoordinates("Press SELECT to", 0, 24);
@@ -459,13 +480,23 @@ void displayBLEMenu() {
 
 void displayBLEInfoListMenu() {
 	displayStatusBar();
-	String items[3] = {};
+	String items[4] = {};
 	if (currentSelection < blescanres->size()) {
 		BLEScanResult bledevice = blescanres->get(currentSelection);
 
 		items[0] = bledevice.name;
 		items[1] = "Addr: " + (String)bledevice.addr.toString().c_str();
-		items[2] = "RSSI: " +(String)bledevice.rssi;
+		String itemsbuf = "RSSI: " + (String)bledevice.rssi;
+		bledevice.isAirtags ? itemsbuf += " (Airtag)" : "";
+		bledevice.isFlipper ? itemsbuf += " (Flipper)" : "";
+		items[2] = itemsbuf;
+		String devicedata = "";
+		if (bledevice.isAirtags) {
+			devicedata = "Last Seen: " + String(bledevice.airtagsdata.last_seen) + " ms ago";
+		} else if (bledevice.isFlipper) {
+			devicedata = "Color: " + bledevice.flipperdata.variant;
+		}
+		items[3] = devicedata;
 	}
 	String errortext[2] = {
 		"No Devices Found!",
@@ -475,7 +506,6 @@ void displayBLEInfoListMenu() {
 }
 
 void displayMainSpooferMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPOOFER_COUNT] = {
@@ -488,7 +518,6 @@ void displayMainSpooferMenu() {
 }
 
 void displayAppleSpooferMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[GET_SIZE(pp_models) + 1];// + back option
@@ -501,7 +530,6 @@ void displayAppleSpooferMenu() {
 }
 
 void displayAppleDeviceColorSpooferMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[pp_models[spooferDeviceIndex].colors_count + 1];// + back option
@@ -514,7 +542,6 @@ void displayAppleDeviceColorSpooferMenu() {
 }
 
 void displaySamsungSpooferMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPO_SAMSUNG_COUNT] = {
@@ -527,7 +554,6 @@ void displaySamsungSpooferMenu() {
 }
 
 void displaySamsungBudsDeviceMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[GET_SIZE(buds_models) + 1];// + back option
@@ -540,7 +566,6 @@ void displaySamsungBudsDeviceMenu() {
 }
 
 void displaySamsungWatchsDeviceMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[GET_SIZE(watch_models) + 1];// + back option
@@ -553,7 +578,6 @@ void displaySamsungWatchsDeviceMenu() {
 }
 
 void displayConnectableModeSpooferMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPO_CONN_MODE_COUNT] = {
@@ -567,7 +591,6 @@ void displayConnectableModeSpooferMenu() {
 }
 
 void displayDiscoverableModeSpooferMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 
 	String items[BLE_SPO_DISC_MODE_COUNT] = {
@@ -581,13 +604,23 @@ void displayDiscoverableModeSpooferMenu() {
 }
 
 void displaySpooferRunning() {
-	digitalWrite(espatsettings.statusLedPin, HIGH);
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, HIGH);
+	#else
+		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+		pixels.show();
+	#endif
 	display.clearScreen();
 	display.displayStringwithCoordinates("ADVERTISING...", 0, 12, true);
 }
 
 void displayExploitAttackBLEMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, LOW);
+	#else
+		pixels.clear();
+		pixels.show();
+	#endif
 	displayStatusBar();
 	
 	String items[BLE_ATK_MENU_COUNT] = {
@@ -605,7 +638,12 @@ void displayExploitAttackBLEMenu() {
 }
 
 void displayMediaCtrlBLEMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, LOW);
+	#else
+		pixels.clear();
+		pixels.show();
+	#endif
 	displayStatusBar();
 	
 	String items[BLE_MEDIA_MENU_COUNT] = {
@@ -624,7 +662,6 @@ void displayMediaCtrlBLEMenu() {
 }
 
 void displayKeymoteBLEMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 	
 	String items[BLE_KEYMOTE_ITEM_COUNT] = {
@@ -639,7 +676,6 @@ void displayKeymoteBLEMenu() {
 }
 
 void displayTikTokScrollMenu() {
-	digitalWrite(espatsettings.statusLedPin, LOW);
 	displayStatusBar();
 	
 	String items[BLE_TT_ITEM_COUNT] = {
@@ -688,10 +724,14 @@ void displayWiFiGeneralMenu() {
 
 	String items[WIFI_GENERAL_MENU_COUNT] = {
 		"Scan AP",
+		#ifndef BOARD_ESP32_C5_DEVKIT_C1
 		"Scan Dual-Band AP",
+		#endif
 		"Scan AP (Old)",
 		"Scan AP/STA",
+		#ifndef BOARD_ESP32_C5_DEVKIT_C1
 		"Scan DualB.. AP/STA",
+		#endif
 		"Probe Req Scan",
 		"Deauth Scan",
 		"Beacon Scan",
@@ -711,11 +751,32 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 			wifiScanDisplay = true;
 			display.displayStringwithCoordinates("Scan complete", 0, 24);
 			display.displayStringwithCoordinates("SELECT->back", 0, 36);
+			#ifndef BOARD_ESP32_C5_DEVKIT_C1 
 			if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_SCAN_OLD || mode == WIFI_GENERAL_DUAL_BAND_AP_SCAN)
+			#else
+			if (mode == WIFI_GENERAL_AP_SCAN || mode == WIFI_GENERAL_AP_SCAN_OLD) {
+			#endif
 				display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
+				#ifndef BUILTIN_RGB_LED
+					digialWrite(espatsettings.statusLedPin, LOW);
+				#else
+					pixels.clear();
+					pixels.show();
+				#endif
+			}
+			#ifndef BOARD_ESP32_C5_DEVKIT_C1
 			else if (mode == WIFI_GENERAL_AP_STA_SCAN || mode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+			#else
+			else if (mode == WIFI_GENERAL_AP_STA_SCAN) {
+			#endif
 				display.displayStringwithCoordinates("AP Found: " + String(access_points ? access_points->size() : 0), 0, 48);
 				display.displayStringwithCoordinates("STA Found: " + String(device_station ? device_station->size() : 0), 0, 60, true);
+				#ifndef BUILTIN_RGB_LED
+					digialWrite(espatsettings.statusLedPin, LOW);
+				#else
+					pixels.clear();
+					pixels.show();
+				#endif
 			}
 		} else {
 			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
@@ -749,7 +810,7 @@ void displayWiFiSelectMenu() {
 
 			for (int i = 0; i < 4; i++) {
 				if (i == 0) items[i] = apInfo;
-				else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi) + " Band:" + ((ap.band == WIFI_BAND_2_4G) ? "2.4G" : "5G"));
+				else if (i == 1) items[i] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi) + " Band:" + ((ap.band == WIFI_BAND_2_4Ghz) ? "2.4G" : "5G"));
 				else if (i == 2) items[i] = ("B:" + String(bssidStr));
 				else if (i == 3) items[i] = ("Enc:" + ap.wpastr);
 			}
@@ -1405,7 +1466,12 @@ void startBLEAttack(BLEScanState attackType) {
 	attackStartTime = millis();
 	currentState = BLE_ATTACK_RUNNING;
 	
-	digitalWrite(espatsettings.statusLedPin, HIGH);
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, HIGH);
+	#else
+		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+		pixels.show();
+	#endif
 	displayAttackStatus();
 }
 
@@ -1456,16 +1522,18 @@ void startWiFiAttack(WiFiScanState attackType) {
 	else if (attackType == WIFI_ATTACK_SLEEP_ALL) {
 		strmode = "Assoc Sleep All";
 	}
-	if (wifi.dualBandInList && attackType != WIFI_ATTACK_DEAUTH &&
-						  attackType != WIFI_ATTACK_STA_DEAUTH &&
-						  attackType != WIFI_ATTACK_AUTH &&
-						  attackType != WIFI_ATTACK_DEAUTH_FLOOD && 
-						  attackType != WIFI_ATTACK_EVIL_PORTAL &&
-						  attackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
-						  attackType != WIFI_ATTACK_RIC_BEACON &&
-						  attackType != WIFI_ATTACK_FUN_BEACON &&
-						  attackType != WIFI_ATTACK_RND_BEACON &&
-						  attackType != WIFI_ATTACK_KARMA) {
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
+	if (wifi.dualBandInList && 
+		attackType != WIFI_ATTACK_DEAUTH &&
+		attackType != WIFI_ATTACK_STA_DEAUTH &&
+		attackType != WIFI_ATTACK_AUTH &&
+		attackType != WIFI_ATTACK_DEAUTH_FLOOD && 
+		attackType != WIFI_ATTACK_EVIL_PORTAL &&
+		attackType != WIFI_ATTACK_EVIL_PORTAL_DEAUTH &&
+		attackType != WIFI_ATTACK_RIC_BEACON &&
+		attackType != WIFI_ATTACK_FUN_BEACON &&
+		attackType != WIFI_ATTACK_RND_BEACON &&
+		attackType != WIFI_ATTACK_KARMA) {
 		displayStatusBar();
 		display.displayStringwithCoordinates("This Feature In This", 0, 24);
 		display.displayStringwithCoordinates("Version Can't Run", 0, 36);
@@ -1475,12 +1543,18 @@ void startWiFiAttack(WiFiScanState attackType) {
 		displayWiFiAttackMenu();
 		return;
 	}
+	#endif
 	Serial.println("[INFO] Starting WiFi attack: " + strmode);
 	
 	currentWiFiAttackType = attackType;
 	currentState = WIFI_ATTACK_RUNNING;
 	
-	digitalWrite(espatsettings.statusLedPin, HIGH);
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, HIGH);
+	#else
+		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+		pixels.show();
+	#endif
 
 	if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL ||
 		currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH ||
@@ -1506,7 +1580,12 @@ void startNRFJammer(NRFJammerMode jammer_mode) {
 	nrfJammerSetupOneShot = false;
 	currentState = NRF24_JAMMER_RUNNING;
 
-	digitalWrite(espatsettings.statusLedPin, HIGH); 
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, HIGH);
+	#else
+		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+		pixels.show();
+	#endif
 }
 
 void startBLEScan() {
@@ -1518,6 +1597,12 @@ void startBLEScan() {
 	bleScanOneShot = true;
 	display.clearBuffer();
 	ble.StartMode(BLE_SCAN_DEVICE);
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, HIGH);
+	#else
+		pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+		pixels.show();
+	#endif
 	//displayStatusBar(true);
 	//ble.ShutdownBLE();
 	//bleScanInProgress = false;
@@ -1541,7 +1626,9 @@ void startWiFiScan(WiFiGeneralItem mode) {
 			displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 			wifi.StartMode(WIFI_SCAN_AP_STA);
 		}
-	} else if (mode == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+	}
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
+	else if (mode == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
 		wifiScanInProgress = true;
 		display.clearBuffer();
 		wifiScanOneShot = true;
@@ -1553,7 +1640,9 @@ void startWiFiScan(WiFiGeneralItem mode) {
 		wifiScanOneShot = true;
 		displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 		rtl8720dn->sendCommand("RTL_START_AP_STA_SCAN");
-	} else {
+	}
+	#endif
+	else {
 		wifiScanInProgress = true;
 		displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
 		wifi.StartMode(WIFI_SCAN_AP_OLD);
@@ -1568,6 +1657,12 @@ void startWiFiScan(WiFiGeneralItem mode) {
 
 void startSnifferScan(WiFiGeneralItem sniffer_mode) {
 	display.clearBuffer();
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, HIGH);
+	#else
+		pixels.setPixelColor(0, pixels.Color(0, 0, 255));
+		pixels.show();
+	#endif
 	if (sniffer_mode == WIFI_GENERAL_PROBE_REQ_SCAN) {
 		wifi.StartMode(WIFI_SCAN_PROBE_REQ);
 	}
@@ -1615,15 +1710,22 @@ void stopCurrentAttack() {
 			wifiAttackOneShot = false;
 		}
 		display.setFont(u8g2_font_ncenB08_tr);
+		#ifndef BOARD_ESP32_C5_DEVKIT_C1
 		if (wifi.dualBandInList) {
 			rtl8720dn->sendCommand("RTL_STOP_SCAN");
 			wifi.dualBandInList = false;
 		} else {
 			wifi.StartMode(WIFI_SCAN_OFF);
 		}
+		#endif
 	}
 		
-	digitalWrite(espatsettings.statusLedPin, LOW);
+	#ifndef BUILTIN_RGB_LED
+		digialWrite(espatsettings.statusLedPin, LOW);
+	#else
+		pixels.clear();
+		pixels.show();
+	#endif
 		
 	// Add delay to ensure proper cleanup
 	vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -2013,6 +2115,16 @@ void selectCurrentItem() {
 	switch(currentState) {
 		case MAIN_MENU:
 			if (currentSelection == MAIN_BLE) {
+				#ifndef BOARD_ESP32_C5_DEVKIT_C1
+					displayStatusBar();
+					display.displayStringwithCoordinates("BLE Mode Is Not", 0, 24);
+					display.displayStringwithCoordinates("Supported In This", 0, 36);
+					display.displayStringwithCoordinates("Board!", 0, 48, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					selPress = false;
+					displayMainMenu();
+					return;
+				#endif
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
@@ -2023,7 +2135,7 @@ void selectCurrentItem() {
 				maxSelections = WIFI_MENU_COUNT;
 				displayWiFiMenu();
 			} else if (currentSelection == MAIN_NRF24) {
-				if (NRFRadio.isChipConnected() || (espatsettings.nrfCePin != 99 && espatsettings.nrfCsPin != 99)) {
+				if (NRFRadio.isChipConnected() && (espatsettings.nrfCePin != 99 && espatsettings.nrfCsPin != 99)) {
 					currentState = NRF24_MENU;
 					currentSelection = 0;
 					maxSelections = NRF24_MENU_COUNT;
@@ -2116,7 +2228,21 @@ void selectCurrentItem() {
 			if (currentSelection == BLE_BACK) {
 				goBack();
 			} else {
+				#ifdef BOARD_ESP32_C5_DEVKIT_C1
+				if (currentSelection > BLE_INFO) {
+					displayStatusBar();
+					display.displayStringwithCoordinates("This Mode Is Not", 0, 24);
+					display.displayStringwithCoordinates("Supported In This", 0, 36);
+					display.displayStringwithCoordinates("Board!", 0, 48, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					selPress = false;
+					displayBLEMenu();
+					return;
+				}
+				else if (currentSelection == BLE_EXPLOIT_ATTACK) {
+				#else
 				if (currentSelection == BLE_EXPLOIT_ATTACK) {
+				#endif
 					currentState = BLE_EXPLOIT_ATTACK_MENU;
 					currentSelection = 0;
 					maxSelections = BLE_ATK_MENU_COUNT;
@@ -2125,6 +2251,12 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_ANALYZER) {
 					currentState = BLE_ANALYZER_RUNNING;
 					ble.StartMode(BLE_SCAN_ANALYZER);
+					#ifndef BUILTIN_RGB_LED
+						digialWrite(espatsettings.statusLedPin, HIGH);
+					#else
+						pixels.setPixelColor(0, pixels.Color(0, 0, 255));
+						pixels.show();
+					#endif
 				} else if (currentSelection == BLE_INFO) {
 					currentState = BLE_INFO_MENU_LIST;
 					currentSelection = 0;
@@ -2431,8 +2563,12 @@ void selectCurrentItem() {
 			else if (currentSelection == BLE_KEYMOTE_DOWN) badusb.Keymote(hid_ble, KEYMOTE_DOWN); 
 			else if (currentSelection == BLE_KEYMOTE_LEFT) badusb.Keymote(hid_ble, KEYMOTE_LEFT); 
 			else if (currentSelection == BLE_KEYMOTE_RIGHT) badusb.Keymote(hid_ble, KEYMOTE_RIGHT);
+			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
 			vTaskDelay(80 / portTICK_PERIOD_MS);
+			pixels.clear();
+			pixels.show();
 			displayKeymoteBLEMenu();
 			break;
 		case BLE_MEDIA_MENU:
@@ -2449,8 +2585,12 @@ void selectCurrentItem() {
 			else if (currentSelection == BLE_MEDIA_VOL_UP) badusb.mediaController(hid_ble, MEDIA_VOL_UP);
 			else if (currentSelection == BLE_MEDIA_VOL_DOWN) badusb.mediaController(hid_ble, MEDIA_VOL_DOWN);
 			else if (currentSelection == BLE_MEDIA_MUTE) badusb.mediaController(hid_ble, MEDIA_MUTE);
+			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
 			vTaskDelay(80 / portTICK_PERIOD_MS);
+			pixels.clear();
+			pixels.show();
 			displayMediaCtrlBLEMenu();
 			break;
 		case BLE_TT_SCROLL_MENU:
@@ -2462,8 +2602,12 @@ void selectCurrentItem() {
 			else if (currentSelection == BLE_TT_SCROLL_UP) badusb.tiktokScroll(hid_ble, SCROLL_UP);
 			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_ble, SCROLL_DOWN);
 			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_ble, LIKE_VIDEO);
+			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
 			vTaskDelay(80 / portTICK_PERIOD_MS);
+			pixels.clear();
+			pixels.show();
 			displayTikTokScrollMenu();
 			break;
 		case WIFI_MENU:
@@ -2591,6 +2735,7 @@ void selectCurrentItem() {
 				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 				//startWiFiScan(WIFI_GENERAL_AP_SCAN);
 			}
+			#ifndef BOARD_ESP32_C5_DEVKIT_C1
 			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
 				if (!rtl8720dn_ready) {
 					displayStatusBar();
@@ -2604,15 +2749,6 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
 			}
-			else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
-				currentState = WIFI_SCAN_RUNNING;
-				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
-			}
-			else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
-				currentState = WIFI_SCAN_RUNNING;
-				displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
-				//startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
-			}
 			else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 				if (!rtl8720dn_ready) {
 					displayStatusBar();
@@ -2625,6 +2761,16 @@ void selectCurrentItem() {
 				}
 				currentState = WIFI_SCAN_RUNNING;
 				displayWiFiScanMenu(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
+			}
+			#endif
+			else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN_OLD);
+			}
+			else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
+				currentState = WIFI_SCAN_RUNNING;
+				displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
+				//startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 			}
 			else if (currentSelection == WIFI_GENERAL_PROBE_REQ_SCAN) {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
@@ -2657,21 +2803,53 @@ void selectCurrentItem() {
 			if (!wifiScanRunning) {
 				if (currentSelection == WIFI_GENERAL_AP_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN);
+					#ifndef BUILTIN_RGB_LED
+						digialWrite(espatsettings.statusLedPin, HIGH);
+					#else
+						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+						pixels.show();
+					#endif
 				}
+				#ifndef BOARD_ESP32_C5_DEVKIT_C1
 				else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
 					access_points->clear();
 					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
-				}
-				else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
-					startWiFiScan(WIFI_GENERAL_AP_SCAN_OLD);
-				}
-				else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
-					startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
+					#ifndef BUILTIN_RGB_LED
+						digialWrite(espatsettings.statusLedPin, HIGH);
+					#else
+						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+						pixels.show();
+					#endif
 				}
 				else if (currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 					access_points->clear();
 					device_station->clear();
 					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
+					#ifndef BUILTIN_RGB_LED
+						digialWrite(espatsettings.statusLedPin, HIGH);
+					#else
+						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+						pixels.show();
+					#endif
+				}
+				#endif
+				else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
+					startWiFiScan(WIFI_GENERAL_AP_SCAN_OLD);
+					#ifndef BUILTIN_RGB_LED
+						digialWrite(espatsettings.statusLedPin, HIGH);
+					#else
+						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+						pixels.show();
+					#endif
+				}
+				else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
+					startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
+					#ifndef BUILTIN_RGB_LED
+						digialWrite(espatsettings.statusLedPin, HIGH);
+					#else
+						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
+						pixels.show();
+					#endif
 				}
 			} else wifiScanRunning = false;
 			break;
@@ -2828,14 +3006,16 @@ void selectCurrentItem() {
 					displayWiFiAttackMenu();
 					return;
 				}
+				#ifndef BOARD_ESP32_C5_DEVKIT_C1
 				for (int i = 0; i < access_points->size(); i++) {
-					if (access_points->get(i).selected && access_points->get(i).band == WIFI_BAND_5G) {
+					if (access_points->get(i).selected && access_points->get(i).band == WIFI_BAND_5Ghz) {
 						wifi.dualBandInList = true;
 						break;
 					} else {
 						wifi.dualBandInList = false;
 					}
 				}
+				#endif
 				
 				// Start WiFi attack
 				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_FUN_BEACON,
@@ -3218,19 +3398,31 @@ void goBack() {
 			displayWiFiMenu();
 			break;
 		case WIFI_SCAN_RUNNING:
+			#ifndef BOARD_ESP32_C5_DEVKIT_C1
 			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
+			#else
+			if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
+			#endif
 				if (wifiScanRunning && wifiScanInProgress) {
 					wifiScanInProgress = false;
 					if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_STA_SCAN) {
 						wifi.StartMode(WIFI_SCAN_OFF);
 					}
+					#ifndef BOARD_ESP32_C5_DEVKIT_C1
 					else {
 						rtl8720dn->sendCommand("RTL_STOP_SCAN");
 					}
 					if (currentSelection == WIFI_GENERAL_AP_SCAN || currentSelection == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+					#else
+					if (currentSelection == WIFI_GENERAL_AP_SCAN) {
+					#endif
 						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()));
 						displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
+					#ifndef BOARD_ESP32_C5_DEVKIT_C1
 					} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN || currentSelection == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+					#else
+					} else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
+					#endif
 						Serial.println("[INFO] Wifi Scan completed successfully! AP in list: " + String(access_points->size()) + " Station in list: " + String(device_station->size()));
 						displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 					}
@@ -3273,12 +3465,18 @@ void goBack() {
 			break;
 		case WIFI_SCAN_SNIFFER_RUNNING:
 			currentState = WIFI_GENERAL_MENU;
-			currentSelection = 0;
+			//currentSelection = 0;
 			maxSelections = WIFI_GENERAL_MENU_COUNT;
 			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) display.clearGraph(wifi.wifi_analyzer_frames);
 			wifi.wifi_analyzer_ssid = "";
 			wifiSnifferMode = -1;
 			wifi.StartMode(WIFI_SCAN_OFF);
+			#ifndef BUILTIN_RGB_LED
+				digialWrite(espatsettings.statusLedPin, LOW);
+			#else
+				pixels.clear();
+				pixels.show();
+			#endif
 			displayWiFiGeneralMenu();
 			break;
 		case WIFI_SELECT_MENU:
@@ -3348,6 +3546,12 @@ void goBack() {
 			ble.StartMode(BLE_SCAN_OFF);
 			display.clearGraph(ble.ble_analyzer_frames);
 			ble.ble_analyzer_device = "";
+			#ifndef BUILTIN_RGB_LED
+				digialWrite(espatsettings.statusLedPin, LOW);
+			#else
+				pixels.clear();
+				pixels.show();
+			#endif
 			displayBLEMenu();
 			break;
 		case BLE_EXPLOIT_ATTACK_MENU:
@@ -3679,8 +3883,14 @@ void handleInput(MenuState handle_state) {
 		else if ((wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN ||
 				 wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN ||
 				 wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) && currentState == WIFI_SCAN_SNIFFER_RUNNING) {
-			if (wifi.set_channel < 2) wifi.set_channel = 13;
+			#ifndef BOARD_ESP32_C5_DEVKIT_C1
+			if (wifi.set_channel <= 1) wifi.set_channel = 14;
 			else wifi.set_channel = wifi.set_channel - 1;
+			#else
+			if (wifi.dual_band_channels_index <= 0) wifi.dual_band_channels_index = DUAL_BAND_CHANNELS - 1;
+			else wifi.dual_band_channels_index--;
+			wifi.set_channel = wifi.dual_band_channels[wifi.dual_band_channels_index];
+			#endif
 			wifi.changeChannel();
 			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) {
 				analyzerChangedChannel = true;
@@ -3704,8 +3914,14 @@ void handleInput(MenuState handle_state) {
 		if ((wifiSnifferMode == WIFI_GENERAL_EAPOL_SCAN ||
 			wifiSnifferMode == WIFI_GENERAL_EAPOL_DEAUTH_SCAN ||
 			wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) && currentState == WIFI_SCAN_SNIFFER_RUNNING) {
-			if (wifi.set_channel > 12) wifi.set_channel = 1;
+			#ifndef BOARD_ESP32_C5_DEVKIT_C1
+			if (wifi.set_channel >= 14) wifi.set_channel = 1;
 			else wifi.set_channel = wifi.set_channel + 1;
+			#else
+			if (wifi.dual_band_channels_index >= DUAL_BAND_CHANNELS - 1) wifi.dual_band_channels_index = 0;
+			else wifi.dual_band_channels_index++;
+			wifi.set_channel = wifi.dual_band_channels[wifi.dual_band_channels_index];
+			#endif
 			wifi.changeChannel();
 			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) {
 				analyzerChangedChannel = true;
@@ -3752,16 +3968,21 @@ void handleTasks(MenuState handle_state) {
 				startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 			}
 		}
+		#ifndef BOARD_ESP32_C5_DEVKIT_C1
 		if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN) {
+		#else
+		if (wifiSnifferMode == WIFI_GENERAL_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_AP_SCAN_OLD) {
+		#endif
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_SCAN);
 		}
 		else {
 			if (!wifiScanDisplay && !wifiScanInProgress) displayWiFiScanMenu(WIFI_GENERAL_AP_STA_SCAN);
 		}
-
+		#ifndef BOARD_ESP32_C5_DEVKIT_C1
 		if (wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_SCAN || wifiSnifferMode == WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
 			rtl8720dn->parseAPSTAScanResponse(rtl8720dn->filterRTLData(rtl8720dn->waitForResponse(5)));
 		}
+		#endif
 
 		if (wifiScanInProgress && wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
 			if (wifiScanRedraw) {
@@ -3772,10 +3993,14 @@ void handleTasks(MenuState handle_state) {
 			}
 		}
 
+		#ifndef BOARD_ESP32_C5_DEVKIT_C1
 		if (wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD && wifiSnifferMode != WIFI_GENERAL_DUAL_BAND_AP_SCAN && wifiSnifferMode != WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN) {
+		#else
+		if (wifiSnifferMode != WIFI_GENERAL_AP_SCAN_OLD) {
+		#endif
 			static unsigned long channelhoptimer = 0;
 			if (wifiScanRunning && wifiScanInProgress) {
-				if (millis() - channelhoptimer > 500) {
+				if (millis() - channelhoptimer > CHANNEL_HOP_DELAY) {
 					wifi.channelHop();
 					channelhoptimer = millis();
 				}
@@ -3806,7 +4031,7 @@ void handleTasks(MenuState handle_state) {
 			wifiSnifferMode != WIFI_GENERAL_EAPOL_DEAUTH_SCAN &&
 			wifiSnifferMode != WIFI_GENERAL_CH_ANALYZER) {
 			static unsigned long channelhoptimer = 0;
-			if (millis() - channelhoptimer > 500) {
+			if (millis() - channelhoptimer > CHANNEL_HOP_DELAY) {
 				wifi.channelHop();
 				channelhoptimer = millis();
 			}
@@ -3940,7 +4165,19 @@ void handleTasks(MenuState handle_state) {
 			display.displayStringwithCoordinates("TV-B-Gone Mode", 0, 24);
 			display.displayStringwithCoordinates("Region:" + region, 0,36);
 			display.displayStringwithCoordinates("Press Sel to stop", 0, 48, true);
+			#ifndef BUILTIN_RGB_LED
+				digialWrite(espatsettings.statusLedPin, HIGH);
+			#else
+				pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+				pixels.show();
+			#endif
 			irtx.startTVBGone();
+			#ifndef BUILTIN_RGB_LED
+				digialWrite(espatsettings.statusLedPin, LOW);
+			#else
+				pixels.clear();
+				pixels.show();
+			#endif
 			display.clearScreen();
 			displayStatusBar();
 			display.displayStringwithCoordinates("All Codes", 0, 24);
@@ -3960,8 +4197,20 @@ void handleTasks(MenuState handle_state) {
 				display.displayStringwithCoordinates(irSendFile, 0,36);
 				display.displayStringwithCoordinates("Please wait!", 0, 48, true);
 				Serial.println("[INFO] Starting IR Send File: " + irSendFile);
+				#ifndef BUILTIN_RGB_LED
+					digialWrite(espatsettings.statusLedPin, HIGH);
+				#else
+					pixels.setPixelColor(0, pixels.Color(255, 0, 0));
+					pixels.show();
+				#endif
 				irtx.sendIRTx(irSendFile);
 				vTaskDelay(300 / portTICK_PERIOD_MS);
+				#ifndef BUILTIN_RGB_LED
+				digialWrite(espatsettings.statusLedPin, LOW);
+				#else
+					pixels.clear();
+					pixels.show();
+				#endif
 				display.clearScreen();
 				displayStatusBar();
 				display.displayStringwithCoordinates("IR File Sent", 0, 24);
@@ -4030,17 +4279,63 @@ void handleTasks(MenuState handle_state) {
 					if (currentWiFiAttackType == WIFI_ATTACK_KARMA) {
 						for (int i = 0; i < probe_req_ssids->size(); i++) {
 							if (probe_req_ssids->get(i).selected) {
-								_ap = eportal.apSetup(probe_req_ssids->get(i).essid, false);
+								_ap = eportal.apSetup(probe_req_ssids->get(i).essid);
 								Serial.println("[INFO] Karma Mode Enable");
 								break;
 							}
 						}
 					} else {
 						if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH) {
-							_ap = eportal.apSetup("", true);
-						} else {
-							_ap = eportal.apSetup("", false);
+							String target_ssids = "";
+							ep_target_mac_list->clear();
+							for (int i = 0; i < access_points->size(); i++) {
+								if (access_points->get(i).selected) {
+									target_ssids = access_points->get(i).essid;
+									break;
+								}
+							}
+
+							for (int i = 0; i < access_points->size(); i++) {
+								if (access_points->get(i).essid != target_ssids) continue;
+								bool exists = false;
+
+								for (int j = 0; j < ep_target_mac_list->size(); j++) {
+									if (memcmp(ep_target_mac_list->get(j).target_mac, access_points->get(i).bssid, 6) == 0) {
+										exists = true;
+										break;
+									}
+								}
+
+								if (!exists) {
+									EPDeauthList entry;
+									memcpy(entry.target_mac, access_points->get(i).bssid, 6);
+									entry.channel = access_points->get(i).channel;
+									ep_target_mac_list->add(entry);
+								}
+							}
+
+							#ifndef BOARD_ESP32_C5_DEVKIT_C1
+							if (wifi.dualBandInList) {
+								String src_macs = "";
+								String channels = "";
+								bool first_ap = true;
+								for (int x = 0; x < ep_target_mac_list->size(); x++) {
+									EPDeauthList sel_ap = ep_target_mac_list->get(x);
+									
+									if (!first_ap) {
+										src_macs += ",";
+										channels += ",";
+									}
+									
+									src_macs += macToString(sel_ap.target_mac);
+									channels += String(sel_ap.channel);
+									first_ap = false;
+								}
+								str_deauth_frame = "RTL_DEAUTH -am {" + src_macs + "} -c {" + channels + "}";
+							}
+							#endif
 						}
+						_ap = eportal.apSetup("");
 					}
 					
 					bool _html = eportal.htmlSetup();
@@ -4055,29 +4350,27 @@ void handleTasks(MenuState handle_state) {
 						display.displayString("Failed To Init", true);
 						display.displayString("Initialized Portal", true, true);
 					}
+					#ifndef BOARD_ESP32_C5_DEVKIT_C1
 					if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH && wifi.dualBandInList) {
 						rtl8720dn->sendCommand(str_deauth_frame);
 					}
+					#endif
 					evilPortalOneShot = true;
 				}
 
-				if (eportal.password_received && eportal.name_received){
+				if (eportal.password_received || eportal.name_received){
 					display.displayEvilPortalText(eportal.get_user_name(), eportal.get_password());
 				}
 				eportal.loop();
 				
 				// Deauth handling for Evil Portal + Deauth
-				if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH && !wifi.dualBandInList) {
-					static unsigned long lastDeauthTime = 0;
-					if (millis() - lastDeauthTime > 250) {
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
-						esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame, sizeof(deauth_frame), false);
-
-						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
-						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
-						esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame, sizeof(deauth_frame), false);
-						lastDeauthTime = millis();
+				if (currentWiFiAttackType == WIFI_ATTACK_EVIL_PORTAL_DEAUTH
+					#ifndef BOARD_ESP32_C5_DEVKIT_C1
+					&& !wifi.dualBandInList
+					#endif
+					) {
+					for (int i = 0; i < ep_target_mac_list->size(); i++) {
+						for (int j = 0; j < 15; j++) wifi.sendDeauthFrame(ep_target_mac_list->get(i).target_mac, ep_target_mac_list->get(i).channel);
 					}
 				}
 			}
@@ -4088,6 +4381,7 @@ void handleTasks(MenuState handle_state) {
 			else {
 				// Regular WiFi attacks
 				if (!wifiAttackOneShot) {
+					#ifndef BOARD_ESP32_C5_DEVKIT_C1
 					if (!wifi.dualBandInList) wifi.StartMode(currentWiFiAttackType);
 					else {
 						if (currentWiFiAttackType == WIFI_ATTACK_STA_DEAUTH || currentWiFiAttackType == WIFI_ATTACK_DEAUTH) {
@@ -4168,9 +4462,14 @@ void handleTasks(MenuState handle_state) {
 						} else {
 							Serial.println("[WARN] (Dualband) Not Mode Selected!");
 						}
+					
 					}
+					#else
+						wifi.StartMode(currentWiFiAttackType);
+					#endif
 					wifiAttackOneShot = true;
 				}
+				#ifndef BOARD_ESP32_C5_DEVKIT_C1
 				if (!wifi.dualBandInList) wifi.mainAttackLoop(currentWiFiAttackType); // this can handle only 2.4Ghz band
 				else {
 					String packet_res = rtl8720dn->waitForResponse(10);
@@ -4180,6 +4479,9 @@ void handleTasks(MenuState handle_state) {
 						wifi.packet_sent = packet_res.toInt();
 					}
 				}
+				#else 
+				wifi.mainAttackLoop(currentWiFiAttackType);
+				#endif
 			}
 		}
 

@@ -6,7 +6,8 @@
 // BOARD CONFIGURATION //
 
 //#define BOARD_ESP32_C3_MINI
-#define BOARD_XIAO_ESP32_C3
+//#define BOARD_XIAO_ESP32_C3
+#define BOARD_ESP32_C5_DEVKIT_C1
 
 // BLE Configuration //
 
@@ -15,6 +16,10 @@
 #define SWIFTPAIR_SPAM_DELAY 20
 
 #define ATTACK_TOOL_VERSION "2.9.0"
+
+// WiFi Configuration //
+
+#define CHANNEL_HOP_DELAY 150
 
 // SCREEN CONFIGURATION //
 
@@ -35,6 +40,10 @@
     #define SDA_PIN 6
     #define SCL_PIN 7
     #define RST_PIN -1
+#elif defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define SDA_PIN 2
+    #define SCL_PIN 3
+    #define RST_PIN -1
 #endif
 
 // LED CONFIGURATION //
@@ -45,6 +54,9 @@
     #define STA_LED 29
 #elif defined(BOARD_ESP32)
     #define STA_LED 2
+#elif defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define STA_LED 27
+    #define BUILTIN_RGB_LED
 #endif
 
 
@@ -53,9 +65,9 @@
 #define USING_ENCODER
 //#define USING_BUTTON
 
-#define ENC_PIN_A 3
-#define ENC_PIN_B 4
-#define ENC_BTN 2
+#define ENC_PIN_A 25
+#define ENC_PIN_B 26
+#define ENC_BTN 6
 
 #define LEFT_BTN 1
 #define RIGHT_BTN 2
@@ -80,6 +92,10 @@
     #define SPI_MOSI_PIN 10
     #define SPI_MISO_PIN 9
     #define SPI_SCK_PIN 8
+#elif defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define SPI_MOSI_PIN 7
+    #define SPI_MISO_PIN 8
+    #define SPI_SCK_PIN 9
 #endif
 // SD Card Configuration //
 
@@ -89,6 +105,8 @@
     #define SD_CS_PIN 10
 #elif defined(BOARD_XIAO_ESP32_C3)
     #define SD_CS_PIN 5
+#elif defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define SD_CS_PIN 10
 #endif
 
 // NRF24 CONFIGURATION //
@@ -102,6 +120,9 @@
 #elif defined(BOARD_XIAO_ESP32_C3)
     #define NRF24_CE_PIN 99
     #define NRF24_CSN_PIN 99
+#elif defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define NRF24_CE_PIN 24
+    #define NRF24_CSN_PIN 23 
 #endif
 
 // IR Configuration //
@@ -117,6 +138,9 @@
 #elif defined(BOARD_XIAO_ESP32_C3)
     #define IR_PIN 99
     #define IR_RX_PIN 99
+#elif defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define IR_PIN 4
+    #define IR_RX_PIN 5
 #endif
 
 // Serial Configuration (for RTL8720DN) //
@@ -125,5 +149,9 @@
     #define RTL_SERIAL_BAUD 115200
     #define SERIAL_RX_PIN 20
     #define SERIAL_TX_PIN 21
+#elif defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define RTL_SERIAL_BAUD 115200
+    #define SERIAL_RX_PIN 99
+    #define SERIAL_TX_PIN 99
 #endif
 #endif // CONFIGS_H

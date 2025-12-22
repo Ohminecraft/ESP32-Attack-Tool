@@ -266,7 +266,7 @@ void BLEModules::main()
     NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
     NimBLEDevice::setScanDuplicateCacheSize(200);
     NimBLEDevice::init("");
-    NimBLEDevice::setPower(MAX_TX_POWER);
+    //NimBLEDevice::setPower(MAX_TX_POWER);
     pBLEScan = NimBLEDevice::getScan();
     ble_initialized = true;
     Serial.println("[INFO] Successfully Initialized BLE Module");
@@ -285,7 +285,9 @@ bool BLEModules::ShutdownBLE()
         }
         // Deinitialize BLE
         vTaskDelay(10 / portTICK_PERIOD_MS); // need delay to prevent crash
+        #ifndef BOARD_ESP32_C5_DEVKIT_C1 // Deinit cause crash on ESP32-C5 https://github.com/h2zero/NimBLE-Arduino/issues/1008
         NimBLEDevice::deinit();
+        #endif
         ble_initialized = false;
         Serial.println("[INFO] Shutting down BLE Module Successfully");
         return true;
@@ -498,8 +500,8 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    esp_ble_gap_set_rand_addr(null_addr);
+    //uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    //setBleGapRandAddress(null_addr);
 
     Serial.println("[INFO] BLE Spoofer Initialized Successfully!");
 }
@@ -513,8 +515,8 @@ void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t
     if (!ble_initialized) {
         uint8_t macAddr[6];
         generateRandomMac(macAddr);
-        esp_base_mac_addr_set(macAddr);
-        esp_ble_gap_set_rand_addr(dummy_addr);
+        setBaseMacAddress(macAddr);
+        //setBleGapRandAddress(dummy_addr);
         NimBLEDevice::init(espatsettings.bleName.c_str());
         NimBLEDevice::setPower(MAX_TX_POWER);
         NimBLEServer *pServer = NimBLEDevice::createServer();
@@ -543,8 +545,8 @@ void BLEModules::stopSpoofer() {
 }
 
 void BLEModules::initSpam() {
-    uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    esp_ble_gap_set_rand_addr(null_addr);
+    //uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
+    //setBleGapRandAddress(null_addr);
 
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
@@ -559,8 +561,8 @@ void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
     }
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
-    esp_base_mac_addr_set(macAddr);
-    esp_ble_gap_set_rand_addr(dummy_addr);
+    setBaseMacAddress(macAddr);
+    //setBleGapRandAddress(dummy_addr);
     NimBLEDevice::init("");
     NimBLEDevice::setPower(MAX_TX_POWER, NimBLETxPowerType::Advertise);
     NimBLEServer *pServer = NimBLEDevice::createServer();
@@ -598,8 +600,71 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
             ble_name = advertisedDevice->getName().c_str();
             if (ble_name.isEmpty()) bleres.name = "<no name>";
             else bleres.name = ble_name;
+
             bleres.rssi = advertisedDevice->getRSSI();
             bleres.addr = advertisedDevice->getAddress();
+            const std::vector<unsigned char>& payload = advertisedDevice->getPayload();
+            size_t len = payload.size();
+
+            bool match_airtag = false;
+            bool match_flipper = false;
+            bleres.isAirtags = false;
+            bleres.isFlipper = false;
+
+            for (int i = 0; i <= len - 4; i++) {
+              if (payload[i] == 0x1E && payload[i+1] == 0xFF && payload[i+2] == 0x4C && payload[i+3] == 0x00) {
+                match_airtag = true;
+                break;
+              }
+              if (payload[i] == 0x4C && payload[i+1] == 0x00 && payload[i+2] == 0x12 && payload[i+3] == 0x19) {
+                match_airtag = true;
+                break;
+              }
+            }
+            if (match_airtag) {
+                for (int i = 0; i < blescanres->size(); i++) {
+                    if (blescanres->get(i).addr.equals(bleres.addr)) {
+                        BLEScanResult new_data = blescanres->get(i);
+                        new_data.airtagsdata.last_seen = millis();
+                        new_data.rssi = bleres.rssi;
+                        blescanres->set(i, new_data);
+                        Serial.println("[INFO] Updated Airtag: " + new_data.name + " (Addr: " + String(new_data.addr.toString().c_str()) + ")" + " (RSSI: " + String(new_data.rssi) + ")");
+                        return;
+                    }
+                }
+                bleres.isAirtags = true;
+                bleres.airtagsdata.last_seen = millis();
+            }
+
+            String flippercolor = "Unknown";
+            for (int i = 0; i <= len - 4; i++) {
+              if (payload[i] == 0x81 && payload[i+1] == 0x30) {
+                match_flipper = true;
+                flippercolor = "Black";
+                break;
+              }
+              if (payload[i] == 0x82 && payload[i+1] == 0x30) {
+                match_flipper = true;
+                flippercolor = "White";
+                break;
+              }
+              if (payload[i] == 0x83 && payload[i+1] == 0x30) {
+                flippercolor = "Transparent";
+                match_flipper = true;
+                break;
+              }
+            }
+
+            if (match_flipper) {
+                for (int i = 0; i < blescanres->size(); i++) {
+                    if (blescanres->get(i).addr.equals(bleres.addr)) {
+                        return; // Already exists, ignore
+                    }
+                }
+                bleres.isFlipper = true;
+                bleres.flipperdata.variant = flippercolor;
+            }
+
             if (!low_memory_warning)
                 blescanres->add(bleres);
             String add_to_buffer;
@@ -608,8 +673,13 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
                 else add_to_buffer = ble_name;
             } else add_to_buffer = String("Low Mem! Ignore!");
             display_buffer->add(add_to_buffer);
-            if (!low_memory_warning) Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
-            else Serial.println("[INFO] Low Memory Warning! Ignore: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+
+            if (!low_memory_warning) {
+                if (match_airtag) Serial.println("[INFO] Added Airtag: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")" + " (Last Seen: " + String(bleres.airtagsdata.last_seen) + " ms)");
+                else if (match_flipper) Serial.println("[INFO] Added Flipper Zero Device: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (Color: " + String(bleres.flipperdata.variant) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+                else Serial.println("[INFO] Added: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")");
+            }
+            else Serial.println("[WARN] Low Memory Warning! Ignore New Device Found!");
         } else {
             for (int i = 0; i < 5; i++) ble.ble_analyzer_value++;
 
@@ -626,20 +696,20 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
                 ble.ble_analyzer_frames_recvd = 0;
             }
         }
-        
     }
 };
 
 void BLEModules::bleScan() {
-    delete blescanres;
-    blescanres = new LinkedList<BLEScanResult>();
     NimBLEDevice::init(espatsettings.bleName.c_str());
     ble_initialized = true;
     pBLEScan = NimBLEDevice::getScan();
-    if (!bleAnalyzerMode)
-    pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), false);
+    if (!bleAnalyzerMode) {
+        delete blescanres;
+        blescanres = new LinkedList<BLEScanResult>();
+        pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), false);
+    }
     else
-    pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), true);
+        pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), true);
 
     pBLEScan->setActiveScan(true);
     pBLEScan->setInterval(100);

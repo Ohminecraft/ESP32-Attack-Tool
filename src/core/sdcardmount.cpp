@@ -16,8 +16,7 @@ void SDCardModules::main() {
     sdcard_buffer = new LinkedList<String>();
     SDCardSPI->begin(espatsettings.spiSckPin,
                      espatsettings.spiMisoPin,
-                     espatsettings.spiMosiPin,
-                     espatsettings.sdcardCsPin);
+                     espatsettings.spiMosiPin);
     if (!SD.begin(espatsettings.sdcardCsPin, *SDCardSPI)) {
         Serial.println("[ERROR] SD Card Mount Failed!");
         return;
@@ -75,6 +74,7 @@ bool SDCardModules::deleteFile(String path) {
             return true;
         }
     }
+    return true;
 }
 
 bool SDCardModules::isExists(String path) {
@@ -152,4 +152,5 @@ int8_t SDCardModules::update() { // 0 for fail open file, -1 for fail begin upda
     } else {
         Serial.println("[WARN] SD Card is not mounted!");
     }
+    return true;
 }

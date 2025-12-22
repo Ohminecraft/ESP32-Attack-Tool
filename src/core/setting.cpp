@@ -260,7 +260,7 @@ void ESP32ATSetting::loadSettings() {
     static bool reloadedOnce = false;
 
     SDCardSPI = &SPI;
-    SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin, sdcardCsPin);
+    SDCardSPI->begin(spiSckPin, spiMisoPin, spiMosiPin);
 
     if (!SD.begin(sdcardCsPin, *SDCardSPI)) {
         Serial.println("[INFO] Failed to mount SD, open LittleFS config file to check sd pin");

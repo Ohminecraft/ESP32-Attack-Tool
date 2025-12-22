@@ -16,7 +16,23 @@
 #include <SPI.h>
 #include <vector>
 
+#include "esp_wifi.h"
+#include "esp_wifi_types.h"
+
 #include "configs.h"
+
+#ifdef BOARD_ESP32_C5_DEVKIT_C1
+  extern "C" {
+    #include "esp_netif.h"
+    #include "esp_netif_net_stack.h"
+  }
+  #include "esp_system.h"
+#endif
+
+#ifdef BUILTIN_RGB_LED
+  #include <Adafruit_NeoPixel.h>
+#endif
+
 
 #define MEM_LOWER_LIM 20000
 
@@ -26,6 +42,10 @@
 #define GET_USED_HEAP_PERCENT 3
 
 #define GET_SIZE(x) (sizeof(x) / sizeof(x[0]))
+
+#ifdef BOARD_ESP32_C5_DEVKIT_C1
+  extern "C" esp_err_t esp_base_mac_addr_set(uint8_t *Mac);
+#endif
 
 uint32_t getHeap(uint8_t type);
 const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
