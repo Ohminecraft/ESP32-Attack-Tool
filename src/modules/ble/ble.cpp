@@ -72,13 +72,9 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
                 uint16_t model = pp_models[model_index].value;
                 uint8_t color = pp_models[model_index].colors[random(pp_models[model_index].colors_count)].value;
                 uint8_t prefix;
-                if(model == 0x0055 || model == 0x0030) prefix = 0x05;
+                if (model == 0x0055 || model == 0x0030) prefix = 0x05; // Airtag
                 else {
-                    if (espatsettings.useAppleJuicePaired) {
-                        prefix = 0x01;
-                    } else {
-                        prefix = 0x07;
-                    }
+                    espatsettings.useAppleJuicePaired ? prefix = 0x01 : prefix = 0x07;
                 }
                 AdvData_Raw[i++] = prefix; // Prefix (paired 0x01 new 0x07 airtag 0x05)
                 AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // Device Model
@@ -90,7 +86,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
                 AdvData_Raw[i++] = color; // Device Color
                 AdvData_Raw[i++] = 0x00;
                 esp_fill_random(&AdvData_Raw[i], 16);
-                i += 16;
                 AdvData.addData(AdvData_Raw, 31);
             } else if (randdevice == 1) {
                 AdvData_Raw = new uint8_t[11];
@@ -107,7 +102,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
                 AdvData_Raw[i++] = flags;
                 AdvData_Raw[i++] = action;
                 esp_fill_random(&AdvData_Raw[i], 3);
-                i += 3;
                 AdvData.addData(AdvData_Raw, 11);
             }
             break;
@@ -127,7 +121,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData_Raw[i++] = 0x00;
             AdvData_Raw[i++] = 0x80;
             memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
-            i += name_len;
             AdvData.addData(AdvData_Raw, 7 + name_len);
             break;
         }
@@ -266,7 +259,7 @@ void BLEModules::main()
     NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
     NimBLEDevice::setScanDuplicateCacheSize(200);
     NimBLEDevice::init("");
-    //NimBLEDevice::setPower(MAX_TX_POWER);
+    NimBLEDevice::setPower(MAX_TX_POWER);
     pBLEScan = NimBLEDevice::getScan();
     ble_initialized = true;
     Serial.println("[INFO] Successfully Initialized BLE Module");
@@ -594,7 +587,6 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
         extern BLEModules ble;
 
         if (!bleAnalyzerMode) {
-            bleScanRedraw = true;
             BLEScanResult bleres;
             String ble_name;
             ble_name = advertisedDevice->getName().c_str();
@@ -665,6 +657,11 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
                 bleres.flipperdata.variant = flippercolor;
             }
 
+            for (int i = 0; i < blescanres->size(); i++) {
+                if (blescanres->get(i).addr.equals(bleres.addr)) {
+                    return; // Already exists, ignore
+                }
+            }
             if (!low_memory_warning)
                 blescanres->add(bleres);
             String add_to_buffer;
@@ -673,6 +670,7 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
                 else add_to_buffer = ble_name;
             } else add_to_buffer = String("Low Mem! Ignore!");
             display_buffer->add(add_to_buffer);
+            bleScanRedraw = true;
 
             if (!low_memory_warning) {
                 if (match_airtag) Serial.println("[INFO] Added Airtag: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")" + " (Last Seen: " + String(bleres.airtagsdata.last_seen) + " ms)");
@@ -706,7 +704,7 @@ void BLEModules::bleScan() {
     if (!bleAnalyzerMode) {
         delete blescanres;
         blescanres = new LinkedList<BLEScanResult>();
-        pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), false);
+        pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), true);
     }
     else
         pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), true);

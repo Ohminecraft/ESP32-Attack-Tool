@@ -2115,16 +2115,6 @@ void selectCurrentItem() {
 	switch(currentState) {
 		case MAIN_MENU:
 			if (currentSelection == MAIN_BLE) {
-				#ifndef BOARD_ESP32_C5_DEVKIT_C1
-					displayStatusBar();
-					display.displayStringwithCoordinates("BLE Mode Is Not", 0, 24);
-					display.displayStringwithCoordinates("Supported In This", 0, 36);
-					display.displayStringwithCoordinates("Board!", 0, 48, true);
-					vTaskDelay(1000 / portTICK_PERIOD_MS);
-					selPress = false;
-					displayMainMenu();
-					return;
-				#endif
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
