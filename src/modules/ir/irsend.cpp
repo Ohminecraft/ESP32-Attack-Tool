@@ -8,23 +8,16 @@
     * Licensed under the MIT License.
 */
 
-IRSendModules::IRSendModules() : irsend(espatsettings.irTxPin)
+IRSendModules::IRSendModules() //: irsend(espatsettings.irTxPin)
 {
     // Constructor for IR send module
     // Initialize IR send object with default parameters
 }
 
-extern const IrCode* const NApowerCodes[];
-extern const IrCode* const EUpowerCodes[];
-extern uint8_t num_NAcodes, num_EUcodes;
-
 LinkedList<IRCode>* ir_codes;
-
-uint8_t bitsleft_r = 0;
-uint8_t bits_r=0;
-uint8_t code_ptr;
-volatile const IrCode * beGoneCode;
+String universal_power_mode = "TV";
 bool ending_early = false;
+IRsend irsend(espatsettings.irTxPin);
 
 void IRSendModules::main() {
     // Initialize IR send module
@@ -32,6 +25,7 @@ void IRSendModules::main() {
     ir_codes = new LinkedList<IRCode>();
     pinMode(espatsettings.irTxPin, OUTPUT); // Set the IR pin as output
     Serial.println("[INFO] IR Send Module Initialized");
+    digitalWrite(espatsettings.irTxPin, LOW); // Set IR pin to HIGH (no signal)
 }
 
 void delay_ten_us(uint16_t us) {
@@ -46,65 +40,118 @@ void delay_ten_us(uint16_t us) {
     }
 }
 
-uint8_t read_bits(uint8_t count) {
-    uint8_t i;
-    uint8_t tmp = 0;
-    for (i = 0; i < count; i++) {
-        if (bitsleft_r == 0) {
-            bits_r = beGoneCode->codes[code_ptr++];
-            bitsleft_r = 8;
-        }
-        bitsleft_r--;
-        tmp |= (((bits_r >> (bitsleft_r)) & 1) << (count - 1 - i));
-    }
-    return tmp;
-}
-
-uint16_t ontime, offtime;
-uint8_t i, num_codes;
-TvBeGoneRegion begoneregion;
-
-// https://github.com/pr3y/Bruce/blob/main/src/modules/ir/TV-B-Gone.cpp
-void IRSendModules::startTVBGone() {
-    if (begoneregion == NA) size_num_codes = num_NAcodes;
-    else size_num_codes = num_EUcodes;
-
-    uint16_t rawData[300];
-
-    for (int i = 0; i < size_num_codes; i++) {
-        if (check(selPress)) {
-            ending_early = true;
-            break; // Stop sending codes if the user presses the button
-        }
-        if (begoneregion == NA) {
-            beGoneCode = NApowerCodes[i];
-        } else {
-            beGoneCode = EUpowerCodes[i];
-        }
-
-        const uint8_t freq = beGoneCode->timer_val;
-        const uint8_t numpairs = beGoneCode->numpairs;
-        const uint8_t bitcompression = beGoneCode->bitcompression;
-
-        code_ptr = 0;
-        for (uint8_t x = 0; x < numpairs; x++) {
-            if (selPress) {
+void IRSendModules::startUniversalPowerRemote() {
+    irsend.begin();
+    if (universal_power_mode == "TV") {
+        String data = "";
+        String line = "";
+        int index = 0;
+        while (getNextLine(universal_power_tv_ir_codes, index, line)) {
+            if (check(selPress)) {
+                ending_early = true;
                 break; // Stop sending codes if the user presses the button
             }
-            uint16_t ti = (read_bits(bitcompression)) * 2;
-            offtime = beGoneCode->times[ti];    // read word 1 - ontime
-            ontime = beGoneCode->times[ti + 1]; // read word 2 - offtime
-            rawData[x * 2] = offtime * 10;
-            rawData[(x * 2) + 1] = ontime * 10;
+            data += line + "\n";
+            if (line.startsWith("#")) {
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
+                yield();
+                data = "";
+                universal_power_code_sended += 1;
+            }
         }
-        irsend.sendRaw(rawData, (numpairs * 2), freq);
-        yield(); // Allow other tasks to run
-        begone_code_sended += 1;
-        bitsleft_r = 0;
-        digitalWrite(espatsettings.irTxPin, LOW);
-        delay_ten_us(3000);
-        digitalWrite(espatsettings.irTxPin, HIGH);
-        delay_ten_us(20500);
+    } else if (universal_power_mode == "PROJECTOR") {
+        String data = "";
+        String line = "";
+        int index = 0;
+        while (getNextLine(universal_power_projector_ir_codes, index, line)) {
+            if (check(selPress)) {
+                ending_early = true;
+                break; // Stop sending codes if the user presses the button
+            }
+            data += line + "\n";
+            if (line.startsWith("#")) {
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
+                yield();
+                data = "";
+                universal_power_code_sended += 1;
+            }
+        }
+    } else if (universal_power_mode == "AC") {
+        String data = "";
+        String line = "";
+        int index = 0;
+        while (getNextLine(universal_power_ac_ir_codes, index, line)) {
+            if (check(selPress)) {
+                ending_early = true;
+                break; // Stop sending codes if the user presses the button
+            }
+            data += line + "\n";
+            if (line.startsWith("#")) {
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
+                yield();
+                data = "";
+                universal_power_code_sended += 1;
+            }
+        }
+    } else if (universal_power_mode == "FAN") {
+        String data = "";
+        String line = "";
+        int index = 0;
+        while (getNextLine(universal_power_fan_ir_codes, index, line)) {
+            if (check(selPress)) {
+                ending_early = true;
+                break; // Stop sending codes if the user presses the button
+            }
+            data += line + "\n";
+            if (line.startsWith("#")) {
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
+                yield();
+                data = "";
+                universal_power_code_sended += 1;
+            }
+        }
+    }
+    else if (universal_power_mode == "LED") {
+        String data = "";
+        String line = "";
+        int index = 0;
+        while (getNextLine(universal_power_led_ir_codes, index, line)) {
+            if (check(selPress)) {
+                ending_early = true;
+                break; // Stop sending codes if the user presses the button
+            }
+            if (line.startsWith("#")) {
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
+                yield();
+                data = "";
+                universal_power_code_sended += 1;
+            }
+            data += line + "\n";
+        }
+    }
+    else if (universal_power_mode == "MONITOR") {
+        String data = "";
+        String line = "";
+        int index = 0;
+        while (getNextLine(universal_power_monitor_ir_codes, index, line)) {
+            if (check(selPress)) {
+                ending_early = true;
+                break; // Stop sending codes if the user presses the button
+            }
+            data += line + "\n";
+            if (line.startsWith("#")) {
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
+                yield();
+                data = "";
+                universal_power_code_sended += 1;
+            }
+        }
     }
     if (ending_early) {
         delay_ten_us(50000); //500ms delay 
@@ -117,7 +164,7 @@ void IRSendModules::startTVBGone() {
         delay_ten_us(65535);
         delay_ten_us(65535);
         ending_early = false; // Reset the flag
-        Serial.println("[INFO] TV-B-Gone Stopped by user");
+        Serial.println("[INFO] Universal Power Remote Stopped by user");
     } else {
         for (int i = 0; i < 8; i++) {
             digitalWrite(espatsettings.irTxPin, LOW);
@@ -125,13 +172,77 @@ void IRSendModules::startTVBGone() {
             digitalWrite(espatsettings.irTxPin, HIGH);
         }
         digitalWrite(espatsettings.irTxPin, LOW);
-        Serial.println("[INFO] TV-B-Gone Codes Sended: " + String(begone_code_sended));
-        if (begone_code_sended == num_NAcodes || begone_code_sended == num_EUcodes) {
-            Serial.println("[INFO] TV-B-Gone All Code Sended Successfully");
-        } else {
-            Serial.println("[ERROR] TV-B-Gone Finished with Failure");
+        Serial.println("[INFO] Universal Power Remote Codes Sended: " + String(universal_power_code_sended));
+    }
+}
+
+IRCode IRSendModules::parseIrData(const String &rawText) {
+    String line;
+    String type, rawData;
+    String protocol, address, command, value;
+    uint32_t frequency = 0;
+    uint8_t bits = 32;
+
+    int index = 0;
+
+    while (getNextLine(rawText, index, line)) {
+        if (line.startsWith("type:")) {
+            type = line.substring(5);
+            type.trim();
+
+            // ================= RAW =================
+            if (type == "raw") {
+                while (getNextLine(rawText, index, line)) {
+
+                    if (line.startsWith("frequency:")) {
+                        frequency = line.substring(10).toInt();
+                    }
+                    else if (line.startsWith("data:")) {
+                        rawData = line.substring(5);
+                        rawData.trim();
+                    }
+                    else if ((frequency != 0 && rawData.length()) || line.startsWith("#")) {
+                        IRCode code;
+                        code.type = "raw";
+                        code.data = rawData;
+                        code.frequency = frequency;
+                        return code;
+                    }
+                }
+            }
+
+            // ================= PARSED =================
+            else if (type == "parsed") {
+                while (getNextLine(rawText, index, line)) {
+
+                    if (line.startsWith("protocol:")) {
+                        protocol = line.substring(9);
+                        protocol.trim();
+                    }
+                    else if (line.startsWith("address:")) {
+                        address = line.substring(8);
+                        address.trim();
+                    }
+                    else if (line.startsWith("command:")) {
+                        command = line.substring(8);
+                        command.trim();
+                    }
+                    else if (line.startsWith("value:") || line.startsWith("state:")) {
+                        value = line.substring(6);
+                        value.trim();
+                    }
+                    else if (line.startsWith("bits:")) {
+                        bits = line.substring(5).toInt();
+                    }
+                    else if (line.startsWith("#")) {
+                        IRCode code(protocol, address, command, value, bits);
+                        return code;
+                    }
+                }
+            }
         }
     }
+    return IRCode();
 }
 
 void IRSendModules::sendIRTx(String filename) {
@@ -182,6 +293,7 @@ void IRSendModules::sendIRTx(String filename) {
                         code.data = rawData;
                         code.frequency = frequency;
                         sendIRCommand(&code);
+                        digitalWrite(espatsettings.irTxPin, LOW);
 
                         rawData = "";
                         frequency = 0;
@@ -212,6 +324,7 @@ void IRSendModules::sendIRTx(String filename) {
                     } else if (line.indexOf("#") != -1) { // TODO: also detect EOF
                         IRCode code(protocol, address, command, value, bits);
                         sendIRCommand(&code);
+                        digitalWrite(espatsettings.irTxPin, LOW);
 
                         protocol = "";
                         address = "";
@@ -299,8 +412,8 @@ void IRSendModules::sendIRCommand(IRCode *code) {
 }
 
 void IRSendModules::sendNECCommand(String address, String command) {
-    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
+    //irsend.begin();
     uint16_t addressValue = strtoul(address.substring(0, 2).c_str(), nullptr, 16);
     uint16_t commandValue = strtoul(command.substring(0, 2).c_str(), nullptr, 16);
     uint64_t data = irsend.encodeNEC(addressValue, commandValue);
@@ -315,12 +428,12 @@ void IRSendModules::sendNECCommand(String address, String command) {
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
 
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendNECextCommand(String address, String command) {
-    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
+    //rsend.begin();
 
     int first_zero_byte_pos = address.indexOf("00", 2);
     if (first_zero_byte_pos != -1) address = address.substring(0, first_zero_byte_pos);
@@ -352,12 +465,12 @@ void IRSendModules::sendNECextCommand(String address, String command) {
         "[INFO] Ir Sent NECext Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendRC5Command(String address, String command) {
-    IRsend irsend(espatsettings.irTxPin, true); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin, true); // Set the GPIO to be used to sending the message.
+    //irsend.begin();
 
     uint8_t addressValue = strtoul(address.substring(0, 2).c_str(), nullptr, 16);
     uint8_t commandValue = strtoul(command.substring(0, 2).c_str(), nullptr, 16);
@@ -371,12 +484,12 @@ void IRSendModules::sendRC5Command(String address, String command) {
         "[INFO] Ir Sent RC5 Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendRC6Command(String address, String command) {
-    IRsend irsend(espatsettings.irTxPin, true); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin, true); // Set the GPIO to be used to sending the message.
+    //irsend.begin();
 
     address.replace(" ", "");
     command.replace(" ", "");
@@ -394,12 +507,12 @@ void IRSendModules::sendRC6Command(String address, String command) {
         "[INFO] Ir Sent RC6 Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendSamsungCommand(String address, String command) {
-    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
-    irsend.begin();;
+    //IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
+    //irsend.begin();;
     uint8_t addressValue = strtoul(address.substring(0, 2).c_str(), nullptr, 16);
     uint8_t commandValue = strtoul(command.substring(0, 2).c_str(), nullptr, 16);
     uint64_t data = irsend.encodeSAMSUNG(addressValue, commandValue);
@@ -414,12 +527,12 @@ void IRSendModules::sendSamsungCommand(String address, String command) {
         "[INFO] Ir Sent Samsung Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendSonyCommand(String address, String command, uint8_t nbits) {
-    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
+    //irsend.begin();
 
     address.replace(" ", "");
     command.replace(" ", "");
@@ -460,12 +573,12 @@ void IRSendModules::sendSonyCommand(String address, String command, uint8_t nbit
         "[INFO] Ir Sent Sony Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 void IRSendModules::sendKaseikyoCommand(String address, String command) {
-    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
+    //irsend.begin();
 
     address.replace(" ", "");
     command.replace(" ", "");
@@ -512,15 +625,15 @@ void IRSendModules::sendKaseikyoCommand(String address, String command) {
         "[INFO] Ir Sent Kaseikyo Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }
 
 bool IRSendModules::sendDecodedCommand(String protocol, String value, uint8_t bits) {
     decode_type_t type = strToDecodeType(protocol.c_str());
     if (type == decode_type_t::UNKNOWN) return false;
 
-    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
+    //irsend.begin();
     bool success = false;
 
     if (hasACState(type)) {
@@ -559,13 +672,13 @@ bool IRSendModules::sendDecodedCommand(String protocol, String value, uint8_t bi
         "[INFO] Ir Sent Decoded Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
     return success;
 }
 
 void IRSendModules::sendRawCommand(uint16_t frequency, String rawData) {
-    IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
-    irsend.begin();
+    //IRsend irsend(espatsettings.irTxPin); // Set the GPIO to be used to sending the message.
+    //irsend.begin();
 
     uint16_t dataBufferSize = 1;
     for (int i = 0; i < rawData.length(); i++) {
@@ -583,7 +696,7 @@ void IRSendModules::sendRawCommand(uint16_t frequency, String rawData) {
         dataBuffer[count++] = (dataChunk.toInt());
     }
 
-    Serial.println("[INFO] Parsing raw data complete.");
+    //Serial.println("[INFO] Parsing raw data complete.");
     // Serial.println(count);
     // Serial.println(dataBuffer[count-1]);
     // Serial.println(dataBuffer[0]);
@@ -603,5 +716,5 @@ void IRSendModules::sendRawCommand(uint16_t frequency, String rawData) {
         "[INFO] Ir Sent Raw Command" +
         (espatsettings.irRepeat > 0 ? " (1 initial + " + String(espatsettings.irRepeat) + " repeats)" : "")
     );
-    digitalWrite(espatsettings.irTxPin, LOW);
+    //digitalWrite(espatsettings.irTxPin, LOW);
 }

@@ -63,6 +63,7 @@ String uint32ToString(uint32_t value);
 String uint32ToStringInverted(uint32_t value);
 uint32_t swap32(uint32_t value);
 uint8_t hexCharToDecimal(char c);
+bool getNextLine(const String &src, int &index, String &line);
 
 extern volatile bool nextPress;
 extern volatile bool prevPress; 

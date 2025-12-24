@@ -191,6 +191,24 @@ uint8_t hexCharToDecimal(char c) {
     return 0;
 }
 
+bool getNextLine(const String &src, int &index, String &line) {
+    if (index >= src.length()) return false;
+
+    int next = src.indexOf('\n', index);
+    if (next == -1) {
+        line = src.substring(index);
+        index = src.length();
+    } else {
+        line = src.substring(index, next);
+        index = next + 1;
+    }
+
+    if (line.endsWith("\r")) {
+        line.remove(line.length() - 1);
+    }
+    return true;
+}
+
 volatile bool nextPress = false;
 volatile bool prevPress = false;
 volatile bool selPress = false;

@@ -52,7 +52,7 @@ enum MenuState {
     SD_DELETE_MENU,
     BADUSB_KEY_LAYOUT_MENU,
     BADUSB_RUNNING,
-    IR_TV_B_GONE_REGION,
+    IR_UNIVERSAL_POWER_REMOTE_MENU,
     IR_READ_MENU,
     IR_READ_RUNNING,
     IR_CODE_SELECT,
@@ -287,7 +287,7 @@ enum NRFJammerItem {
 enum IRMenuItem {
     IR_READ,
     IR_SEND,
-    IR_TV_B_GONE,
+    IR_UNIVERSAL_POWER_REMOTE,
     IR_BACK,
     IR_MENU_COUNT
 };
@@ -299,11 +299,15 @@ enum IRReadMenuItem {
     IR_READ_MENU_COUNT
 };
 
-enum IRTVBGoneRegion {
-    IR_TV_B_GONE_NA,
-    IR_TV_B_GONE_EU,
-    IR_TV_B_GONE_BACK,
-    IR_TV_B_GONE_REGION_COUNT
+enum UniversalPowerRemoteRegion {
+    IR_UNIVERSAL_POWER_TV,
+    IR_UNIVERSAL_POWER_PROJECTOR,
+    IR_UNIVERSAL_POWER_AC,
+    IR_UNIVERSAL_POWER_FAN,
+    IR_UNIVERSAL_POWER_LED,
+    IR_UNIVERSAL_POWER_MONITOR,
+    IR_UNIVERSAL_POWER_BACK,
+    IR_UNIVERSAL_POWER_MODE_COUNT
 };
 
 enum SDMenuItem {
@@ -380,8 +384,7 @@ bool nrfScannerSetupOneShot = false;
 
 // IRSend/Recv
 
-TvBeGoneRegion irTvBGoneRegion;
-bool starttvbgone = false;
+bool startuniversalpowerremote = false;
 
 //bool irtxRedraw = false;
 bool send_select_code = false;

@@ -313,8 +313,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Attack", 0, 12);
 	else if (currentState == IR_MENU)
 		display.displayStringwithCoordinates("IR Menu", 0, 12);
-	else if (currentState == IR_TV_B_GONE_REGION)
-		display.displayStringwithCoordinates("IR Tv-B-Gone", 0, 12);
+	else if (currentState == IR_UNIVERSAL_POWER_REMOTE_MENU)
+		display.displayStringwithCoordinates("Uni Pwr Rmt", 0, 12);
 	else if (currentState == IR_SEND_RUNNING)
 		display.displayStringwithCoordinates("IR Send", 0, 12);
 	else if (currentState == IR_READ_MENU)
@@ -1116,7 +1116,7 @@ void displayIRMenu() {
 	String items[IR_MENU_COUNT] = {
 		"IR Read",
 		"IR Send",
-		"Tv-B-Gone",
+		"Universal Pwr Remote",
 		"< Back"
 	};
 
@@ -1153,16 +1153,20 @@ void displayIrCodeDataInFile() {
 	menuNode(items, GET_SIZE(items), "Codes: ", errorText, ir_codes->size());
 }
 
-void displayIRTvBGoneRegionMenu() {
+void displayUniversalPowerRemoteModeMenu() {
 	displayStatusBar();
 
-	String items[IR_TV_B_GONE_REGION_COUNT] = {
-		"NA",
-		"EU",
+	String items[IR_UNIVERSAL_POWER_MODE_COUNT] = {
+		"TV",
+		"Projector",
+		"AC",
+		"Fan",
+		"LED",
+		"Monitor",
 		"< Back"
 	};
 
-	menuNode(items, IR_TV_B_GONE_REGION_COUNT);
+	menuNode(items, IR_UNIVERSAL_POWER_MODE_COUNT);
 }
 
 void displaySDMenu() {
@@ -1958,8 +1962,8 @@ void navigateUp() {
 		case IR_MENU:
 			displayIRMenu();
 			break;
-		case IR_TV_B_GONE_REGION:
-			displayIRTvBGoneRegionMenu();
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
+			displayUniversalPowerRemoteModeMenu();
 			break;
 		case SD_MENU:
 			displaySDMenu();
@@ -2077,8 +2081,8 @@ void navigateDown() {
 		case IR_MENU:
 			displayIRMenu();
 			break;
-		case IR_TV_B_GONE_REGION:
-			displayIRTvBGoneRegionMenu();
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
+			displayUniversalPowerRemoteModeMenu();
 			break;
 		case SD_MENU:
 			displaySDMenu();
@@ -3059,11 +3063,11 @@ void selectCurrentItem() {
 				}
 			break;
 		case IR_MENU:
-			if (currentSelection == IR_TV_B_GONE) {
-				currentState = IR_TV_B_GONE_REGION;
+			if (currentSelection == IR_UNIVERSAL_POWER_REMOTE) {
+				currentState = IR_UNIVERSAL_POWER_REMOTE_MENU;
 				currentSelection = 0;
-				maxSelections = IR_TV_B_GONE_REGION_COUNT;
-				displayIRTvBGoneRegionMenu();
+				maxSelections = IR_UNIVERSAL_POWER_MODE_COUNT;
+				displayUniversalPowerRemoteModeMenu();
 			} else if (currentSelection == IR_READ) {
 				currentState = IR_READ_MENU;
 				currentSelection = 0;
@@ -3103,8 +3107,8 @@ void selectCurrentItem() {
 				quickRemoteTV = false;
 			}
 			break;
-		case IR_TV_B_GONE_REGION:
-			if (currentSelection == IR_TV_B_GONE_BACK) {
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
+			if (currentSelection == IR_UNIVERSAL_POWER_BACK) {
 				goBack();
 			} else {
 				// Check memory before starting attack
@@ -3114,16 +3118,24 @@ void selectCurrentItem() {
 					display.displayStringwithCoordinates("Cannot start", 0, 21);
 					display.displayStringwithCoordinates("attack", 0, 31, true);
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
-					displayIRTvBGoneRegionMenu();
+					displayUniversalPowerRemoteModeMenu();
 					return;
 				}
-				if (currentSelection == IR_TV_B_GONE_NA) {
-					irTvBGoneRegion = NA;
-				} else {
-					irTvBGoneRegion = EU;
+				if (currentSelection == IR_UNIVERSAL_POWER_TV) {
+					universal_power_mode = "TV";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_PROJECTOR) {
+					universal_power_mode = "PROJECTOR";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_AC) {
+					universal_power_mode = "AC";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_FAN) {
+					universal_power_mode = "FAN";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_LED) {
+					universal_power_mode = "LED";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_MONITOR) {
+					universal_power_mode = "MONITOR";
 				}
 				currentState = IR_SEND_RUNNING;
-				starttvbgone = true;
+				startuniversalpowerremote = true;
 			}
 			break;
 		case SD_MENU:
@@ -3354,7 +3366,9 @@ void selectCurrentItem() {
 		case IR_CODE_SELECT:
 			if (currentSelection < ir_codes->size()) {
 				IRCode code = ir_codes->get(currentSelection);
+				irsend.begin();
 				irtx.sendIRCommand(&code);
+				digitalWrite(espatsettings.irTxPin, LOW);
 				display.clearScreen();
 				displayStatusBar();
 				display.displayStringwithCoordinates("IR Code Sent", 0, 24, true);
@@ -3716,19 +3730,19 @@ void goBack() {
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
-		case IR_TV_B_GONE_REGION:
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
 			currentState = IR_MENU;
 			currentSelection = 0;
 			maxSelections = IR_MENU_COUNT;
 			displayIRMenu();
 			break;
 		case IR_SEND_RUNNING:
-			if (starttvbgone) {
-				starttvbgone = false;
-				currentState = IR_MENU;
-				currentSelection = 0;
-				maxSelections = IR_MENU_COUNT;
-				displayIRMenu();
+			if (startuniversalpowerremote) {
+				startuniversalpowerremote = false;
+				currentState = IR_UNIVERSAL_POWER_REMOTE_MENU;
+				//currentSelection = 0;
+				maxSelections = IR_UNIVERSAL_POWER_MODE_COUNT;
+				displayUniversalPowerRemoteModeMenu();
 			} else {
 				if (send_select_code) {
 					send_select_code = false;
@@ -4139,21 +4153,12 @@ void handleTasks(MenuState handle_state) {
 	}
 
 	else if (handle_state == IR_SEND_RUNNING) {
-		if (starttvbgone) {
-			Serial.println("[INFO] Starting IR TV-B-Gone");
-			String region;
-			if (irTvBGoneRegion == NA) {
-				region = "NA";
-				begoneregion = NA;
-			}
-			else {
-				region = "EU";
-				begoneregion = EU;
-			}
+		if (startuniversalpowerremote) {
+			Serial.println("[INFO] Starting IR Universal Power Remote");
 			display.clearScreen();
 			displayStatusBar();
-			display.displayStringwithCoordinates("TV-B-Gone Mode", 0, 24);
-			display.displayStringwithCoordinates("Region:" + region, 0,36);
+			display.displayStringwithCoordinates("Universal Pwr Remote", 0, 24);
+			display.displayStringwithCoordinates("Mode:" + universal_power_mode, 0,36);
 			display.displayStringwithCoordinates("Press Sel to stop", 0, 48, true);
 			#ifndef BUILTIN_RGB_LED
 				digialWrite(espatsettings.statusLedPin, HIGH);
@@ -4161,7 +4166,7 @@ void handleTasks(MenuState handle_state) {
 				pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 				pixels.show();
 			#endif
-			irtx.startTVBGone();
+			irtx.startUniversalPowerRemote();
 			#ifndef BUILTIN_RGB_LED
 				digialWrite(espatsettings.statusLedPin, LOW);
 			#else
@@ -4172,12 +4177,11 @@ void handleTasks(MenuState handle_state) {
 			displayStatusBar();
 			display.displayStringwithCoordinates("All Codes", 0, 24);
 			display.displayStringwithCoordinates("Sended", 0, 36);
-			display.displayStringwithCoordinates("Total:" + String(irtx.begone_code_sended),0, 48);
+			display.displayStringwithCoordinates("Total:" + String(irtx.universal_power_code_sended),0, 48);
 			display.displayStringwithCoordinates("Press Sel to exit", 0, 60, true);
 			while(!check(selPress)) yield();
-			Serial.println("[INFO] IR TV-B-Gone Done! Total: " + String(irtx.begone_code_sended) + " codes sended.");
-			//starttvbgone = false;
-			irtx.begone_code_sended = 0;
+			Serial.println("[INFO] IR Universal Power Remote Done! Total: " + String(irtx.universal_power_code_sended) + " codes sended.");
+			irtx.universal_power_code_sended = 0;
 			goBack();
 		} else {
 			if (!send_select_code) {
@@ -4553,8 +4557,8 @@ void redrawTasks() {
 		case IR_MENU:
 			displayIRMenu();
 			break;
-		case IR_TV_B_GONE_REGION:
-			displayIRTvBGoneRegionMenu();
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
+			displayUniversalPowerRemoteModeMenu();
 			break;
 		case SD_MENU:
 			displaySDMenu();
