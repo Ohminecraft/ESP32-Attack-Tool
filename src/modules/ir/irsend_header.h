@@ -30,11 +30,8 @@
 
 extern ESP32ATSetting espatsettings;
 
-#define NOPP __asm__ __volatile__("nop")
-
 extern String universal_power_mode;
 extern SDCardModules sdcard;
-extern IRsend irsend;
 
 struct IRCode {
     IRCode(

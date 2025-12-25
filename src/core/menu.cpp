@@ -3366,9 +3366,9 @@ void selectCurrentItem() {
 		case IR_CODE_SELECT:
 			if (currentSelection < ir_codes->size()) {
 				IRCode code = ir_codes->get(currentSelection);
-				irsend.begin();
+				//irsend.begin();
 				irtx.sendIRCommand(&code);
-				digitalWrite(espatsettings.irTxPin, LOW);
+				//digitalWrite(espatsettings.irTxPin, LOW);
 				display.clearScreen();
 				displayStatusBar();
 				display.displayStringwithCoordinates("IR Code Sent", 0, 24, true);
