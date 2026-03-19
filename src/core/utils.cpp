@@ -223,6 +223,9 @@ bool low_memory_warning = false; // Low Memory Warning Flag
 // Encoder Object
 RotaryEncoder *encoder = nullptr;
 
+// Selection list
+LinkedList<String> *selection_list;
+
 IRAM_ATTR void checkPosition() {
     encoder->tick(); // just call tick() to check the state.
 }

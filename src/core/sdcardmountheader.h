@@ -15,7 +15,6 @@
 #include "configs.h"
 
 extern ESP32ATSetting espatsettings;
-extern LinkedList<String> *sdcard_buffer;
 
 class SDCardModules {
 public: 

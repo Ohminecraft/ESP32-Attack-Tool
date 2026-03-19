@@ -13,6 +13,7 @@
 
 #include <Arduino.h>
 #include <RotaryEncoder.h>
+#include <LinkedList.h>
 #include <SPI.h>
 #include <vector>
 
@@ -80,6 +81,8 @@ extern RotaryEncoder *encoder;
 IRAM_ATTR void checkPosition();
 
 //void handleInputs();
+
+extern LinkedList<String> *selection_list;
 
 extern TaskHandle_t xHandle;
 

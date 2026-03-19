@@ -337,31 +337,46 @@ void WiFiModules::channelRandom() {
 
 void WiFiModules::StartDeauthFlood() {
 	if (!deauth_flood_scan_one_shot) {
-		delete deauth_flood_ap;
-		deauth_flood_ap = new LinkedList<AccessPoint>();
+		deauth_flood_ap->clear();
 
-		WiFi.mode(WIFI_STA);
+		esp_netif_init();
+		esp_event_loop_create_default();
+
+		esp_wifi_init(&cfg2);
+		#ifdef BOARD_ESP32_C5_DEVKIT_C1
+			esp_wifi_set_country(&country);
+			esp_event_loop_create_default();
+		#endif
+		esp_wifi_set_storage(WIFI_STORAGE_RAM);
+		esp_wifi_set_mode(WIFI_MODE_NULL);
+		esp_wifi_start();
+		this->setMac();
+		esp_wifi_set_promiscuous(true);
+		esp_wifi_set_promiscuous_filter(&filt);
+		esp_wifi_set_promiscuous_rx_cb(&deauthFloodSnifferCallback);
+		esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
 		wifi_initialized = true;
 		delay(100);
 
 		deauth_flood_scan_one_shot = true;
 
-		int numNetworks = WiFi.scanNetworks(false, true); // use old scan for deauth flood
-
-		Serial.println("[INFO] Deauth WiFi Scan Done! Total: " + String(numNetworks) + " Found!");
-
-		for (int i = 0; i < numNetworks; i++) {
-			AccessPoint ap;
-			ap.essid = WiFi.SSID(i);
-			ap.channel = static_cast<uint8_t>(WiFi.channel(i));
-			uint8_t* bssid = WiFi.BSSID(i);
-			if (bssid != nullptr) {
-				memcpy(ap.bssid, bssid, 6);
-			} else {
-				memset(ap.bssid, 0, 6);
-			}
-			deauth_flood_ap->add(ap);
+		#ifndef BOARD_ESP32_C5_DEVKIT_C1
+		while (set_channel < 15) {
+			set_channel++;
+			changeChannel();
+			vTaskDelay(300 / portTICK_PERIOD_MS);
 		}
+		#else
+		while (dual_band_channels_index < DUAL_BAND_CHANNELS) {
+			set_channel = dual_band_channels[dual_band_channels_index];
+			changeChannel();
+			dual_band_channels_index++;
+			vTaskDelay(300 / portTICK_PERIOD_MS);
+		}
+		dual_band_channels_index = 0;
+		#endif
+
+		Serial.println("[INFO] Deauth WiFi Scan Done! Total: " + String(deauth_flood_ap->size()) + " Found!");
 
 		if (deauth_flood_ap->size() > 0) deauth_flood_found_ap = true;
 
@@ -600,6 +615,96 @@ void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type)
 				}
 
 				if (!first_scan) logutils.pcapAppend(snifferPacket, len);
+			}
+		}
+	}
+}
+
+void WiFiModules::deauthFloodSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
+	extern WiFiModules wifi;
+	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
+	WifiMgmtHdr *frameControl = (WifiMgmtHdr*)snifferPacket->payload;
+	int len = snifferPacket->rx_ctrl.sig_len;
+
+	String essid = "";
+	String bssid = "";
+
+	if (type == WIFI_PKT_MGMT) {
+		len -= 4;
+		int fctl = ntohs(frameControl->fctl);
+		const wifi_ieee80211_packet_t *ipkt = (wifi_ieee80211_packet_t *)snifferPacket->payload;
+		const WifiMgmtHdr *hdr = &ipkt->hdr;
+
+		if ((snifferPacket->payload[0] == 0x80))
+    	{
+			char addr[] = "00:00:00:00:00:00";
+			getMAC(addr, snifferPacket->payload, 10);
+			bool in_list = false;
+			bool mac_match = true;
+
+			for (int i = 0; i < access_points->size(); i++) {
+				mac_match = true;
+
+				
+				for (int x = 0; x < 6; x++) {
+					if (snifferPacket->payload[x + 10] != access_points->get(i).bssid[x]) {
+						mac_match = false;
+						break;
+					}
+				}
+				if (mac_match) {
+					in_list = true;
+					break;
+				}
+			}
+
+			if (!in_list) {
+		
+				vTaskDelay(random(0, 10) / portTICK_PERIOD_MS);
+				for (int i = 0; i < snifferPacket->payload[37]; i++)
+				{
+					essid.concat((char)snifferPacket->payload[i + 38]);
+				}
+
+				bssid.concat(addr);
+			
+					
+				if (essid.isEmpty()) {
+					essid = bssid;
+				}
+
+				uint32_t ie_offset = 36;
+				uint8_t channel = 0;
+            
+				while (ie_offset + 2 < len) {
+					uint8_t ie_type = snifferPacket->payload[ie_offset];
+					uint8_t ie_length = snifferPacket->payload[ie_offset + 1];
+					
+					if (ie_offset + 2 + ie_length > len) break;
+
+					if (ie_type == 3 && ie_length >= 1) {  // DS Parameter Set
+						channel = snifferPacket->payload[ie_offset + 2];
+						break;
+					}
+					
+					ie_offset += 2 + ie_length;
+				}
+
+				if (channel == 0) channel = snifferPacket->rx_ctrl.channel;
+
+				AccessPoint _temp_ap;
+				_temp_ap.essid = essid;
+				_temp_ap.channel = channel;
+				memcpy(_temp_ap.bssid, &snifferPacket->payload[10], 6);
+				
+				if (!low_memory_warning) {
+					deauth_flood_ap->add(_temp_ap);
+					Serial.println("[INFO] Added: " + essid + "(Ch: " + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ")" + " (BSSID: " + bssid \
+					+ ")");
+				} else {
+					Serial.println("[WARN] Low Memory! Ignore AP " + essid + "(Ch: " + /*String(snifferPacket->rx_ctrl.channel)*/ String(channel) + ")" + " (BSSID: " + bssid \
+					+ ") - Not added to list");
+				}
 			}
 		}
 	}

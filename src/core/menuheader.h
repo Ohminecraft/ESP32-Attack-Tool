@@ -42,6 +42,7 @@
 // Menu states
 enum MenuState {
     MAIN_MENU,
+    SELECTION_LIST,
     BLE_MENU,
     WIFI_MENU,
     NRF24_MENU,
@@ -49,7 +50,6 @@ enum MenuState {
     SD_MENU,
     CLOCK_MENU,
     SD_UPDATE_MENU,
-    SD_DELETE_MENU,
     BADUSB_KEY_LAYOUT_MENU,
     BADUSB_RUNNING,
     IR_UNIVERSAL_POWER_REMOTE_MENU,
@@ -404,6 +404,9 @@ bool need_restart = false;
 bool autoSleep = false;
 bool standby = false;
 bool handleStateRunningCheck = false; // Used to check if the handle state is running
+
+// SD
+bool selectforsddelete = false;
 
 void displayWelcome();
 void displayMainMenu();

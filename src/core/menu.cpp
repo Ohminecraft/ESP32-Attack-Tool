@@ -8,9 +8,6 @@
 	* Licensed under the MIT License.
 */
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch"
-
 ESP32ATSetting espatsettings;
 
 WiFiModules wifi;
@@ -195,6 +192,7 @@ void menuinit() {
 	if (espatsettings.autoConnectWiFi) {
 		xTaskCreate(connectWiFi, "wifiConnect", 4096, NULL, 2, NULL);
 	}
+	selection_list = new LinkedList<String>();
 	vTaskDelay(50 / portTICK_PERIOD_MS);
 	Serial.println("[INFO] All Modules initialized");
 	Serial.printf("[INFO] Total heap: %d bytes\n", String(getHeap(GET_TOTAL_HEAP)).toInt());
@@ -327,22 +325,22 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("SD Menu", 0, 12);
 	else if (currentState == SD_UPDATE_MENU)
 		display.displayStringwithCoordinates("SD Update", 0, 12);
-	else if (currentState == SD_DELETE_MENU) {
-		if (selectforbadusb)
-			display.displayStringwithCoordinates("BadUSB Script", 0, 12);
-		else if (selectforirtx)
-			display.displayStringwithCoordinates("IR Code", 0, 12);
-		else if (selectforevilportal)
-			display.displayStringwithCoordinates("EP Html", 0, 12);
-		else
-			display.displayStringwithCoordinates("SD Delete", 0, 12);
-	}
 	else if (currentState == BADUSB_KEY_LAYOUT_MENU)
 		display.displayStringwithCoordinates("BadUSB Layout", 0, 12);
 	else if (currentState == BADUSB_RUNNING)
 		display.displayStringwithCoordinates("BadUSB Deploy", 0, 12);
 	else if (currentState == CLOCK_MENU)
 		display.displayStringwithCoordinates("Clock", 0, 12);
+	else if (currentState == SELECTION_LIST) {
+		if (selectforbadusb)
+			display.displayStringwithCoordinates("BadUSB Script", 0, 12);
+		else if (selectforirtx)
+			display.displayStringwithCoordinates("IR Code", 0, 12);
+		else if (selectforevilportal)
+			display.displayStringwithCoordinates("EP Html", 0, 12);
+		else if (selectforsddelete)
+			display.displayStringwithCoordinates("SD Delete", 0, 12);
+	}
 	else
 		display.displayStringwithCoordinates("Unknown State", 0, 12);
 	
@@ -1199,12 +1197,12 @@ void displayUpdateSDCard(int8_t error_code) { // 0 for fail open file, -1 for fa
 	
 }
 
-void displayDeleteSDCard() {
+void displaySelectionList() {
 	display.clearScreen();
 	displayStatusBar();
 	String items[1];
-	if (currentSelection < sdcard_buffer->size()) {
-		String fileName = sdcard_buffer->get(currentSelection);
+	if (currentSelection < selection_list->size()) {
+		String fileName = selection_list->get(currentSelection);
 		items[0] = fileName;
 	}
 
@@ -1213,7 +1211,7 @@ void displayDeleteSDCard() {
 		"Or Smth Went Wrong!"
 	};
 
-	menuNode(items, GET_SIZE(items), "Files: ", error_text, sdcard_buffer->size());
+	menuNode(items, GET_SIZE(items), "Files: ", error_text, selection_list->size());
 }
 
 void displayBadUSBKeyboardLayout() {
@@ -1970,8 +1968,8 @@ void navigateUp() {
 			break;
 		case SD_UPDATE_MENU:
 			break;
-		case SD_DELETE_MENU:
-			displayDeleteSDCard();
+		case SELECTION_LIST:
+			displaySelectionList();
 			break;
 		case BADUSB_KEY_LAYOUT_MENU:
 			displayBadUSBKeyboardLayout();
@@ -2089,8 +2087,8 @@ void navigateDown() {
 			break;
 		case SD_UPDATE_MENU:
 			break;
-		case SD_DELETE_MENU:
-			displayDeleteSDCard();
+		case SELECTION_LIST:
+			displaySelectionList();
 			break;
 		case BADUSB_KEY_LAYOUT_MENU:
 			displayBadUSBKeyboardLayout();
@@ -2286,13 +2284,12 @@ void selectCurrentItem() {
 					}
 					selectforbadusb = true;
 					badble = true;
-					delete sdcard_buffer;
-					sdcard_buffer = new LinkedList<String>();
-					sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".txt");
-					currentState = SD_DELETE_MENU;
+					selection_list->clear();
+					sdcard.addListFileToLinkedList(selection_list, "/", ".txt");
+					currentState = SELECTION_LIST;
 					currentSelection = 0;
-					maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-					displayDeleteSDCard();
+					maxSelections = selection_list ? selection_list->size() + 1 : 1;
+					displaySelectionList();
 				} else if (currentSelection == BLE_MEDIA_CMD) {
 					display.clearScreen();
 					displayStatusBar();
@@ -2709,13 +2706,12 @@ void selectCurrentItem() {
 				displayWiFiSelectAptoSta();
 			} else if (currentSelection == WIFI_UTILS_SET_EVIL_PORTAL_HTML) {
 				selectforevilportal = true;
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".html");
-				currentState = SD_DELETE_MENU;
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list, "/", ".html");
+				currentState = SELECTION_LIST;
 				currentSelection = 0;
-				maxSelections = sdcard_buffer->size() + 1;
-				displayDeleteSDCard();
+				maxSelections = selection_list->size() + 1;
+				displaySelectionList();
 			} else if (currentSelection == WIFI_UTILS_BACK) {
 				goBack();
 			}
@@ -3075,14 +3071,13 @@ void selectCurrentItem() {
 				display.clearScreen();
 				displayIRReadMenu();
 			} else if (currentSelection == IR_SEND) {
-				currentState = SD_DELETE_MENU;
+				currentState = SELECTION_LIST;
 				selectforirtx = true;
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".ir");
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list, "/", ".ir");
 				currentSelection = 0;
-				maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-				displayDeleteSDCard();
+				maxSelections = selection_list->size() + 1;
+				displaySelectionList();
 			} else if (currentSelection == IR_BACK) {
 				goBack();
 			}
@@ -3147,23 +3142,23 @@ void selectCurrentItem() {
 				vTaskDelay(1000 / portTICK_PERIOD_MS);
 				goBack();
 			} else if (currentSelection == SD_DELETE) {
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer);
-				currentState = SD_DELETE_MENU;
+				selectforsddelete = true;
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list);
+				currentState = SELECTION_LIST;
 				currentSelection = 0;
-				maxSelections = sdcard_buffer->size() + 1;
-				displayDeleteSDCard();
+				maxSelections = selection_list->size() + 1;
+				displaySelectionList();
 			}
 			break;
-		case SD_DELETE_MENU:
-			if (!sdcard_buffer || sdcard_buffer->size() == 0) {
+		case SELECTION_LIST:
+			if (!selection_list || selection_list->size() == 0) {
 				goBack();
 			} else {
 				display.setColor(WHITE);
-				if (currentSelection < sdcard_buffer->size()) {
+				if (currentSelection < selection_list->size()) {
 					if (selectforbadusb) {
-						String fileName = sdcard_buffer->get(currentSelection);
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Select file for", 0, 12);
 						display.displayStringwithCoordinates("BadUSB:", 0, 24);
@@ -3181,7 +3176,7 @@ void selectCurrentItem() {
 									display.displayStringwithCoordinates("Select another", 0, 24);
 									display.displayStringwithCoordinates("file", 0, 36, true);
 									vTaskDelay(1000 / portTICK_PERIOD_MS);
-									displayDeleteSDCard();
+									displaySelectionList();
 									return;
 								}
 								selectforbadusb = false;
@@ -3199,7 +3194,7 @@ void selectCurrentItem() {
 						maxSelections = BADUSB_LAYOUT_COUNT;
 						displayBadUSBKeyboardLayout();
 					} else if (selectforirtx) {
-						String fileName = sdcard_buffer->get(currentSelection);
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Select file for", 0, 12);
 						display.displayStringwithCoordinates("Ir:", 0, 24);
@@ -3216,7 +3211,7 @@ void selectCurrentItem() {
 									display.displayStringwithCoordinates("Select another", 0, 24);
 									display.displayStringwithCoordinates("file", 0, 36, true);
 									vTaskDelay(1000 / portTICK_PERIOD_MS);
-									displayDeleteSDCard();
+									displaySelectionList();
 									checkisnotempty.close();
 									return;
 								}
@@ -3244,14 +3239,14 @@ void selectCurrentItem() {
 								}
 							} else if (check(prevPress)) {
 								confirmed = true;
-								displayDeleteSDCard();
+								displaySelectionList();
 								return;
 							}
 							vTaskDelay(10 / portTICK_PERIOD_MS);
 						}
 						if (!send_select_code) currentState = IR_SEND_RUNNING;
 					} else if (selectforevilportal) {
-						String fileName = sdcard_buffer->get(currentSelection);
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Select file for", 0, 12);
 						display.displayStringwithCoordinates("Eportal:", 0, 24);
@@ -3269,7 +3264,7 @@ void selectCurrentItem() {
 									display.displayStringwithCoordinates("Select another", 0, 24);
 									display.displayStringwithCoordinates("file", 0, 36, true);
 									vTaskDelay(1000 / portTICK_PERIOD_MS);
-									displayDeleteSDCard();
+									displaySelectionList();
 									return;
 								}
 								selectforevilportal = false;
@@ -3277,7 +3272,7 @@ void selectCurrentItem() {
 								htmlFile = "/" + fileName;
 							} else if (check(prevPress)) {
 								confirmed = true;
-								displayDeleteSDCard();
+								displaySelectionList();
 								return;
 							}
 							vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -3286,8 +3281,8 @@ void selectCurrentItem() {
 						currentSelection = 0;
 						maxSelections = WIFI_UTILS_MENU_COUNT;
 						displayWiFiUtilsMenu();
-					} else {
-						String fileName = sdcard_buffer->get(currentSelection);
+					} else if (selectforsddelete) {
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Delete file:", 0, 12);
 						display.displayStringwithCoordinates(fileName, 0, 24);
@@ -3298,7 +3293,7 @@ void selectCurrentItem() {
 						while (!confirmed) {
 							if (check(selPress)) {
 								sdcard.deleteFile("/" + fileName);
-								sdcard_buffer->remove(currentSelection);
+								selection_list->remove(currentSelection);
 								maxSelections--;
 								confirmed = true;
 							} else if (check(prevPress)) {
@@ -3306,7 +3301,7 @@ void selectCurrentItem() {
 							}
 							vTaskDelay(10 / portTICK_PERIOD_MS);
 						}
-						displayDeleteSDCard();
+						displaySelectionList();
 					}
 				} else {
 					goBack();
@@ -3752,10 +3747,10 @@ void goBack() {
 					displayIRMenu();
 				} else {
 					selectforirtx = true;
-					currentState = SD_DELETE_MENU;
+					currentState = SELECTION_LIST;
 					currentSelection = 0;
-					maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-					displayDeleteSDCard();
+					maxSelections = selection_list ? selection_list->size() + 1 : 1;
+					displaySelectionList();
 				}
 			}
 			break;
@@ -3765,36 +3760,37 @@ void goBack() {
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
-		case SD_DELETE_MENU:
-		if (selectforbadusb) {
-			selectforbadusb = false;
-			if (badble) {
-				badble = false;
-				currentState = BLE_MENU;
+		case SELECTION_LIST:
+			if (selectforbadusb) {
+				selectforbadusb = false;
+				if (badble) {
+					badble = false;
+					currentState = BLE_MENU;
+					currentSelection = 0;
+					maxSelections = BLE_MENU_COUNT;
+					displayBLEMenu();
+				}
+			} else if (selectforirtx) {
+				selectforirtx = false;
+				currentState = IR_MENU;
 				currentSelection = 0;
-				maxSelections = BLE_MENU_COUNT;
-				displayBLEMenu();
+				maxSelections = IR_MENU_COUNT;
+				displayIRMenu();
+			} else if (selectforevilportal) {
+				selectforevilportal = false;
+				currentState = WIFI_UTILS_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_UTILS_MENU_COUNT;
+				displayWiFiUtilsMenu();
 			}
-		} else if (selectforirtx) {
-			selectforirtx = false;
-			currentState = IR_MENU;
-			currentSelection = 0;
-			maxSelections = IR_MENU_COUNT;
-			displayIRMenu();
-		} else if (selectforevilportal) {
-			selectforevilportal = false;
-			currentState = WIFI_UTILS_MENU;
-			currentSelection = 0;
-			maxSelections = WIFI_UTILS_MENU_COUNT;
-			displayWiFiUtilsMenu();
-		}
-		else {
-			currentState = SD_MENU;
-			currentSelection = 0;
-			maxSelections = SD_MENU_COUNT;
-			displaySDMenu();
-		}
-		break;
+			else if (selectforsddelete) {
+				selectforsddelete = false;
+				currentState = SD_MENU;
+				currentSelection = 0;
+				maxSelections = SD_MENU_COUNT;
+				displaySDMenu();
+			}
+			break;
 		case SD_UPDATE_MENU:
 			currentState = SD_MENU;
 			currentSelection = 0;
@@ -3813,13 +3809,12 @@ void goBack() {
 		case BADUSB_RUNNING:
 			if (badble) {
 				selectforbadusb = true;
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".txt");
-				currentState = SD_DELETE_MENU;
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list, "/", ".txt");
+				currentState = SELECTION_LIST;
 				currentSelection = 0;
-				maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-				displayDeleteSDCard();
+				maxSelections = selection_list ? selection_list->size() + 1 : 1;
+				displaySelectionList();
 			}
 			break;
 		case IR_READ_RUNNING:
@@ -4563,8 +4558,8 @@ void redrawTasks() {
 		case SD_MENU:
 			displaySDMenu();
 			break;
-		case SD_DELETE_MENU:
-			displayDeleteSDCard();
+		case SELECTION_LIST:
+			displaySelectionList();
 			break;
 		case BLE_MEDIA_MENU:
 			displayMediaCtrlBLEMenu();
@@ -4659,5 +4654,3 @@ void menuloop() {
 	}
 
 }
-
-#pragma GCC diagnostic pop

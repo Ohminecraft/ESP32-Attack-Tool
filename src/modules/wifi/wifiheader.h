@@ -438,7 +438,7 @@ class WiFiModules
         static void deauthSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
-
+        static void deauthFloodSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
 };
 
 #endif // WIFIHEADER_H

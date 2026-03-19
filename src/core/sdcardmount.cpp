@@ -8,12 +8,10 @@
     * Licensed under the MIT License.
 */
 
-LinkedList<String> *sdcard_buffer;
 SPIClass *SDCardSPI;
 
 void SDCardModules::main() {
     SDCardSPI = &SPI;
-    sdcard_buffer = new LinkedList<String>();
     SDCardSPI->begin(espatsettings.spiSckPin,
                      espatsettings.spiMisoPin,
                      espatsettings.spiMosiPin);
