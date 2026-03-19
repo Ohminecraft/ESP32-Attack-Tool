@@ -57,6 +57,30 @@ void getMAC(char *addr, uint8_t* data, uint16_t offset) {
 	sprintf(addr, "%02x:%02x:%02x:%02x:%02x:%02x", data[offset+0], data[offset+1], data[offset+2], data[offset+3], data[offset+4], data[offset+5]);
 }
 
+void getMAC(uint8_t* mac, const uint8_t* data, uint16_t offset) {
+  for (int i = 0; i < 6; i++)
+    mac[i] = data[offset + i];
+}
+
+String hexDump(const uint8_t *buf, size_t len) {
+  String out;
+  out.reserve(len * 3);  // "FF " per byte (approx)
+
+  for (size_t i = 0; i < len; i++) {
+    if (buf[i] < 0x10) {
+      out += '0';
+    }
+    out += String(buf[i], HEX);
+
+    if (i < len - 1) {
+      out += ' ';
+    }
+  }
+
+  out.toUpperCase();
+  return out;
+}
+
 void generateRandomMac(uint8_t* mac) {
 	// Set the locally administered bit and unicast bit for the first byte
 	mac[0] = 0x02; // The locally administered bit is the second least significant bit

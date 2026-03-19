@@ -15,6 +15,10 @@
 #include <WiFi.h>
 #include "esp_wifi.h"
 #include "esp_wifi_types.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/bignum.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/ecp.h"
 
 #include <LinkedList.h>
 
@@ -36,10 +40,12 @@ enum WiFiScanState {
     WIFI_SCAN_EAPOL,
     WIFI_SCAN_EAPOL_DEAUTH,
     WIFI_SCAN_CH_ANALYZER,
+    WIFI_SCAN_SAE_COMMIT,
     WIFI_ATTACK_RND_BEACON,
     WIFI_ATTACK_FUN_BEACON,
     WIFI_ATTACK_RIC_BEACON,
     WIFI_ATTACK_AP_BEACON,
+    WIFI_ATTACK_SAE_COMMIT,
     WIFI_ATTACK_DEAUTH,
     WIFI_ATTACK_STA_DEAUTH,
     WIFI_ATTACK_DEAUTH_FLOOD,
@@ -51,6 +57,8 @@ enum WiFiScanState {
     WIFI_ATTACK_BAD_MSG_ALL,
     WIFI_ATTACK_SLEEP,
     WIFI_ATTACK_SLEEP_ALL,
+    WIFI_ATTACK_CSA,
+    WIFI_ATTACK_QUIET
 };
 
 #define WIFI_SECURITY_OPEN   0
@@ -123,6 +131,15 @@ esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *buffer, int len, b
 class WiFiModules
 {
     private:
+        uint8_t sae_commit_packet[32] = {
+            0xb0, 0x00, 0x00, 0x00,                     // Type/Subtype, Duration
+            0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,         // Destination
+            0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,         // Source
+            0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,         // BSSID (Destination)
+            0x00, 0x00,                                 // Frag num
+            0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x13, 0x00  // Auth alg (SAE), SAE sequence, group 19
+        };
+
         // ESP32 Marauder
         uint8_t beacon_frame_packet[128] = {
             /* 0 - 3 */    0x80, 0x00, 0x00, 0x00, //Frame Control, Duration
@@ -131,8 +148,8 @@ class WiFiModules
             /* 16 - 21 */  0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //BSSID - overwritten to the same as the source address
             /* 22 - 23 */  0xc0, 0x6c, //Seq-ctl
             /* 24 - 31 */  0x83, 0x51, 0xf7, 0x8f, 0x0f, 0x00, 0x00, 0x00, //timestamp - the number of microseconds the AP has been active
-            /* 32 - 33 */  0x64, 0x00, //Beacon interval
-            /* 34 - 35 */  0x01, 0x04, //Capability info
+            /*32 - 33*/    0xe8, 0x03, //Beacon interval
+            /*34 - 35*/    0x31, 0x00, //Capability info
             /* SSID */
             /*36*/  0x00
             };
@@ -170,7 +187,7 @@ class WiFiModules
             0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // Destination (Broadcast)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Source (BSSID)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // BSSID
-            0x00, 0x00,                         // Sequence Control
+            0x30, 0x00,                         // Sequence Control
             /* LLC / SNAP */
             0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00,
             0x88, 0x8e,                          // Ethertype = EAPOL
@@ -181,7 +198,7 @@ class WiFiModules
             /* -------- EAPOL‑Key frame body (117 B) -------- */
             0x02,                               // Desc Type 2 (AES/CCMP)
             0x00, 0xCA,                          // Key Info (Install|Ack…)
-            0x00, 0x10,                          // Key Length = 16
+             0x00, 0x10,                          // Key Length = 16
             /* Replay Counter (8) */
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
             /* Nonce (32) */
@@ -194,7 +211,7 @@ class WiFiModules
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             /* Key RSC (8) */
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            /* Key ID  (8) */ 
+             /* Key ID  (8) */ 
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             /* Key MIC (16) */ 
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -202,11 +219,11 @@ class WiFiModules
             /* Key Data Len (2) */ 
             0x00, 0x16,
             /* Key Data (22 B) */
-            0xDD, 0x16,                // Vendor‑specific (PMKID IE)
+            0xDD, 0x14,                // Vendor‑specific (PMKID IE)
             0x00, 0x0F, 0xAC, 0x04,      // OUI + Type (PMKID)
             /* PMKID (16 byte zero) */
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 
+            0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x11
         };
 
         uint8_t association_packet[200] = {
@@ -251,7 +268,7 @@ class WiFiModules
             "Never gonna tell a lie",
             "and hurt you"};
         
-        const char* funny_ssid_beacon[50] = {
+        const char* funny_ssid_beacon[51] = {
             "Mom Use This One",
             "Abraham Linksys",
             "Benjamin FrankLAN",
@@ -301,10 +318,14 @@ class WiFiModules
             "Drop It Like It's Hotspot",
             "Life in the Fast LAN",
             "The Creep Next Door",
-            "Ye Olde Internet"
+            "Ye Olde Internet",
+            "Six Seven!"
         };
+        
+         int current_act_len = 0;
 
         bool wsl_bypass_enable = false;
+        uint32_t data_frames = 0;
 
         uint8_t getSecurityType(const uint8_t* beacon, uint16_t len);
         void StartAPStaWiFiScan();
@@ -315,16 +336,19 @@ class WiFiModules
         void StartDeauthScan();
         void StartEapolScan();
         void StartAnalyzerScan();
+        void SAEScan(bool attack);
         void StartWiFiAttack(WiFiScanState attack_mode);
 
         void sendCustomBeacon(AccessPoint custom_ssid);
         void sendCustomESSIDBeacon(const char* ESSID);
         void sendBeaconRandomSSID();
+        void sendQuietCsaAttack(AccessPoint target_ap, bool csa);
         void sendDeauthAttack();
         void sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t sta_mac[6]);
         void sendProbeAttack();
         void sendEapolBagMsg(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);
         void sendAssociationSleep(const char* ESSID, uint8_t bssid[6], int channel, uint8_t sta_mac[6]);
+        bool sendSAECommitFrame(uint8_t target_mac[6], uint8_t src_mac[6]);
 
     public:
 
@@ -348,6 +372,8 @@ class WiFiModules
         bool deauth_flood_found_ap = false;
         bool deauth_flood_scan_one_shot = false;
         String deauth_flood_target = "";
+
+        bool sae_scan = false;
 
         uint8_t dual_band_channels[DUAL_BAND_CHANNELS] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165, 169, 173, 177};
 
@@ -418,6 +444,7 @@ class WiFiModules
             0x07, 0x00                          // Reason code
         };
 
+        bool filterActive();
         void setMac();
         void changeChannel();
         void channelHop();
@@ -429,8 +456,15 @@ class WiFiModules
         void mainAttackLoop(WiFiScanState mode);
         void StartDeauthFlood();
 
+
         void sendDeauthFrame(uint8_t bssid[6], int channel);
         // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.h
+        static bool initMbedtls();
+        static int mbedtls_entropy_source(void *data, unsigned char *output, size_t len);
+        static bool getSAEACT(const uint8_t *frame, size_t frame_len, uint16_t &group_out, size_t &act_len_out);
+        static bool sae_group_sizes(uint16_t group, size_t &scalar_len, size_t &element_len);
+        static bool mac_cmp(const uint8_t *a, const uint8_t *b);
+        static inline uint16_t le16(const uint8_t *p);
         static void apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void probeSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
@@ -439,6 +473,7 @@ class WiFiModules
         static void eapolSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void analyzerWiFiSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
         static void deauthFloodSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
+        static void SAECommitSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type);
 };
 
 #endif // WIFIHEADER_H

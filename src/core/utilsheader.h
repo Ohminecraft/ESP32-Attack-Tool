@@ -55,6 +55,8 @@ bool checkLeftMemory();
 
 void generateRandomMac(uint8_t* mac);
 void getMAC(char *addr, uint8_t* data, uint16_t offset);
+void getMAC(uint8_t* mac, const uint8_t* data, uint16_t offset);
+String hexDump(const uint8_t *buf, size_t len);
 void stringToMac(const String& macStr, uint8_t macAddr[6]);
 String macToString(uint8_t macAddr[6]);
 uint8_t stringToHex(const String& hex_str);

