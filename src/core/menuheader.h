@@ -27,7 +27,7 @@
 #include "modules/nrf24/nrf24header.h"
 #include "modules/ir/irsend_header.h"
 #include "modules/ir/irread_header.h"
-#include "modules/badusb/ducky_usb_header.h"
+#include "modules/badble/badscript_header.h"
 
 #include "configs.h"
 
@@ -394,8 +394,25 @@ String irSendFile;
 bool irreadOneShot = false;
 
 // BadUSB
+
+const uint8_t *keyboardLayouts[] = {
+    KeyboardLayout_en_US, // 0
+    KeyboardLayout_da_DK, // 1
+    KeyboardLayout_en_UK, // 2
+    KeyboardLayout_fr_FR, // 3
+    KeyboardLayout_de_DE, // 4
+    KeyboardLayout_hu_HU, // 5
+    KeyboardLayout_it_IT, // 6
+    KeyboardLayout_en_US, // 7
+    KeyboardLayout_pt_BR, // 8
+    KeyboardLayout_pt_PT, // 9
+    KeyboardLayout_si_SI, // 10
+    KeyboardLayout_es_ES, // 11
+    KeyboardLayout_sv_SE, // 12
+    KeyboardLayout_tr_TR  // 13
+};
+
 bool selectforbadusb = false;
-bool badble = false;
 String badusbFile;
 
 bool need_restart = false;

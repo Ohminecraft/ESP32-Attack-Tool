@@ -278,9 +278,7 @@ bool BLEModules::ShutdownBLE()
         }
         // Deinitialize BLE
         vTaskDelay(10 / portTICK_PERIOD_MS); // need delay to prevent crash
-        #ifndef BOARD_ESP32_C5_DEVKIT_C1 // Deinit cause crash on ESP32-C5 https://github.com/h2zero/NimBLE-Arduino/issues/1008
         NimBLEDevice::deinit();
-        #endif
         ble_initialized = false;
         Serial.println("[INFO] Shutting down BLE Module Successfully");
         return true;
@@ -493,23 +491,15 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    //uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    //setBleGapRandAddress(null_addr);
 
     Serial.println("[INFO] BLE Spoofer Initialized Successfully!");
 }
 
 void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode) {
-    uint8_t dummy_addr[6] = {0x00};
-    for (int i = 0; i < 6; i++) {
-       dummy_addr[i] = random(256);
-        if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
-    }
     if (!ble_initialized) {
         uint8_t macAddr[6];
         generateRandomMac(macAddr);
         setBaseMacAddress(macAddr);
-        //setBleGapRandAddress(dummy_addr);
         NimBLEDevice::init(espatsettings.bleName.c_str());
         NimBLEDevice::setPower(MAX_TX_POWER);
         NimBLEServer *pServer = NimBLEDevice::createServer();
@@ -531,16 +521,13 @@ void BLEModules::stopSpoofer() {
         vTaskDelay(50 / portTICK_PERIOD_MS); // Wait for advertisement to stop
         pAdvertising->stop();
         vTaskDelay(10 / portTICK_PERIOD_MS); // Wait for stop to complete
-        BLEDevice::deinit();
+        NimBLEDevice::deinit();
         ble_initialized = false;
     }
     Serial.println("[INFO] Stopping Spoofer Advertisement");
 }
 
 void BLEModules::initSpam() {
-    //uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    //setBleGapRandAddress(null_addr);
-
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }

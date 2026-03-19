@@ -33,5 +33,6 @@ public:
     
     virtual bool isConnected() { return false; };
     virtual void setLayout(const uint8_t *layout) {};
+    virtual void setDelay(uint32_t ms) {};
 };
 #endif

@@ -37,6 +37,7 @@ class ESP32ATSetting {
         uint16_t sourappleSpamDelay = SOUR_APPLE_SPAM_DELAY;
         uint16_t applejuiceSpamDelay = APPLE_JUICE_SPAM_DELAY;
         uint16_t swiftpairSpamDelay = SWIFTPAIR_SPAM_DELAY;
+        uint16_t badscriptKeyDelay = 50;
         bool useAppleJuicePaired = true; // Show Color of device
         bool useBleNameasnameofNameFlood = true;
         uint16_t spamAllDelay = 20;

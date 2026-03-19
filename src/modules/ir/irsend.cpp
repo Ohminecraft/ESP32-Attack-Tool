@@ -57,7 +57,8 @@ void IRSendModules::startUniversalPowerRemote() {
             }
             data += line + "\n";
             if (line.startsWith("#")) {
-                sendIRCommand(&parseIrData(data));
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
                 yield();
                 data = "";
                 universal_power_code_sended += 1;
@@ -74,7 +75,8 @@ void IRSendModules::startUniversalPowerRemote() {
             }
             data += line + "\n";
             if (line.startsWith("#")) {
-                sendIRCommand(&parseIrData(data));
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
                 yield();
                 data = "";
                 universal_power_code_sended += 1;
@@ -91,7 +93,8 @@ void IRSendModules::startUniversalPowerRemote() {
             }
             data += line + "\n";
             if (line.startsWith("#")) {
-                sendIRCommand(&parseIrData(data));
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
                 yield();
                 data = "";
                 universal_power_code_sended += 1;
@@ -108,7 +111,8 @@ void IRSendModules::startUniversalPowerRemote() {
                 break; // Stop sending codes if the user presses the button
             }
             if (line.startsWith("#")) {
-                sendIRCommand(&parseIrData(data));
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
                 yield();
                 data = "";
                 universal_power_code_sended += 1;
@@ -127,7 +131,8 @@ void IRSendModules::startUniversalPowerRemote() {
             }
             data += line + "\n";
             if (line.startsWith("#")) {
-                sendIRCommand(&parseIrData(data));
+                IRCode code = parseIrData(data);
+                sendIRCommand(&code);
                 yield();
                 data = "";
                 universal_power_code_sended += 1;

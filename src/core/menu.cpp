@@ -12,7 +12,7 @@ ESP32ATSetting espatsettings;
 
 WiFiModules wifi;
 BLEModules ble;
-BadUSBModules badusb;
+BadScriptModules badScript;
 DisplayModules display;
 EvilPortalAddtional eportal;
 NRF24Modules nrf;
@@ -333,7 +333,7 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("Clock", 0, 12);
 	else if (currentState == SELECTION_LIST) {
 		if (selectforbadusb)
-			display.displayStringwithCoordinates("BadUSB Script", 0, 12);
+			display.displayStringwithCoordinates("BadScript", 0, 12);
 		else if (selectforirtx)
 			display.displayStringwithCoordinates("IR Code", 0, 12);
 		else if (selectforevilportal)
@@ -2266,7 +2266,7 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_BADUSB) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2283,7 +2283,6 @@ void selectCurrentItem() {
 						return;
 					}
 					selectforbadusb = true;
-					badble = true;
 					selection_list->clear();
 					sdcard.addListFileToLinkedList(selection_list, "/", ".txt");
 					currentState = SELECTION_LIST;
@@ -2293,7 +2292,7 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_MEDIA_CMD) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2309,10 +2308,10 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
+					badScript.beginKB(hid_ble, KeyboardLayout_en_US);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-					if (badusb.isConnected(hid_ble)) {
+					while (!badScript.isConnected(hid_ble) && !check(prevPress)) yield();
+					if (badScript.isConnected(hid_ble)) {
 						currentState = BLE_MEDIA_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_MEDIA_MENU_COUNT;
@@ -2328,7 +2327,7 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_KEYMOTE) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2344,10 +2343,10 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
+					badScript.beginKB(hid_ble, KeyboardLayout_en_US, true);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-					if (badusb.isConnected(hid_ble)) {
+					while (!badScript.isConnected(hid_ble) && !check(prevPress)) {yield();}
+					if (badScript.isConnected(hid_ble)) {
 						currentState = BLE_KEYMOTE_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_KEYMOTE_ITEM_COUNT;
@@ -2363,7 +2362,7 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_TT_SCROLL) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_ALL || currentkbmode == BLE_KEYBOARD_MODE_KEYBOARD || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_ALL || currentkbmode == BLE_KEYBOARD_MODE_KEYBOARD || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2379,10 +2378,10 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true, BLE_KEYBOARD_MODE_MOUSE);
+					badScript.beginKB(hid_ble, KeyboardLayout_en_US, BLE_KEYBOARD_MODE_MOUSE);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-					if (badusb.isConnected(hid_ble)) {
+					while (!badScript.isConnected(hid_ble) && !check(prevPress)) {yield();}
+					if (badScript.isConnected(hid_ble)) {
 						currentState = BLE_TT_SCROLL_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_TT_ITEM_COUNT;
@@ -2550,10 +2549,10 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			} 
-			else if (currentSelection == BLE_KEYMOTE_UP) badusb.Keymote(hid_ble, KEYMOTE_UP); 
-			else if (currentSelection == BLE_KEYMOTE_DOWN) badusb.Keymote(hid_ble, KEYMOTE_DOWN); 
-			else if (currentSelection == BLE_KEYMOTE_LEFT) badusb.Keymote(hid_ble, KEYMOTE_LEFT); 
-			else if (currentSelection == BLE_KEYMOTE_RIGHT) badusb.Keymote(hid_ble, KEYMOTE_RIGHT);
+			else if (currentSelection == BLE_KEYMOTE_UP) badScript.Keymote(hid_ble, KEYMOTE_UP); 
+			else if (currentSelection == BLE_KEYMOTE_DOWN) badScript.Keymote(hid_ble, KEYMOTE_DOWN); 
+			else if (currentSelection == BLE_KEYMOTE_LEFT) badScript.Keymote(hid_ble, KEYMOTE_LEFT); 
+			else if (currentSelection == BLE_KEYMOTE_RIGHT) badScript.Keymote(hid_ble, KEYMOTE_RIGHT);
 			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
@@ -2568,14 +2567,14 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			} 
-			else if (currentSelection == BLE_MEDIA_SCREENSHOT) badusb.mediaController(hid_ble, MEDIA_SCREENSHOT);
-			else if (currentSelection == BLE_MEDIA_PLAYPAUSE) badusb.mediaController(hid_ble, MEDIA_PLAY_PAUSE);
-			else if (currentSelection == BLE_MEDIA_STOP) badusb.mediaController(hid_ble, MEDIA_STOP);
-			else if (currentSelection == BLE_MEDIA_NEXT_TRACK) badusb.mediaController(hid_ble, MEDIA_NEXT_TRACK);
-			else if (currentSelection == BLE_MEDIA_PREV_TRACK) badusb.mediaController(hid_ble, MEDIA_PREV_TRACK);
-			else if (currentSelection == BLE_MEDIA_VOL_UP) badusb.mediaController(hid_ble, MEDIA_VOL_UP);
-			else if (currentSelection == BLE_MEDIA_VOL_DOWN) badusb.mediaController(hid_ble, MEDIA_VOL_DOWN);
-			else if (currentSelection == BLE_MEDIA_MUTE) badusb.mediaController(hid_ble, MEDIA_MUTE);
+			else if (currentSelection == BLE_MEDIA_SCREENSHOT) badScript.mediaController(hid_ble, MEDIA_SCREENSHOT);
+			else if (currentSelection == BLE_MEDIA_PLAYPAUSE) badScript.mediaController(hid_ble, MEDIA_PLAY_PAUSE);
+			else if (currentSelection == BLE_MEDIA_STOP) badScript.mediaController(hid_ble, MEDIA_STOP);
+			else if (currentSelection == BLE_MEDIA_NEXT_TRACK) badScript.mediaController(hid_ble, MEDIA_NEXT_TRACK);
+			else if (currentSelection == BLE_MEDIA_PREV_TRACK) badScript.mediaController(hid_ble, MEDIA_PREV_TRACK);
+			else if (currentSelection == BLE_MEDIA_VOL_UP) badScript.mediaController(hid_ble, MEDIA_VOL_UP);
+			else if (currentSelection == BLE_MEDIA_VOL_DOWN) badScript.mediaController(hid_ble, MEDIA_VOL_DOWN);
+			else if (currentSelection == BLE_MEDIA_MUTE) badScript.mediaController(hid_ble, MEDIA_MUTE);
 			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
@@ -2590,9 +2589,9 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			}
-			else if (currentSelection == BLE_TT_SCROLL_UP) badusb.tiktokScroll(hid_ble, SCROLL_UP);
-			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_ble, SCROLL_DOWN);
-			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_ble, LIKE_VIDEO);
+			else if (currentSelection == BLE_TT_SCROLL_UP) badScript.tiktokScroll(hid_ble, SCROLL_UP);
+			else if (currentSelection == BLE_TT_SCROLL_DOWN) badScript.tiktokScroll(hid_ble, SCROLL_DOWN);
+			else if (currentSelection == BLE_TT_LIKE_VIDEO) badScript.tiktokScroll(hid_ble, LIKE_VIDEO);
 			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
@@ -3318,12 +3317,11 @@ void selectCurrentItem() {
 				display.clearScreen();
 			}
 		case BADUSB_RUNNING:
-			if (badble) {
-				badusb.beginLayout(hid_ble, badble);
+				badScript.beginKB(hid_ble, keyboardLayouts[keyboardLayout]);
 				displayStatusBar();
 				display.displayStringwithCoordinates("Waiting Victim", 0, 24, true);
-				while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-				if (badusb.isConnected(hid_ble)) {
+				while (!badScript.isConnected(hid_ble) && !check(prevPress)) {yield();}
+				if (badScript.isConnected(hid_ble)) {
 					display.clearScreen();
 					displayStatusBar();
 					display.displayStringwithCoordinates("Preparing", 0, 24, true);
@@ -3336,7 +3334,7 @@ void selectCurrentItem() {
 					display.clearScreen();
 					displayStatusBar();
 					display.displayStringwithCoordinates("Deploying BadUSB", 0, 24, true);
-					badusb.launchBadUSB(badusbFile, hid_ble);
+					badScript.launchBadScript(badusbFile, hid_ble);
 					display.clearScreen();
 					displayStatusBar();
 					display.displayStringwithCoordinates("BadUSB Launched", 0, 24);
@@ -3350,12 +3348,8 @@ void selectCurrentItem() {
 					display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					selPress = false; // Prevent immediate re-entry
-					if (badble) {
-						goBack();
-					}
+					goBack();
 					return;
-				}
-
 			}
 			break;
 		case IR_CODE_SELECT:
@@ -3763,13 +3757,10 @@ void goBack() {
 		case SELECTION_LIST:
 			if (selectforbadusb) {
 				selectforbadusb = false;
-				if (badble) {
-					badble = false;
-					currentState = BLE_MENU;
-					currentSelection = 0;
-					maxSelections = BLE_MENU_COUNT;
-					displayBLEMenu();
-				}
+				currentState = BLE_MENU;
+				currentSelection = 0;
+				maxSelections = BLE_MENU_COUNT;
+				displayBLEMenu();
 			} else if (selectforirtx) {
 				selectforirtx = false;
 				currentState = IR_MENU;
@@ -3798,24 +3789,19 @@ void goBack() {
 			displaySDMenu();
 			break;
 		case BADUSB_KEY_LAYOUT_MENU:
-			if (badble) {
-				badble = false;
-				currentState = BLE_MENU;
-				currentSelection = 0;
-				maxSelections = BLE_MENU_COUNT;
-				displayBLEMenu();
-			}
+			currentState = BLE_MENU;
+			currentSelection = 0;
+			maxSelections = BLE_MENU_COUNT;
+			displayBLEMenu();
 			break;
 		case BADUSB_RUNNING:
-			if (badble) {
-				selectforbadusb = true;
-				selection_list->clear();
-				sdcard.addListFileToLinkedList(selection_list, "/", ".txt");
-				currentState = SELECTION_LIST;
-				currentSelection = 0;
-				maxSelections = selection_list ? selection_list->size() + 1 : 1;
-				displaySelectionList();
-			}
+			selectforbadusb = true;
+			selection_list->clear();
+			sdcard.addListFileToLinkedList(selection_list, "/", ".txt");
+			currentState = SELECTION_LIST;
+			currentSelection = 0;
+			maxSelections = selection_list ? selection_list->size() + 1 : 1;
+			displaySelectionList();
 			break;
 		case IR_READ_RUNNING:
 			currentState = IR_MENU;
@@ -4230,29 +4216,7 @@ void handleTasks(MenuState handle_state) {
 
 		if (handle_state == BLE_ATTACK_RUNNING) {
 			// BLE attack handling...
-			switch(currentBLEAttackType) {
-				case BLE_ATTACK_EXPLOIT_SOUR_APPLE:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_SOUR_APPLE);
-					break;
-				case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_JUICE);
-					break;
-				case BLE_ATTACK_EXPLOIT_MICROSOFT:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_MICROSOFT);
-					break;
-				case BLE_ATTACK_EXPLOIT_SAMSUNG:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_SAMSUNG);
-					break;
-				case BLE_ATTACK_EXPLOIT_GOOGLE:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_GOOGLE);
-					break;
-				case BLE_ATTACK_EXPLOIT_NAME_FLOOD:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_NAME_FLOOD);
-					break;
-				case BLE_ATTACK_EXPLOIT_SPAM_ALL:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_SPAM_ALL);
-					break;
-			}
+			ble.StartMode(currentBLEAttackType);
 		} 
 		else if (handle_state == WIFI_ATTACK_RUNNING) {
 			// SỬA: Tách biệt xử lý Evil Portal và các WiFi attack khác

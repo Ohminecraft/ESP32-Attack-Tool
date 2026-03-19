@@ -118,6 +118,7 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     defaultSetting["applejuiceSpamDelay"] = APPLE_JUICE_SPAM_DELAY; // default Apple Juice spam delay
     defaultSetting["swiftpairSpamDelay"] = SWIFTPAIR_SPAM_DELAY; // default Swift Pair spam delay
     defaultSetting["spamallSpamDelay"] = 20; // default Spam All spam delay
+    defaultSetting["badscriptKeyDelay"] = 50; // default Bad Script key delay
     defaultSetting["useAppleJuicePaired"] = true; // default use AppleJuice Paired
     defaultSetting["useBleNameasnameofNameFlood"] = true; // default use Blename as name of Name Flood Exploit Attack
     
@@ -516,6 +517,13 @@ void ESP32ATSetting::loadSettings() {
         Serial.println("spamAllDelay: " + String(spamAllDelay));
     } else {
         Serial.println("[WARN] Failed to get 'spamallSpamDelay' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["badscriptKeyDelay"].isNull()) {
+        badscriptKeyDelay = _settings["badscriptKeyDelay"].as<uint16_t>();
+        Serial.println("badscriptKeyDelay: " + String(badscriptKeyDelay));
+    } else {
+        Serial.println("[WARN] Failed to get 'badscriptKeyDelay' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["irTxPin"].isNull()) {
