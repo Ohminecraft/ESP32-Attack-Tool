@@ -2250,21 +2250,7 @@ void selectCurrentItem() {
 			if (currentSelection == BLE_BACK) {
 				goBack();
 			} else {
-				#ifdef BOARD_ESP32_C5_DEVKIT_C1
-				if (currentSelection > BLE_INFO) {
-					displayStatusBar();
-					display.displayStringwithCoordinates("This Mode Is Not", 0, 24);
-					display.displayStringwithCoordinates("Supported In This", 0, 36);
-					display.displayStringwithCoordinates("Board!", 0, 48, true);
-					vTaskDelay(1000 / portTICK_PERIOD_MS);
-					selPress = false;
-					displayBLEMenu();
-					return;
-				}
-				else if (currentSelection == BLE_EXPLOIT_ATTACK) {
-				#else
 				if (currentSelection == BLE_EXPLOIT_ATTACK) {
-				#endif
 					currentState = BLE_EXPLOIT_ATTACK_MENU;
 					currentSelection = 0;
 					maxSelections = BLE_ATK_MENU_COUNT;

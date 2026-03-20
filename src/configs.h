@@ -62,20 +62,20 @@
 
 // INPUT CONFIGURATION //
 
-#define USING_ENCODER
-//#define USING_BUTTON
+//#define USING_ENCODER
+#define USING_BUTTON
 
 #define ENC_PIN_A 25
 #define ENC_PIN_B 26
 #define ENC_BTN 6
 
-#define LEFT_BTN 1
-#define RIGHT_BTN 2
+#define LEFT_BTN 25
+#define RIGHT_BTN 26
 
 #if defined(USING_ENCODER)
     #define SEL_BTN ENC_BTN
 #else
-    #define SEL_BTN 0
+    #define SEL_BTN 6
 #endif
 
 // SPI Global Configuration //
