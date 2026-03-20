@@ -287,6 +287,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Sel Menu", 0, 12);
 	else if (currentState == WIFI_GENERAL_MENU)
 		display.displayStringwithCoordinates("WiFi Gen Menu", 0, 12);
+	else if (currentState == WIFI_JOIN_MENU)
+		display.displayStringwithCoordinates("WiFi Join", 0, 12);
 	else if (currentState == WIFI_ATTACK_MENU)
 		display.displayStringwithCoordinates("WiFi Atk Menu", 0, 12);
 	else if (currentState == WIFI_SCAN_RUNNING)
@@ -788,6 +790,35 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 		display.displayStringwithCoordinates("start scan", 0, 36);
 		display.displayStringwithCoordinates("or LEFT to go back", 0, 48, true);
 	}
+}
+
+void displayWiFiListMenu() {
+	displayStatusBar();
+
+	String items[4] = {};
+	
+	if (currentSelection < access_points->size()) {
+
+		AccessPoint ap = access_points->get(currentSelection);
+		char bssidStr[18];
+
+		snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+		ap.bssid[0], ap.bssid[1], ap.bssid[2], 
+		ap.bssid[3], ap.bssid[4], ap.bssid[5]);
+
+		items[0] = ap.essid;
+		items[1] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi) + " Band:" + ((ap.band == WIFI_BAND_2_4Ghz) ? "2.4G" : "5G"));
+		items[2] = ("B:" + String(bssidStr));
+		items[3] = "SELECT to connect";
+		
+	}
+
+	String errorText[2] = {
+		"No APs found!",
+		"Scan First!"
+	};
+
+	menuNode(items, GET_SIZE(items), "APs: ", errorText, access_points->size());
 }
 
 void displayWiFiSelectMenu() {
@@ -1774,6 +1805,19 @@ void stopCurrentAttack() {
 	}
 }
 
+bool hasWPA3APs() {
+	if (!access_points || access_points->size() == 0) {
+		return false;
+	}
+	
+	for (int i = 0; i < access_points->size(); i++) {
+		if (access_points->get(i).selected && (access_points->get(i).wpa == WIFI_SECURITY_WPA3 || access_points->get(i).wpa == WIFI_SECURITY_WPA3_ENTERPRISE)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 bool hasSelectedAPs() {
 	if (!access_points || access_points->size() == 0) {
 		return false;
@@ -1898,6 +1942,164 @@ void performDeepSleep() {
 	esp_deep_sleep_start();
 }
 
+String keyboard() {
+
+    // ── Key layouts (3 modes, 4 rows each) ───────────────────────
+    // Sentinel characters (non-printable):
+    //   \x01 = SHIFT (cycle mode)
+    //   \x02 = BACKSPACE
+    //   \x03 = SPACE
+    //   \x04 = DONE / OK
+    const char* rows[3][4] = {
+        { "qwertyuiop", "asdfghjkl", "\x01zxcvbnm\x02", "\x03\x04" },
+        { "QWERTYUIOP", "ASDFGHJKL", "\x01ZXCVBNM\x02", "\x03\x04" },
+        { "1234567890", "!@#$%^&*()", "\x01-_=+[]{}\x02", ".,;:'\"~`\x04" },
+    };
+
+    // ── Layout constants ──────────────────────────────────────────
+    const uint8_t KEY_W   = 12;
+    const uint8_t KEY_H   = 12;
+    const uint8_t KEY_GAP =  1;
+    const uint8_t STEP    = KEY_W + KEY_GAP;
+    const uint8_t KB_Y    = 14;   // Keyboard top Y (below input bar)
+    const uint8_t INPUT_H = 12;
+
+    // ── State ─────────────────────────────────────────────────────
+    String  input   = "";
+    uint8_t mode    = 0;
+    uint8_t curRow  = 0;
+    uint8_t curCol  = 0;
+
+    // Compute total key count for current mode (used for linear wrap)
+    auto totalKeys = [&]() -> uint8_t {
+        uint8_t total = 0;
+        for (uint8_t r = 0; r < 4; r++)
+            total += strlen(rows[mode][r]);
+        return total;
+    };
+
+    // Convert flat linear index → (row, col)
+    auto indexToRC = [&](uint8_t idx) {
+        for (uint8_t r = 0; r < 4; r++) {
+            uint8_t len = strlen(rows[mode][r]);
+            if (idx < len) { curRow = r; curCol = idx; return; }
+            idx -= len;
+        }
+    };
+
+    // Convert (row, col) → flat linear index
+    auto rcToIndex = [&]() -> uint8_t {
+        uint8_t idx = 0;
+        for (uint8_t r = 0; r < curRow; r++)
+            idx += strlen(rows[mode][r]);
+        return idx + curCol;
+    };
+
+    // ── Main loop ─────────────────────────────────────────────────
+    while (true) {
+
+        // ── Render ────────────────────────────────────────────────
+        display.clearBuffer();
+        display.setFont(u8g2_font_5x7_tf);
+
+        // Input bar
+        display.drawRBox(0, 0, 128, INPUT_H, 2);
+        display.setDrawColor(0);
+        String displaytext = input.length() > 18
+                         ? input.substring(input.length() - 18)
+                         : input;
+        displaytext += "_";
+        display.displayStringwithCoordinates(displaytext, 2, INPUT_H - 2);
+        display.setDrawColor(1);
+
+        // Draw all keys
+        for (uint8_t r = 0; r < 4; r++) {
+            const char* row    = rows[mode][r];
+            uint8_t     len    = strlen(row);
+            uint8_t     rowPx  = len * STEP - KEY_GAP;
+            uint8_t     startX = (128 - rowPx) / 2;
+            uint8_t     y      = KB_Y + r * (KEY_H + KEY_GAP);
+
+            for (uint8_t c = 0; c < len; c++) {
+                uint8_t x   = startX + c * STEP;
+                char    ch  = row[c];
+                bool    sel = (r == curRow && c == curCol);
+
+                if (sel) {
+                    display.drawRBox(x, y, KEY_W, KEY_H, 2);
+                } else {
+                    display.drawRFrame(x, y, KEY_W, KEY_H, 2);
+                }
+
+                display.setDrawColor(sel ? 0 : 1);
+
+                // Key label
+                char lbl[3] = {0};
+                switch (ch) {
+                    case '\x01': lbl[0] = '<';               break; // SHIFT
+                    case '\x02': lbl[0] = 'x';               break; // BACK
+                    case '\x03': lbl[0] = '_';               break; // SPACE
+                    case '\x04': lbl[0] = 'O'; lbl[1] = 'K'; break; // DONE
+                    default:     lbl[0] = ch;                break;
+                }
+
+                uint8_t lw = (lbl[1] ? 10 : 5);
+                display.displayStringwithCoordinates(lbl, x + (KEY_W - lw) / 2, y + KEY_H - 2);
+
+                display.setDrawColor(1);
+            }
+        }
+
+        // Mode indicator
+        const char* modeLabel[] = { "ab", "AB", "!1" };
+        display.displayStringwithCoordinates(modeLabel[mode], 110, INPUT_H - 2);
+
+        display.sendDisplay();
+
+        // ── Button handling ───────────────────────────────────────
+        if (check(nextPress)) {
+            uint8_t idx  = rcToIndex();
+            uint8_t total = totalKeys();
+            indexToRC((idx + 1) % total);   // move forward, wrap to key 0
+        }
+
+        if (check(prevPress)) {
+            uint8_t idx   = rcToIndex();
+            uint8_t total = totalKeys();
+            indexToRC((idx + total - 1) % total); // move back, wrap to last key
+        }
+
+        if (check(selPress)) {
+            char ch = rows[mode][curRow][curCol];
+
+            switch (ch) {
+                case '\x01':
+                    // Cycle mode, reset cursor to first key
+                    mode   = (mode + 1) % 3;
+                    curRow = 0;
+                    curCol = 0;
+                    break;
+
+                case '\x02':
+                    if (input.length() > 0)
+                        input.remove(input.length() - 1);
+                    break;
+
+                case '\x03':
+                    input += ' ';
+                    break;
+
+                case '\x04':
+                    return input;   // Done — return typed string
+
+                default:
+                    input += ch;
+                    break;
+            }
+        }
+    }
+}
+
 void navigateUp() {
 	if (maxSelections <= 1) {
 		return;
@@ -1980,6 +2182,9 @@ void navigateUp() {
 			break;
 		case WIFI_SELECT_STA_MENU:
 			displayWiFiSelectStaInAp();
+			break;
+		case WIFI_JOIN_MENU:
+			displayWiFiListMenu();
 			break;
 		case NRF24_MENU:
 			displayNRF24Menu();
@@ -2099,6 +2304,9 @@ void navigateDown() {
 			break;
 		case WIFI_SELECT_STA_MENU:
 			displayWiFiSelectStaInAp();
+			break;
+		case WIFI_JOIN_MENU:
+			displayWiFiListMenu();
 			break;
 		case NRF24_MENU:
 			displayNRF24Menu();
@@ -2359,7 +2567,7 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badScript.beginKB(hid_ble, KeyboardLayout_en_US, true);
+					badScript.beginKB(hid_ble, KeyboardLayout_en_US);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
 					while (!badScript.isConnected(hid_ble) && !check(prevPress)) {yield();}
 					if (badScript.isConnected(hid_ble)) {
@@ -2555,7 +2763,7 @@ void selectCurrentItem() {
 				
 				// Start BLE attack
 				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
-									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_NAME_FLOOD, BLE_ATTACK_EXPLOIT_SPAM_ALL};
+									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_NAME_FLOOD, BLE_ATTACK_EXPLOIT_FLIPPER, BLE_ATTACK_EXPLOIT_SPAM_ALL};
 				startBLEAttack(attackTypes[currentSelection]);
 				}
 			break;
@@ -2805,6 +3013,11 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
 				displayStatusBar(true);
 				startSnifferScan(WIFI_GENERAL_SAE_COMMIT_SCAN);
+			} else if (currentSelection == WIFI_GENERAL_JOIN_WIFI) {
+				currentState = WIFI_JOIN_MENU;
+				displayStatusBar(true);
+				displayWiFiListMenu();
+				return;
 			}
 			wifiSnifferMode = currentSelection;
 			break;
@@ -2861,6 +3074,42 @@ void selectCurrentItem() {
 					#endif
 				}
 			} else wifiScanRunning = false;
+			break;
+		case WIFI_JOIN_MENU:
+			if (!access_points || access_points->size() == 0) {
+				goBack();
+			} else {
+				if (currentSelection < access_points->size()) {
+					AccessPoint ap = access_points->get(currentSelection);
+					WiFi.mode(WIFI_MODE_STA);
+					wifi.setMac();
+					String pwd = keyboard();
+					Serial.println("[INFO] Connecting to '" + ap.essid+ "' WiFi, " +  "PWD: " + pwd);
+					WiFi.begin(ap.essid.c_str(), pwd.c_str());
+					wifi_initialized = true;
+					int count = 0;
+					String text = "Connecting";
+					for (int j = 0; j < 20; j++) {
+						text += ".";
+						display.clearScreen();
+						display.displayStringwithCoordinates(text, 0, 12, true);
+						if (WiFi.status() == WL_CONNECTED) {
+							Serial.println("[INFO] Successfully connected '" + ap.essid + "' WiFi");
+							espatsettings.wifi[ap.essid] = pwd;
+							espatsettings.updateConfig();
+							wifi_connected = true;
+							display.displayStringwithCoordinates("Connected!", 0, 12, true);
+							vTaskDelay(2000 / portTICK_PERIOD_MS);
+							timeClock.main();
+							currentState = WIFI_GENERAL_MENU;
+							displayWiFiGeneralMenu();
+							break;
+						}
+						delay(500);
+					}
+				} else {
+					goBack();
+				}
 			break;
 		case WIFI_SELECT_MENU:
 			if (!access_points || access_points->size() == 0) {
@@ -3003,6 +3252,29 @@ void selectCurrentItem() {
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
 					displayWiFiAttackMenu();
 					return;
+				}
+
+				if (currentSelection == WIFI_ATK_DEAUTH ||
+					currentSelection == WIFI_ATK_STA_DEAUTH ||
+					currentSelection == WIFI_ATK_AUTH ||
+					currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH ||
+					currentSelection == WIFI_ATK_QUIET ||
+					currentSelection == WIFI_ATK_CSA) {
+					
+					if (hasWPA3APs()) {
+						display.clearScreen();
+						display.displayStringwithCoordinates("WPA3 AP Selected!", 0, 12);
+						display.displayStringwithCoordinates("Attack May Fail", 0, 21);
+						display.displayStringwithCoordinates("SELECT to continue", 0, 31);
+						display.displayStringwithCoordinates("LEFT to exit", 0, 42, true);
+						Serial.println("[WARN] WPA3 AP Selected!, Attack May Fail! or No Effect");
+						while (!check(selPress) && !prevPress) yield();
+						if (check(prevPress)) {
+							displayWiFiAttackMenu();
+							return;
+						}
+					}
+
 				}
 				
 				// Check memory before starting attack
