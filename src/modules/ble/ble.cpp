@@ -585,15 +585,9 @@ void BLEModules::initSpam() {
 
 void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
 {
-    uint8_t dummy_addr[6] = {0x00};
-      for (int i = 0; i < 6; i++) {
-        dummy_addr[i] = random(256);
-        if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
-    }
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     setBaseMacAddress(macAddr);
-    //setBleGapRandAddress(dummy_addr);
     NimBLEDevice::init("");
     NimBLEDevice::setPower(MAX_TX_POWER, NimBLETxPowerType::Advertise);
     NimBLEServer *pServer = NimBLEDevice::createServer();

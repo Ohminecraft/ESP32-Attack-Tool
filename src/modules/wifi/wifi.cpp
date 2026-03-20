@@ -218,7 +218,8 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 				uint8_t random_mac[6];
 				generateRandomMac(random_mac);
 
-				if (!sendSAECommitFrame(access_points->get(i).bssid, random_mac)) {
+				if (sendSAECommitFrame(access_points->get(i).bssid, random_mac)) {
+					packet_sent = packet_sent + 1;
 					//Serial.println("[ERROR] Failed to send SAE Commit frame");
 				}
 			}
@@ -1387,9 +1388,10 @@ void WiFiModules::SAECommitSnifferCallback(void* buf, wifi_promiscuous_pkt_type_
 }
 
 void WiFiModules::SAEScan(bool attack) {
-	if (!attack) Serial.println("[INFO] Starting Simultaneous Authentication of Equals (SAE) scan...");
-
-	logutils.createFile("sae", true);
+	if (!attack) {
+		logutils.createFile("sae", true);
+		Serial.println("[INFO] Starting Simultaneous Authentication of Equals (SAE) scan...");
+	}
 
 	this->sae_scan = !attack;
 
