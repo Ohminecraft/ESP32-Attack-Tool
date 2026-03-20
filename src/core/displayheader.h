@@ -45,6 +45,8 @@ class DisplayModules
 
         bool main();
 
+        String keyboard();
+
         void clearScreen();
         void drawingRect(int x, int y, int w, int h, bool fill_rect = true, bool senddisplay = false, int color = WHITE);
         void printString(String msg);
