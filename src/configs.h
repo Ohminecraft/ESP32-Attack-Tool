@@ -62,8 +62,8 @@
 
 // INPUT CONFIGURATION //
 
-//#define USING_ENCODER
-#define USING_BUTTON
+#define USING_ENCODER
+//#define USING_BUTTON
 
 #define ENC_PIN_A 25
 #define ENC_PIN_B 26

@@ -200,6 +200,18 @@ void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int co
     }
 }
 
+void DisplayModules::drawRBox(int x, int y, int w, int h, int r) {
+    u8g2.drawRBox(x, y, w, h, r);
+}
+
+void DisplayModules::setDrawColor(int color) {
+    u8g2.setDrawColor(color);
+}
+
+void DisplayModules::drawRFrame(int x, int y, int w, int h, int r) {
+    u8g2.drawRFrame(x, y, w, h, r);
+}
+
 void DisplayModules::drawingCenterString(String msg, int y, bool senddisplay, int color)
 {
     if (!screenInitialized) {

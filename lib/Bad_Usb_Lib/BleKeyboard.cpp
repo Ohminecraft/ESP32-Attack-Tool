@@ -453,7 +453,8 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
 
 void BleKeyboard::end(void)
 {
-  for (int i = 0; i < pServer->getConnectedCount(); i++) pServer->disconnect(pServer->getPeerInfo(i));
+  //for (int i = 0; i < pServer->getConnectedCount(); i++) pServer->disconnect(pServer->getPeerInfo(i));
+  NimBLEDevice::deinit();
 }
 
 bool BleKeyboard::isConnected(void) {

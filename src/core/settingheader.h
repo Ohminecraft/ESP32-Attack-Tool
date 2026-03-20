@@ -30,7 +30,7 @@ class ESP32ATSetting {
         uint8_t statusLedPin = STA_LED;
         String evilportalSSID = "ESP32AttackTool";
         std::map<String, String> wifi = {};
-        bool autoConnectWiFi = false;
+        bool autoConnectWiFi = true;
         bool savepcap = true;
         String bleName = "ESP32AttackTool";
         bool usingSwiftpairForBLEUtilty = true;
@@ -47,13 +47,13 @@ class ESP32ATSetting {
         uint8_t sdcardCsPin = SD_CS_PIN;
         uint8_t nrfCePin = NRF24_CE_PIN;
         uint8_t nrfCsPin = NRF24_CSN_PIN;
-        bool usingEncoder = false;
+        bool usingEncoder = true;
         uint8_t encPinA = ENC_PIN_A;
         uint8_t encPinB = ENC_PIN_B;
         uint8_t leftBtnPin = LEFT_BTN;
         uint8_t rightBtnPin = RIGHT_BTN;
         uint8_t selectBtnPin = SEL_BTN;
-        int8_t timeZone = 0;
+        int8_t timeZone = 7; // Bangkok, Hanoi, Jakarta
         bool autoDeepSleep = true;
         bool autoStandby = true;
 
@@ -61,6 +61,8 @@ class ESP32ATSetting {
         void loadSettings();
         void saveSettings();
         void resetSettings(bool useLittleFS);
+        JsonDocument getConfig();
+        void updateConfig();
         String getSetting(const String &key);
         String getApPassword(const String &ssid) const;
 };

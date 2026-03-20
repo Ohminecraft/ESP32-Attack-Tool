@@ -9,7 +9,7 @@
 	* Licensed under the MIT License.
 */
 
-String generateRandomName() {
+String generateRandomString() {
 	int len = rand() % 10 + 1; // Limit length to 1-10 characters
 	String randomName = "";
 	
@@ -21,6 +21,16 @@ String generateRandomName() {
 	}
 	
 	return randomName;
+}
+
+void generateRandomString(char* buffer, size_t length) {
+    const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    size_t charsetSize = sizeof(charset) - 1; // Exclude null terminator
+
+    for (size_t i = 0; i < length - 1; i++) {
+        buffer[i] = charset[random(0, charsetSize)];
+    }
+    buffer[length - 1] = '\0'; // Null-terminate the string
 }
 
 uint32_t getHeap(uint8_t type) {

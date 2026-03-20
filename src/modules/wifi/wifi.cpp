@@ -532,75 +532,131 @@ void WiFiModules::StartDeauthFlood() {
 
 // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp
 uint8_t WiFiModules::getSecurityType(const uint8_t* beacon, uint16_t len) {
-	const uint8_t* frame = beacon;
-	const uint8_t* ies = beacon + 36; // Start of tagged parameters
-	uint16_t ies_len = len - 36;
-  
-	bool hasRSN = false;
-	bool hasWPA = false;
-	bool hasWEP = false;
-	bool isEnterprise = false;
-	bool isWPA3 = false;
-	bool isWAPI = false;
-  
-	uint16_t i = 0;
-	while (i + 2 <= ies_len) {
-	  uint8_t tag_id = ies[i];
-	  uint8_t tag_len = ies[i + 1];
-  
-	  if (i + 2 + tag_len > ies_len) break;
-  
-	  const uint8_t* tag_data = ies + i + 2;
-  
-	  // Check for RSN (WPA2)
-	  if (tag_id == 48) {
-		hasRSN = true;
-  
-		// WPA2-Enterprise usually uses 802.1X AKM (type 1)
-		if (tag_len >= 20 && tag_data[14] == 0x01 && tag_data[15] == 0x00 && tag_data[16] == 0x00 && tag_data[17] == 0x0f && tag_data[18] == 0xac) {
-		  isEnterprise = true;
-		}
-  
-		// WPA3 typically uses SAE (type 8)
-		if (tag_len >= 20 && tag_data[14] == 0x01 && tag_data[15] == 0x00 && tag_data[16] == 0x00 && tag_data[17] == 0x0f && tag_data[18] == 0xac && tag_data[19] == 0x08) {
-		  isWPA3 = true;
-		}
-	  }
-  
-	  // Check for WPA (in vendor specific tag)
-	  else if (tag_id == 221 && tag_len >= 8 &&
-		  tag_data[0] == 0x00 && tag_data[1] == 0x50 && tag_data[2] == 0xF2 && tag_data[3] == 0x01) {
-		hasWPA = true;
-  
-		// WPA-Enterprise (AKM 1)
-		if (tag_len >= 20 && tag_data[14] == 0x01 && tag_data[15] == 0x00 && tag_data[16] == 0x00 && tag_data[17] == 0x50 && tag_data[18] == 0xf2) {
-		  isEnterprise = true;
-		}
-	  }
-  
-	  // Check for WAPI (Chinese standard)
-	  else if (tag_id == 221 && tag_len >= 4 &&
-		  tag_data[0] == 0x00 && tag_data[1] == 0x14 && tag_data[2] == 0x72 && tag_data[3] == 0x01) {
-		isWAPI = true;
-	  }
-  
-	  i += 2 + tag_len;
-	}
-  
-	// Decision tree
-	if (isWAPI) return WIFI_SECURITY_WAPI;
-	if (hasRSN && isWPA3) return WIFI_SECURITY_WPA3;
-	if (hasRSN && isEnterprise) return WIFI_SECURITY_WPA2_ENTERPRISE;
-	if (hasRSN && hasWPA) return WIFI_SECURITY_WPA_WPA2_MIXED;
-	if (hasRSN) return WIFI_SECURITY_WPA2;
-	if (hasWPA) return isEnterprise ? WIFI_SECURITY_WPA2_ENTERPRISE : WIFI_SECURITY_WPA;
-	
-	// WEP is identified via capability flags
-	uint16_t capab_info = ((uint16_t)frame[34] << 8) | frame[35];
-	if (capab_info & 0x0010) return WIFI_SECURITY_WEP;
-  
-	return WIFI_SECURITY_OPEN;
-  }
+    if (len < 36) return WIFI_SECURITY_OPEN;
+
+    const uint8_t* frame = beacon;
+    const uint8_t* ies = beacon + 36; // Tagged parameters start after fixed 802.11 header
+    uint16_t ies_len = len - 36;
+
+    bool hasRSN = false;
+    bool hasWPA = false;
+    bool isEnterprise = false;
+    bool isWPA3 = false;
+    bool isWAPI = false;
+
+    uint16_t i = 0;
+    while (i + 2 <= ies_len) {
+        uint8_t tag_id  = ies[i];
+        uint8_t tag_len = ies[i + 1];
+
+        if (i + 2 + tag_len > ies_len) break; // Malformed IE, stop parsing
+
+        const uint8_t* tag_data = ies + i + 2;
+
+        // ── RSN IE (Tag 48) — indicates WPA2/WPA3 ────────────────────
+        if (tag_id == 48) {
+            hasRSN = true;
+
+            // Minimum size to reach AKM list:
+            // version(2) + group cipher(4) + pairwise count(2) + 1 suite(4) + AKM count(2) = 14
+            if (tag_len < 14) { i += 2 + tag_len; continue; }
+
+            // Skip version (2 bytes) and group cipher suite (4 bytes)
+            uint16_t offset = 6;
+
+            // Read pairwise cipher suite count and skip over the entire pairwise list
+            // This offset is dynamic — hardcoding byte 14 is wrong when count > 1
+            uint16_t pw_count = tag_data[offset] | ((uint16_t)tag_data[offset + 1] << 8);
+            offset += 2 + pw_count * 4;
+
+            // Bounds check before reading AKM count
+            if (offset + 2 > tag_len) { i += 2 + tag_len; continue; }
+
+            uint16_t akm_count = tag_data[offset] | ((uint16_t)tag_data[offset + 1] << 8);
+            offset += 2;
+
+            // Iterate over each AKM suite (4 bytes: 3-byte OUI + 1-byte type)
+            for (uint16_t a = 0; a < akm_count; a++) {
+                if (offset + 4 > tag_len) break;
+
+                // OUI 00:0F:AC identifies IEEE 802.11 standard AKM suites
+                bool isIEEE = (tag_data[offset]     == 0x00 &&
+                               tag_data[offset + 1] == 0x0f &&
+                               tag_data[offset + 2] == 0xac);
+
+                uint8_t akmType = tag_data[offset + 3];
+
+                if (isIEEE) {
+                    if (akmType == 1 ||
+						akmType == 3 ||
+						akmType == 12 ||
+						akmType == 13)
+					isEnterprise = true; // 802.1X authentication (WPA2-Enterprise) | FT over 802.1X | FILS-SHA256 (WPA3-Enterprise) | FILS-SHA384 (WPA3-Enterprise)
+                    if (akmType == 8)  isWPA3 = true;       // SAE (Simultaneous Authentication of Equals) — WPA3-Personal
+                }
+
+                offset += 4;
+            }
+        }
+
+        // ── WPA IE (Tag 221, OUI 00:50:F2:01) — indicates WPA1 ───────
+        else if (tag_id == 221 && tag_len >= 8 &&
+                 tag_data[0] == 0x00 && tag_data[1] == 0x50 &&
+                 tag_data[2] == 0xf2 && tag_data[3] == 0x01) {
+            hasWPA = true;
+
+            if (tag_len < 14) { i += 2 + tag_len; continue; }
+
+            // WPA IE layout: OUI(3) + type(1) + version(2) + group cipher(4) = 10 bytes before pairwise count
+            uint16_t offset = 10;
+            uint16_t pw_count = tag_data[offset] | ((uint16_t)tag_data[offset + 1] << 8);
+            offset += 2 + pw_count * 4;
+
+            if (offset + 2 > tag_len) { i += 2 + tag_len; continue; }
+
+            uint16_t akm_count = tag_data[offset] | ((uint16_t)tag_data[offset + 1] << 8);
+            offset += 2;
+
+            // Check each AKM suite for 802.1X (WPA-Enterprise)
+            for (uint16_t a = 0; a < akm_count; a++) {
+                if (offset + 4 > tag_len) break;
+
+                // OUI 00:50:F2 is Microsoft's OUI used in WPA IE
+                bool isMSOUI = (tag_data[offset]     == 0x00 &&
+                                tag_data[offset + 1] == 0x50 &&
+                                tag_data[offset + 2] == 0xf2);
+
+                if (isMSOUI && tag_data[offset + 3] == 0x01) isEnterprise = true; // AKM type 1 = 802.1X
+
+                offset += 4;
+            }
+        }
+
+        // ── WAPI IE (Tag 68) — Chinese national Wi-Fi security standard ──
+        else if (tag_id == 68) {
+            isWAPI = true;
+        }
+
+        i += 2 + tag_len;
+    }
+
+    // ── Security type decision tree (most specific first) ────────────
+    if (isWAPI)                 return WIFI_SECURITY_WAPI;
+    if (isWPA3 && isEnterprise) return WIFI_SECURITY_WPA3_ENTERPRISE;
+    if (isWPA3)                 return WIFI_SECURITY_WPA3;
+    if (hasRSN && isEnterprise) return WIFI_SECURITY_WPA2_ENTERPRISE;
+    if (hasRSN && hasWPA)       return WIFI_SECURITY_WPA_WPA2_MIXED;
+    if (hasRSN)                 return WIFI_SECURITY_WPA2;
+    if (hasWPA)                 return isEnterprise ? WIFI_SECURITY_WPA2_ENTERPRISE
+                                                    : WIFI_SECURITY_WPA;
+
+    // WEP is not advertised via IEs — detected through the Privacy bit (bit 4)
+    // in the Capability Information field at bytes 34-35 (little-endian)
+    uint16_t capab = (uint16_t)frame[34] | ((uint16_t)frame[35] << 8);
+    if (capab & 0x0010) return WIFI_SECURITY_WEP;
+
+    return WIFI_SECURITY_OPEN;
+}
 
 // https://github.com/justcallmekoko/ESP32Marauder/blob/master/esp32_marauder/WiFiScan.cpp
 void WiFiModules::apSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type) {
@@ -837,6 +893,8 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 
 		if ((snifferPacket->payload[0] == 0x80))
     	{
+			uint8_t security_type = wifi.getSecurityType(snifferPacket->payload, snifferPacket->rx_ctrl.sig_len);
+
 			char addr[] = "00:00:00:00:00:00";
 			getMAC(addr, snifferPacket->payload, 10);
 			bool in_list = false;
@@ -908,8 +966,6 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 
 				String wpastr = "";
 
-				uint8_t security_type = wifi.getSecurityType(snifferPacket->payload, snifferPacket->rx_ctrl.sig_len);
-
 				switch(security_type) {
 					case WIFI_SECURITY_OPEN: wpastr = "Open"; break;
 					case WIFI_SECURITY_WEP: wpastr = "WEP"; break;
@@ -917,6 +973,7 @@ void WiFiModules::apstaSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t ty
 					case WIFI_SECURITY_WPA2: wpastr = "WPA2"; break;
 					case WIFI_SECURITY_WPA2_ENTERPRISE: wpastr = "WPA2/Enterprise"; break;
 					case WIFI_SECURITY_WPA3: wpastr = "WPA3"; break;
+					case WIFI_SECURITY_WPA3_ENTERPRISE: wpastr = "WPA3/Enterprise"; break;
 					case WIFI_SECURITY_WPA_WPA2_MIXED: wpastr = "WPA/WPA2 Mixed"; break;
 					case WIFI_SECURITY_WAPI: wpastr = "WAPI"; break;
 				}
@@ -1655,6 +1712,7 @@ void WiFiModules::StartAPWiFiScanOld() { // using old scan to scan wifi
             case WIFI_AUTH_WPA_WPA2_PSK: security_type = WIFI_SECURITY_WPA_WPA2_MIXED; break;
             case WIFI_AUTH_WPA2_ENTERPRISE: security_type = WIFI_SECURITY_WPA2_ENTERPRISE; break;
 			case WIFI_AUTH_WPA3_PSK: security_type = WIFI_SECURITY_WPA3; break;
+			case WIFI_AUTH_WPA3_ENTERPRISE: security_type = WIFI_SECURITY_WPA3_ENTERPRISE; break;
 			case WIFI_AUTH_WAPI_PSK: security_type = WIFI_SECURITY_WAPI; break;
             default: security_type = -1; break;
         }
@@ -1666,6 +1724,7 @@ void WiFiModules::StartAPWiFiScanOld() { // using old scan to scan wifi
 			case WIFI_SECURITY_WPA2: ap.wpastr = "WPA2"; break;
 			case WIFI_SECURITY_WPA2_ENTERPRISE: ap.wpastr = "WPA2/Enterprise"; break;
 			case WIFI_SECURITY_WPA3: ap.wpastr = "WPA3"; break;
+			case WIFI_SECURITY_WPA3_ENTERPRISE: ap.wpastr = "WPA3/Enterprise"; break;
 			case WIFI_SECURITY_WPA_WPA2_MIXED: ap.wpastr = "WPA/WPA2 Mixed"; break;
 			case WIFI_SECURITY_WAPI: ap.wpastr = "WAPI"; break;
 		}

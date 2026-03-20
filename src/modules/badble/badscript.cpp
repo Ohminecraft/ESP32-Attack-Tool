@@ -221,39 +221,6 @@ void BadScriptModules::beginKB(HIDInterface *&hid, const uint8_t *layout, uint8_
     hid->begin(layout, mode);  currentkbmode = mode;
 }
 
-void BadScriptModules::beginLayout(HIDInterface *&hid) {
-    if (hid == nullptr) {
-        if (keyboardLayout == Layout_en_US) {
-            beginKB(hid, KeyboardLayout_en_US);
-        } else if (keyboardLayout == Layout_pt_BR) {
-            beginKB(hid, KeyboardLayout_pt_BR);
-        } else if (keyboardLayout == Layout_pt_PT) {
-            beginKB(hid, KeyboardLayout_pt_PT);
-        } else if (keyboardLayout == Layout_fr_FR) {
-            beginKB(hid, KeyboardLayout_fr_FR);
-        } else if (keyboardLayout == Layout_es_ES) {
-            beginKB(hid, KeyboardLayout_es_ES);
-        } else if (keyboardLayout == Layout_it_IT) {
-            beginKB(hid, KeyboardLayout_it_IT);
-        } else if (keyboardLayout == Layout_en_UK) {
-            beginKB(hid, KeyboardLayout_en_UK);
-        } else if (keyboardLayout == Layout_de_DE) {
-            beginKB(hid, KeyboardLayout_de_DE);
-        } else if (keyboardLayout == Layout_sv_SE) {
-            beginKB(hid, KeyboardLayout_sv_SE);
-        } else if (keyboardLayout == Layout_da_DK) {
-            beginKB(hid, KeyboardLayout_da_DK);
-        } else if (keyboardLayout == Layout_hu_HU) {
-            beginKB(hid, KeyboardLayout_hu_HU);
-        } else if (keyboardLayout == Layout_tr_TR) {
-            beginKB(hid, KeyboardLayout_tr_TR);
-        } else if (keyboardLayout == Layout_si_SI) {
-            beginKB(hid, KeyboardLayout_si_SI);
-        }
-       
-    }
-}
-
 bool BadScriptModules::isConnected(HIDInterface *&hid) {
     if (hid == nullptr) return false;
     else return hid->isConnected();

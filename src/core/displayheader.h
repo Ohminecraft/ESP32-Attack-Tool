@@ -61,6 +61,9 @@ class DisplayModules
         void drawingVLine(int x, int y, int h, int color = WHITE);
         void drawingLine(int x1, int y1, int x2, int y2, bool sendDisplay = false);
         void drawingPixel(int x, int y, bool sendDisplay = false);
+        void drawRBox(int x, int y, int w, int h, int r);
+        void drawRFrame(int x, int y, int w, int h, int r);
+        void setDrawColor(int color);
         void sendDisplay();
         //void addToBuffer(String msg);
         void drawBipmap(int x, int y, int w, int h, const uint8_t* icon, bool senddisplay = false);

@@ -68,7 +68,6 @@ extern SDCardModules sdcard;
 class BadScriptModules {
     public:
         void beginKB(HIDInterface *&hid, const uint8_t *layout, uint8_t mode = BLE_KEYBOARD_MODE_KEYBOARD);
-        void beginLayout(HIDInterface *&hid);
         bool isConnected(HIDInterface *&hid);
         void launchBadScript(String badscriptScript, HIDInterface *&hid);
         void mediaController(HIDInterface *&hid, MediaCommand command);

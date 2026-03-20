@@ -70,6 +70,90 @@ bool copyFile(fs::FS &srcFS, const char* srcPath, fs::FS &dstFS, const char* dst
     return true;
 }
 
+JsonDocument ESP32ATSetting::getConfig() {
+    JsonDocument jsonDoc;
+    JsonObject config = jsonDoc.to<JsonObject>();
+    
+    config["spiSckPin"] = spiSckPin;
+    config["spiMisoPin"] = spiMisoPin;
+    config["spiMosiPin"] = spiMosiPin;
+
+    config["displayWidth"] = displayWidth;
+    config["displayHeight"] = displayHeight;
+    config["displayInvert"] = displayInvert;
+    config["maxShowSelection"] = maxShowSelection;
+    config["graphLineLimit"] = graphLineLimit;
+    config["displaySdaPin"] = displaySdaPin;
+    config["displaySclPin"] = displaySclPin;
+
+    config["statusLedPin"] = statusLedPin; 
+
+    config["evilportalSSID"] = evilportalSSID;
+
+    JsonObject _wifi = config["wifi"].to<JsonObject>();
+    for (const auto &pair : wifi) { _wifi[pair.first] = pair.second; }
+
+    config["autoConnectWiFi"] = autoConnectWiFi;
+    
+    config["savepcap"] = savepcap;
+
+    config["bleName"] = bleName;
+    config["usingSwiftpairForBLEUtilty"] = usingSwiftpairForBLEUtilty;
+    config["sourappleSpamDelay"] = sourappleSpamDelay; 
+    config["applejuiceSpamDelay"] = applejuiceSpamDelay; 
+    config["swiftpairSpamDelay"] = swiftpairSpamDelay; 
+    config["spamallSpamDelay"] = spamAllDelay; 
+    config["badscriptKeyDelay"] = badscriptKeyDelay;
+    config["useAppleJuicePaired"] = useAppleJuicePaired; 
+    config["useBleNameasnameofNameFlood"] = useBleNameasnameofNameFlood; 
+
+    config["irTxPin"] = irTxPin;
+    config["irRxPin"] = irRxPin;
+    config["irRepeat"] = irRepeat;
+    
+    config["sdCsPin"] = sdcardCsPin;
+
+    config["nrf24CePin"] = nrfCePin; 
+    config["nrf24CsPin"] = nrfCsPin;
+
+    config["usingEncoder"] = usingEncoder;
+    config["encPinA"] = encPinA; 
+    config["encPinB"] = encPinB; 
+
+    config["leftBtnPin"] = leftBtnPin;
+    config["rightBtnPin"] = rightBtnPin;
+
+    config["selBtnPin"] = selectBtnPin;
+
+    config["timeZone"] = timeZone;
+    config["autoDeepSleep"] = autoDeepSleep;
+    config["autoStandby"] = autoStandby;
+
+    return jsonDoc;
+}
+
+void ESP32ATSetting::updateConfig() {
+    JsonDocument jsonDoc = getConfig();
+
+    File configfile = SD.open("/ESP32AttackTool/ESP32AttackToolconfig.json", FILE_WRITE);
+    if (!configfile) {
+        Serial.println("[ERROR] Failed to open config file in SD card!, Falling back to LittleFS...");
+        // Fallback to LittleFS
+        configfile = LittleFS.open("/ESP32AttackToolconfig.json", FILE_WRITE);
+        if (!configfile) {
+            Serial.println("[ERROR] Failed to open config file in LittleFS!");
+            return;
+        }
+    }
+
+    if (serializeJsonPretty(jsonDoc, configfile) < 5) {
+        Serial.println("[ERROR] Failed to write config to file!");
+    } else {
+        Serial.println("[INFO] Config saved successfully.");
+    }
+    configfile.close();
+}
+
 void ESP32ATSetting::resetSettings(bool useLittleFS) {
     if (!useLittleFS) {
         if (SD.exists("/ESP32AttackTool/ESP32AttackToolconfig.json")) {

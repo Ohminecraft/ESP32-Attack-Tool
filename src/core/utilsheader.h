@@ -50,7 +50,8 @@
 
 uint32_t getHeap(uint8_t type);
 const String alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789-=[];',./`\\_+{}:\"<>?~|!@#$%^&*()";
-String generateRandomName();
+String generateRandomString();
+void generateRandomString(char* buffer, size_t length);
 bool checkLeftMemory();
 
 void generateRandomMac(uint8_t* mac);

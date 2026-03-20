@@ -130,6 +130,7 @@ void connectWiFi(void *pvParameters) {
 	wifi.setMac();
 
 	for (int i = 0; i < access_points->size(); i++) {
+		if (wifi_connected) break; // if already connected to wifi, break
 		String ssid = access_points->get(i).essid;
 		String pwd = espatsettings.getApPassword(ssid);
 		if (pwd == "") continue;
@@ -150,8 +151,8 @@ void connectWiFi(void *pvParameters) {
 	access_points->clear();
 	timeClock.main();
 	delay(1000);
-	wifi.StartMode(WIFI_SCAN_OFF);
-	wifi_connected = false;
+	if (!wifi_connected) wifi.StartMode(WIFI_SCAN_OFF);
+	//wifi_connected = false;
     vTaskDelete(NULL);
     return;
 }
@@ -444,7 +445,7 @@ void displayBLEScanMenu() {
 		if (!bleScanInProgress) {
 			bleScanDisplay = true;
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 			#else
 				pixels.clear();
 				pixels.show();
@@ -605,7 +606,7 @@ void displayDiscoverableModeSpooferMenu() {
 
 void displaySpooferRunning() {
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -616,7 +617,7 @@ void displaySpooferRunning() {
 
 void displayExploitAttackBLEMenu() {
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, LOW);
+		digitalWrite(espatsettings.statusLedPin, LOW);
 	#else
 		pixels.clear();
 		pixels.show();
@@ -640,7 +641,7 @@ void displayExploitAttackBLEMenu() {
 
 void displayMediaCtrlBLEMenu() {
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, LOW);
+		digitalWrite(espatsettings.statusLedPin, LOW);
 	#else
 		pixels.clear();
 		pixels.show();
@@ -740,6 +741,7 @@ void displayWiFiGeneralMenu() {
 		"EAPOL.. Deauth Scan",
 		"Channel Analyzer",
 		"SAE Commit Scan",
+		"Join WiFi",
 		"< Back"
 	};
 
@@ -760,7 +762,7 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 			#endif
 				display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
 				#ifndef BUILTIN_RGB_LED
-					digialWrite(espatsettings.statusLedPin, LOW);
+					digitalWrite(espatsettings.statusLedPin, LOW);
 				#else
 					pixels.clear();
 					pixels.show();
@@ -774,7 +776,7 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 				display.displayStringwithCoordinates("AP Found: " + String(access_points ? access_points->size() : 0), 0, 48);
 				display.displayStringwithCoordinates("STA Found: " + String(device_station ? device_station->size() : 0), 0, 60, true);
 				#ifndef BUILTIN_RGB_LED
-					digialWrite(espatsettings.statusLedPin, LOW);
+					digitalWrite(espatsettings.statusLedPin, LOW);
 				#else
 					pixels.clear();
 					pixels.show();
@@ -1518,7 +1520,7 @@ void startBLEAttack(BLEScanState attackType) {
 	currentState = BLE_ATTACK_RUNNING;
 	
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -1610,7 +1612,7 @@ void startWiFiAttack(WiFiScanState attackType) {
 	currentState = WIFI_ATTACK_RUNNING;
 	
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -1641,7 +1643,7 @@ void startNRFJammer(NRFJammerMode jammer_mode) {
 	currentState = NRF24_JAMMER_RUNNING;
 
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -1658,7 +1660,7 @@ void startBLEScan() {
 	display.clearBuffer();
 	ble.StartMode(BLE_SCAN_DEVICE);
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 		pixels.show();
@@ -1718,7 +1720,7 @@ void startWiFiScan(WiFiGeneralItem mode) {
 void startSnifferScan(WiFiGeneralItem sniffer_mode) {
 	display.clearBuffer();
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(0, 0, 255));
 		pixels.show();
@@ -1784,7 +1786,7 @@ void stopCurrentAttack() {
 	}
 		
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, LOW);
+		digitalWrite(espatsettings.statusLedPin, LOW);
 	#else
 		pixels.clear();
 		pixels.show();
@@ -1951,10 +1953,10 @@ String keyboard() {
     //   \x03 = SPACE
     //   \x04 = DONE / OK
     const char* rows[3][4] = {
-        { "qwertyuiop", "asdfghjkl", "\x01zxcvbnm\x02", "\x03\x04" },
-        { "QWERTYUIOP", "ASDFGHJKL", "\x01ZXCVBNM\x02", "\x03\x04" },
-        { "1234567890", "!@#$%^&*()", "\x01-_=+[]{}\x02", ".,;:'\"~`\x04" },
-    };
+		{ "qwertyuiop", "asdfghjkl", "\x01zxcvbnm\x02", "\x03\x04\x05" },
+		{ "QWERTYUIOP", "ASDFGHJKL", "\x01ZXCVBNM\x02", "\x03\x04\x05" },
+		{ "1234567890", "!@#$%^&*()", "\x01-_=+[]{}\x02", ".,;:'\"~`\x04\x05" },
+	};
 
     // ── Layout constants ──────────────────────────────────────────
     const uint8_t KEY_W   = 12;
@@ -1995,11 +1997,13 @@ String keyboard() {
         return idx + curCol;
     };
 
+	display.clearScreen();
+
     // ── Main loop ─────────────────────────────────────────────────
     while (true) {
 
         // ── Render ────────────────────────────────────────────────
-        display.clearBuffer();
+        display.clearScreen();
         display.setFont(u8g2_font_5x7_tf);
 
         // Input bar
@@ -2036,10 +2040,11 @@ String keyboard() {
                 // Key label
                 char lbl[3] = {0};
                 switch (ch) {
-                    case '\x01': lbl[0] = '<';               break; // SHIFT
-                    case '\x02': lbl[0] = 'x';               break; // BACK
+                    case '\x01': lbl[0] = '^';               break; // SHIFT
+                    case '\x02': lbl[0] = '<';               break; // BACK
                     case '\x03': lbl[0] = '_';               break; // SPACE
-                    case '\x04': lbl[0] = 'O'; lbl[1] = 'K'; break; // DONE
+                    case '\x04': lbl[0] = 'O'; lbl[1] = 'K'; break;
+					case '\x05': lbl[0] = 'E'; lbl[1] = 'X'; break;
                     default:     lbl[0] = ch;                break;
                 }
 
@@ -2089,8 +2094,9 @@ String keyboard() {
                     input += ' ';
                     break;
 
-                case '\x04':
-                    return input;   // Done — return typed string
+                case '\x04': display.setFont(u8g2_font_ncenB08_tr); return input;    // OK
+
+				case '\x05': display.setFont(u8g2_font_ncenB08_tr); return "espattacktool_command_exit";   // EXIT
 
                 default:
                     input += ch;
@@ -2453,7 +2459,6 @@ void selectCurrentItem() {
 				}
 			}
 			break;
-			
 		case BLE_MENU:
 			if (currentSelection == BLE_BACK) {
 				goBack();
@@ -2468,7 +2473,7 @@ void selectCurrentItem() {
 					currentState = BLE_ANALYZER_RUNNING;
 					ble.StartMode(BLE_SCAN_ANALYZER);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 0, 255));
 						pixels.show();
@@ -2653,7 +2658,6 @@ void selectCurrentItem() {
 				}
 			}
 			break;
-
 		case BLE_SPOOFER_APPLE_MENU:
 			if (currentSelection == GET_SIZE(pp_models)) {
 				goBack();
@@ -3015,6 +3019,8 @@ void selectCurrentItem() {
 				startSnifferScan(WIFI_GENERAL_SAE_COMMIT_SCAN);
 			} else if (currentSelection == WIFI_GENERAL_JOIN_WIFI) {
 				currentState = WIFI_JOIN_MENU;
+				maxSelections = access_points ? access_points->size() + 1 : 1;
+				currentSelection = 0;
 				displayStatusBar(true);
 				displayWiFiListMenu();
 				return;
@@ -3026,7 +3032,7 @@ void selectCurrentItem() {
 				if (currentSelection == WIFI_GENERAL_AP_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -3037,7 +3043,7 @@ void selectCurrentItem() {
 					access_points->clear();
 					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -3048,7 +3054,7 @@ void selectCurrentItem() {
 					device_station->clear();
 					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -3058,7 +3064,7 @@ void selectCurrentItem() {
 				else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN_OLD);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -3067,7 +3073,7 @@ void selectCurrentItem() {
 				else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -3081,9 +3087,18 @@ void selectCurrentItem() {
 			} else {
 				if (currentSelection < access_points->size()) {
 					AccessPoint ap = access_points->get(currentSelection);
-					WiFi.mode(WIFI_MODE_STA);
-					wifi.setMac();
 					String pwd = keyboard();
+					if (pwd == "espattacktool_command_exit") {
+						goBack();
+						return;
+					}
+					vTaskDelay(100 / portTICK_PERIOD_MS);
+					wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+					esp_wifi_init(&cfg);
+					esp_wifi_set_mode(WIFI_MODE_STA);
+					esp_wifi_set_storage(WIFI_STORAGE_RAM);
+					esp_wifi_start();
+					wifi.setMac();
 					Serial.println("[INFO] Connecting to '" + ap.essid+ "' WiFi, " +  "PWD: " + pwd);
 					WiFi.begin(ap.essid.c_str(), pwd.c_str());
 					wifi_initialized = true;
@@ -3102,6 +3117,8 @@ void selectCurrentItem() {
 							vTaskDelay(2000 / portTICK_PERIOD_MS);
 							timeClock.main();
 							currentState = WIFI_GENERAL_MENU;
+							maxSelections = WIFI_GENERAL_MENU_COUNT;
+							currentSelection = 0;
 							displayWiFiGeneralMenu();
 							break;
 						}
@@ -3110,6 +3127,7 @@ void selectCurrentItem() {
 				} else {
 					goBack();
 				}
+			}
 			break;
 		case WIFI_SELECT_MENU:
 			if (!access_points || access_points->size() == 0) {
@@ -3260,7 +3278,6 @@ void selectCurrentItem() {
 					currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH ||
 					currentSelection == WIFI_ATK_QUIET ||
 					currentSelection == WIFI_ATK_CSA) {
-					
 					if (hasWPA3APs()) {
 						display.clearScreen();
 						display.displayStringwithCoordinates("WPA3 AP Selected!", 0, 12);
@@ -3748,20 +3765,23 @@ void goBack() {
 			maxSelections = WIFI_MENU_COUNT;
 			displayWiFiMenu();
 			break;
+		case WIFI_JOIN_MENU:
 		case WIFI_SCAN_SNIFFER_RUNNING:
-			currentState = WIFI_GENERAL_MENU;
 			//currentSelection = 0;
+			if (currentState == WIFI_SCAN_SNIFFER_RUNNING) {
+				if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) display.clearGraph(wifi.wifi_analyzer_frames);
+				wifi.wifi_analyzer_ssid = "";
+				wifiSnifferMode = -1;
+				wifi.StartMode(WIFI_SCAN_OFF);
+				#ifndef BUILTIN_RGB_LED
+					digitalWrite(espatsettings.statusLedPin, LOW);
+				#else
+					pixels.clear();
+					pixels.show();
+				#endif
+			}
+			currentState = WIFI_GENERAL_MENU;
 			maxSelections = WIFI_GENERAL_MENU_COUNT;
-			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) display.clearGraph(wifi.wifi_analyzer_frames);
-			wifi.wifi_analyzer_ssid = "";
-			wifiSnifferMode = -1;
-			wifi.StartMode(WIFI_SCAN_OFF);
-			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
-			#else
-				pixels.clear();
-				pixels.show();
-			#endif
 			displayWiFiGeneralMenu();
 			break;
 		case WIFI_SELECT_MENU:
@@ -3832,7 +3852,7 @@ void goBack() {
 			display.clearGraph(ble.ble_analyzer_frames);
 			ble.ble_analyzer_device = "";
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 			#else
 				pixels.clear();
 				pixels.show();
@@ -4434,14 +4454,14 @@ void handleTasks(MenuState handle_state) {
 			display.displayStringwithCoordinates("Mode:" + universal_power_mode, 0,36);
 			display.displayStringwithCoordinates("Press Sel to stop", 0, 48, true);
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, HIGH);
+				digitalWrite(espatsettings.statusLedPin, HIGH);
 			#else
 				pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 				pixels.show();
 			#endif
 			irtx.startUniversalPowerRemote();
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 			#else
 				pixels.clear();
 				pixels.show();
@@ -4465,7 +4485,7 @@ void handleTasks(MenuState handle_state) {
 				display.displayStringwithCoordinates("Please wait!", 0, 48, true);
 				Serial.println("[INFO] Starting IR Send File: " + irSendFile);
 				#ifndef BUILTIN_RGB_LED
-					digialWrite(espatsettings.statusLedPin, HIGH);
+					digitalWrite(espatsettings.statusLedPin, HIGH);
 				#else
 					pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 					pixels.show();
@@ -4473,7 +4493,7 @@ void handleTasks(MenuState handle_state) {
 				irtx.sendIRTx(irSendFile);
 				vTaskDelay(300 / portTICK_PERIOD_MS);
 				#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 				#else
 					pixels.clear();
 					pixels.show();
@@ -4798,6 +4818,9 @@ void redrawTasks() {
 			break;
 		case WIFI_SELECT_STA_MENU:
 			displayWiFiSelectStaInAp();
+			break;
+		case WIFI_JOIN_MENU:
+			displayWiFiListMenu();
 			break;
 		case NRF24_MENU:
 			displayNRF24Menu();

@@ -107,7 +107,7 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             break;
         }
         case Microsoft: {
-            String Name = generateRandomName();
+            String Name = generateRandomString();
 
             uint8_t name_len = Name.length();
 
@@ -212,7 +212,7 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             String Name;
             if (espatsettings.useBleNameasnameofNameFlood)
                 Name = espatsettings.bleName;
-            else Name = generateRandomName();
+            else Name = generateRandomString();
             uint8_t name_len = Name.length();
 
             AdvData_Raw = new uint8_t[12 + name_len];
@@ -239,7 +239,7 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
         }
         case Flipper: {
             char Name[6];  // 5 characters + null terminator
-            strcpy(Name, generateRandomName().c_str());
+            generateRandomString(Name, sizeof(Name));
 
             uint8_t name_len = strlen(Name);
 
