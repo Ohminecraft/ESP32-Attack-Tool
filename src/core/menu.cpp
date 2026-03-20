@@ -2014,6 +2014,11 @@ String keyboard() {
                          : input;
         displaytext += "_";
         display.displayStringwithCoordinates(displaytext, 2, INPUT_H - 2);
+
+		// Mode indicator
+        const char* modeLabel[] = { "ab", "AB", "!1" };
+        display.displayStringwithCoordinates(modeLabel[mode], 110, INPUT_H - 2);
+
         display.setDrawColor(1);
 
         // Draw all keys
@@ -2054,10 +2059,6 @@ String keyboard() {
                 display.setDrawColor(1);
             }
         }
-
-        // Mode indicator
-        const char* modeLabel[] = { "ab", "AB", "!1" };
-        display.displayStringwithCoordinates(modeLabel[mode], 110, INPUT_H - 2);
 
         display.sendDisplay();
 
@@ -3113,6 +3114,7 @@ void selectCurrentItem() {
 							espatsettings.wifi[ap.essid] = pwd;
 							espatsettings.updateConfig();
 							wifi_connected = true;
+							display.clearScreen();
 							display.displayStringwithCoordinates("Connected!", 0, 12, true);
 							vTaskDelay(2000 / portTICK_PERIOD_MS);
 							timeClock.main();
