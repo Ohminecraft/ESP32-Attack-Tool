@@ -16,9 +16,18 @@ extern ESP32ATSetting espatsettings;
 
 #define RF_RECEIVER_MODE 0
 #define RF_TRANSMITTER_MODE 1
+#define RF_FREQUENCY_ANALYZER_MODE 2
 
 #define KEELOQ_SIMPLE_LEARNING 1
 #define KEELOQ_NORMAL_LEARNING 2
+
+#define RSSI_THRESHOLD        -85   // dBm — ignore weaker signal
+#define RSSI_MIN_VALID        -120  // dBm — limit signal strength
+#define FINE_STEP_MHZ         0.05  // fine scan step (50 kHz)
+#define FINE_RANGE_MHZ        1.0   // ±1 MHz scan around scanned signal
+#define RSSI_SAMPLES          5     // Measure RSSI N times and then take the average.
+#define RSSI_SAMPLE_DELAY_US  200   // delay between measurements (µs)
+#define COARSE_SETTLE_US      2000  // CC1101 stabilization time after setMHz
 
 struct KeeloqKey {
     String mf_name{};
@@ -101,6 +110,30 @@ const float subghz_frequency_list[] = {
     928.000f
 };
 
+static const float COARSE_FREQS[] = {
+  // Band 300-348 MHz
+  300.0, 303.0, 303.875, 304.25,
+  307.0, 307.5, 308.0,
+  310.0, 312.0, 312.0, 313.0, 314.0,
+  314.85, 315.0,
+  318.0,
+  // Band 387-464 MHz  
+  390.0,
+  418.0,
+  430.0, 430.5, 431.0, 431.5,
+  433.075, 433.92, 434.0, 434.42, 434.775,
+  438.9,
+  440.0,
+  446.0,
+  447.0, 
+  // Band 779-928 MHz
+  779.0,
+  868.0, 868.35,
+  915.0,
+  925.0,
+  928.0
+};
+
 enum emKeys {
   kUnknown,
   kP12bt,
@@ -152,17 +185,30 @@ uint64_t keeloq_normal_learning(uint32_t data, const uint64_t key);
 
 class RFModules {
     private:
-        uint8_t frequencyIndex = 23; // Default index for 433.92 MHz
+        uint8_t frequencyIndex = 36; // Default index for 433.92 MHz
         float frequency = subghz_frequency_list[frequencyIndex]; // Default frequency in MHz
         bool keyDetected = false;
         bool startup = true;
         bool cc1101_ready = false;
 
+        // Frequenzy Analyzer
+        int8_t RSSI_threshold = RSSI_THRESHOLD;
+
+        float  bestFreq      = 0.0;
+        int8_t bestRSSI      = RSSI_MIN_VALID;
+
+        int8_t readRSSI();
+        int8_t measureRSSI(float freqMHz);
+        float fineScan(float freqCenter, int8_t &bestRssiOut);
+
         void setFrequency(float freqMHz);
         void sendRAW(int *ptrtransmittimings);
-        void sendRAWBit(RfCodes data);
+        void sendRAWBit(const RfCodes& data);
         void sendType(uint64_t data, unsigned int bits, int pulse, int protocol, int repeat);
     public:
+
+        bool redraw = false;
+
         RCSwitch rcSwitch = RCSwitch();
         RfCodes keyData;
         void main();
@@ -171,11 +217,16 @@ class RFModules {
         void configureMode(int mode);
         void stepFrequency(int step);
         float getFrequency();
+        float getFrequencyAnalyzer();
         RfCodes getCurrentData();
         void parseReceivedData();
-        void sendCommand(struct RfCodes code);
+        void sendCommand(const RfCodes& code);
         bool getKeyDetect();
         void resetKeyDetect();
         void shutdownCC1101();
+
+        void frequencyAnalyzerLoop();
+        void stepRSSIThreshold(int step);
+        int8_t getFreqAnalyzerRssiThreshold();
 };
 #endif

@@ -65,6 +65,7 @@ enum MenuState {
     NRF24_JAMMER_MENU,
     RF_RECEIVER_RUNNING,
     RF_RECEIVER_RAW_RUNNING,
+    RF_FREQUENCY_ANALYZER_RUNNING,
     WIFI_UTILS_MENU,
     WIFI_UTILS_SET_MAC_MENU,
     WIFI_GENERAL_MENU,
@@ -327,7 +328,7 @@ enum RFMenuItem {
     RF_READ_RAW,
     RF_SEND,
     RF_JAMMER,
-    RF_BRUTE_FORCE,
+    RF_FREQ_ANALYZER,
     RF_BACK,
     RF_MENU_COUNT
 };
@@ -409,6 +410,7 @@ bool nrfScannerSetupOneShot = false;
 bool rfreplaycode = false;
 bool fixRfDisplayLoop = false;
 bool infrequencychange = false;
+bool inRssichange = false;
 
 // IRSend/Recv
 

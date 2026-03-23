@@ -10,212 +10,205 @@
 
 
 // https://github.com/BruceDevices/firmware/blob/main/src/modules/rf/rf_send.cpp
-void RFModules::sendCommand(struct RfCodes code) {
-    uint32_t frequency = code.frequency;
-    String protocol = code.protocol;
-    String preset = code.preset;
-    String data = code.data;
-    uint64_t key = code.key;
-    byte modulation = 2; // possible values for CC1101: 0 = 2-FSK, 1 =GFSK, 2=ASK, 3 = 4-FSK, 4 = MSK
-    float deviation = 1.58;
-    float rxBW = 270.83; // Receive bandwidth
-    float dataRate = 10;
-
-    int rcswitch_protocol_no = 1;
+// https://github.com/BruceDevices/firmware/blob/main/src/modules/rf/rf_send.cpp
+void RFModules::sendCommand(const RfCodes& code) {
+    uint32_t frequency  = code.frequency;
+    String   protocol   = code.protocol;
+    String   preset     = code.preset;
+    String   data       = code.data;
+ 
+    byte  modulation = 2;    // 0=2-FSK, 1=GFSK, 2=ASK/OOK, 3=4-FSK, 4=MSK
+    float deviation  = 1.58;
+    float rxBW       = 270;
+    float dataRate   = 10;
+    int   rcswitch_protocol_no = 1;
+ 
+    // ── Giải mã preset ──────────────────────────────────────
     if (preset == "FuriHalSubGhzPresetOok270Async") {
         rcswitch_protocol_no = 1;
-        //  pulseLength , syncFactor , zero , one, invertedSignal
-        // rcswitch_protocol = { 350, {  1, 31 }, {  1,  3 }, {  3,  1 }, false };
         modulation = 2;
-        rxBW = 270;
+        rxBW       = 270;
     } else if (preset == "FuriHalSubGhzPresetOok650Async") {
         rcswitch_protocol_no = 2;
-        // rcswitch_protocol = { 650, {  1, 10 }, {  1,  2 }, {  2,  1 }, false };
         modulation = 2;
-        rxBW = 650;
+        rxBW       = 650;
     } else if (preset == "FuriHalSubGhzPreset2FSKDev238Async") {
         modulation = 0;
-        deviation = 2.380371;
-        rxBW = 238;
+        deviation  = 2.380371;
+        rxBW       = 238;
     } else if (preset == "FuriHalSubGhzPreset2FSKDev476Async") {
         modulation = 0;
-        deviation = 47.60742;
-        rxBW = 476;
+        deviation  = 47.60742;
+        rxBW       = 476;
     } else if (preset == "FuriHalSubGhzPresetMSK99_97KbAsync") {
         modulation = 4;
-        deviation = 47.60742;
-        dataRate = 99.97;
+        deviation  = 47.60742;
+        dataRate   = 99.97;
     } else if (preset == "FuriHalSubGhzPresetGFSK9_99KbAsync") {
         modulation = 1;
-        deviation = 19.042969;
-        dataRate = 9.996;
+        deviation  = 19.042969;
+        dataRate   = 9.996;
     } else {
-        bool found = false;
-        for (int p = 0; p < 30; p++) {
-            if (preset == String(p)) {
-                rcswitch_protocol_no = preset.toInt();
-                found = true;
-            }
-        }
-        if (!found) {
+        // FIX #6: bỏ loop thừa, dùng toInt() trực tiếp
+        int n = preset.toInt();
+        if (n > 0 && n <= 30) {
+            rcswitch_protocol_no = n;
+        } else {
             Serial.print("[WARN] Unsupported preset: ");
             Serial.println(preset);
             return;
         }
     }
-
-    main();
+ 
+    // ── Khởi tạo CC1101 đúng thứ tự ────────────────────────
+    // FIX #1: set this->frequency TRƯỚC rồi mới gọi main(),
+    //         main() sẽ dùng đúng tần số này.
     setFrequency(frequency / 1000000.0);
+    main(); // Init SPI, getCC1101(), setFrequency(this->frequency)
+    if (!cc1101_ready) {
+        Serial.println("[ERROR] CC1101 not ready, aborting send.");
+        return;
+    }
+ 
+    // Ghi đè các tham số theo preset
     ELECHOUSE_cc1101.setPA(12);
     ELECHOUSE_cc1101.setModulation(modulation);
-    if (deviation) ELECHOUSE_cc1101.setDeviation(deviation);
-    if (rxBW) ELECHOUSE_cc1101.setRxBW(rxBW); // Set the Receive Bandwidth in kHz. Value from 58.03 to 812.50. Default is 812.50 kHz.
-    if (dataRate) ELECHOUSE_cc1101.setDRate(dataRate);
+    if (deviation > 0) ELECHOUSE_cc1101.setDeviation(deviation);
+    if (rxBW > 0)      ELECHOUSE_cc1101.setRxBW(rxBW);
+    if (dataRate > 0)  ELECHOUSE_cc1101.setDRate(dataRate);
+ 
+    // FIX #1: configureMode KHÔNG gọi main() nữa → tần số không bị ghi đè
     configureMode(RF_TRANSMITTER_MODE);
-    //ELECHOUSE_cc1101.SetTx();
+ 
+    // ── Gửi theo protocol ───────────────────────────────────
     if (protocol == "RAW") {
-        // count the number of elements of RAW_Data
-        int buff_size = 0;
-        int index = 0;
-        while (index >= 0) {
-            index = data.indexOf(' ', index + 1);
-            buff_size++;
+        // FIX #4: đếm buff_size đúng
+        int buff_size = 1;
+        for (int i = 0; i < (int)data.length(); i++) {
+            if (data[i] == ' ') buff_size++;
         }
-        // alloc buffer for transmittimings
-        int *transmittimings =
-            (int *)calloc(sizeof(int), buff_size + 1); // should be smaller the data.length()
-        size_t transmittimings_idx = 0;
-
-        // split data into words, convert to int, and store them in transmittimings
+ 
+        int *transmittimings = (int *)calloc(sizeof(int), buff_size + 1);
+        if (!transmittimings) {
+            Serial.println("[ERROR] calloc failed for RAW buffer");
+            shutdownCC1101();
+            return;
+        }
+ 
         int startIndex = 0;
-        index = 0;
-        for (transmittimings_idx = 0; transmittimings_idx < buff_size; transmittimings_idx++) {
-            index = data.indexOf(' ', startIndex);
-            if (index == -1) {
-                transmittimings[transmittimings_idx] = data.substring(startIndex).toInt();
+        for (int idx = 0; idx < buff_size; idx++) {
+            int spaceIdx = data.indexOf(' ', startIndex);
+            if (spaceIdx == -1) {
+                transmittimings[idx] = data.substring(startIndex).toInt();
             } else {
-                transmittimings[transmittimings_idx] = data.substring(startIndex, index).toInt();
+                transmittimings[idx] = data.substring(startIndex, spaceIdx).toInt();
             }
-            startIndex = index + 1;
+            startIndex = spaceIdx + 1;
         }
-        transmittimings[transmittimings_idx] = 0; // termination
-
-        // send rf command
+        transmittimings[buff_size] = 0; // terminator
+ 
         sendRAW(transmittimings);
         free(transmittimings);
+ 
     } else if (protocol == "BinRAW") {
-        // transform from "00 01 02 ... FF" into "00000000 00000001 00000010 .... 11111111"
-        code.data = hexStrToBinStr(code.data);
-        // Serial.println(rfcode.data);
-        code.data.trim();
-        sendRAWBit(code);
-    }
-
-    else if (protocol == "RcSwitch") {
-        data.replace(" ", "");
-        uint64_t data_val = code.key;
-        int bits = code.Bit;
-        int pulse = code.te;
-        int repeat = 6;
-
-        sendType(data_val, bits, pulse, rcswitch_protocol_no, repeat);
+        // FIX (pass by value): dùng local copy thay vì sửa code
+        RfCodes localCode = code;
+        localCode.data = hexStrToBinStr(code.data);
+        localCode.data.trim();
+        sendRAWBit(localCode);
+ 
+    } else if (protocol == "RcSwitch") {
+        sendType(code.key, code.Bit, code.te, rcswitch_protocol_no, 6);
+ 
     } else if (protocol.startsWith("Princeton")) {
         sendType(code.key, code.Bit, 350, 1, 10);
+ 
     } else {
         Serial.print("[WARN] Unsupported protocol: ");
         Serial.print(protocol);
-        Serial.println(" | Sending RcSwitch 11 protocol");
+        Serial.println(" | Falling back to RcSwitch protocol 11");
         sendType(code.key, code.Bit, 270, 11, 10);
-
-        return;
     }
-
+ 
+    // FIX #5: shutdown 1 lần duy nhất ở đây
     shutdownCC1101();
 }
 
 
 void RFModules::sendRAW(int *ptrtransmittimings) {
     if (!ptrtransmittimings) return;
-
+ 
+    // Tính tổng thời gian để ước lượng số lần repeat
     bool hasNeg = false;
     unsigned long sum_us = 0;
-    for (int i = 0; ptrtransmittimings[i]; ++i) {
+    for (int i = 0; ptrtransmittimings[i] != 0; i++) {
         if (ptrtransmittimings[i] < 0) hasNeg = true;
-        int v = ptrtransmittimings[i] >= 0 ? ptrtransmittimings[i] : -ptrtransmittimings[i];
-        sum_us += (unsigned long)v;
+        sum_us += (unsigned long)abs(ptrtransmittimings[i]);
     }
+ 
     int nRepeatTransmit = 1;
     if (sum_us > 0) {
         nRepeatTransmit = (int)(900000UL / sum_us);
-        if (nRepeatTransmit < 1) nRepeatTransmit = 1;
-        if (nRepeatTransmit > 6) nRepeatTransmit = 6;
+        nRepeatTransmit = constrain(nRepeatTransmit, 1, 6);
     }
-
+ 
     for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
-        unsigned int currenttiming = 0;
         bool level = true;
-        while (ptrtransmittimings[currenttiming]) {
-            int dur = ptrtransmittimings[currenttiming];
-            bool lvl;
+        for (int i = 0; ptrtransmittimings[i] != 0; i++) {
+            int dur = ptrtransmittimings[i];
+            bool  lvl;
             unsigned int t;
+ 
             if (hasNeg) {
+                // signed: dương = HIGH, âm = LOW
                 lvl = (dur >= 0);
-                t = (unsigned int)(dur >= 0 ? dur : -dur);
+                t   = (unsigned int)abs(dur);
             } else {
-                lvl = level;
-                t = (unsigned int)(dur >= 0 ? dur : -dur);
+                // unsigned: xen kẽ HIGH/LOW
+                lvl   = level;
+                t     = (unsigned int)dur;
                 level = !level;
             }
+ 
             digitalWrite(espatsettings.cc1101Gdo0Pin, lvl ? HIGH : LOW);
             delayMicroseconds(t);
-            currenttiming++;
         }
+        // Gap cuối mỗi lần repeat
         digitalWrite(espatsettings.cc1101Gdo0Pin, LOW);
         delayMicroseconds(8000);
-    } // end for
+    }
 }
 
-void RFModules::sendRAWBit(RfCodes data) {
-    if (data.data == "") return;
-    bool currentlogiclevel = false;
-    int nRepeatTransmit = 1;
-    for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
-        int currentBit = data.data.length();
-        while (currentBit >= 0) { // Starts from the end of the string until the max number of bits to send
+void RFModules::sendRAWBit(const RfCodes& data) {
+    if (data.data.length() == 0) return;
+ 
+    // FIX #5: bắt đầu từ index hợp lệ (length-1), không phải length
+    for (int nRepeat = 0; nRepeat < 1; nRepeat++) {
+        for (int currentBit = (int)data.data.length() - 1; currentBit >= 0; currentBit--) {
             char c = data.data[currentBit];
+            bool lvl;
             if (c == '1') {
-                currentlogiclevel = true;
+                lvl = true;
             } else if (c == '0') {
-                currentlogiclevel = false;
+                lvl = false;
             } else {
-                Serial.println("Invalid data");
-                currentBit--;
+                Serial.printf("[WARN] sendRAWBit: invalid char '%c' at index %d\n", c, currentBit);
                 continue;
-                // return;
             }
-
-            digitalWrite(espatsettings.cc1101Gdo0Pin, currentlogiclevel ? HIGH : LOW);
+            digitalWrite(espatsettings.cc1101Gdo0Pin, lvl ? HIGH : LOW);
             delayMicroseconds(data.te);
-            currentBit--;
         }
         digitalWrite(espatsettings.cc1101Gdo0Pin, LOW);
     }
 }
 
 void RFModules::sendType(uint64_t data, unsigned int bits, int pulse, int protocol, int repeat) {
-    // derived from
-    // https://github.com/LSatan/SmartRC-CC1101-Driver-Lib/blob/master/examples/Rc-Switch%20examples%20cc1101/SendDemo_cc1101/SendDemo_cc1101.ino
-
+    // ref: https://github.com/LSatan/SmartRC-CC1101-Driver-Lib/blob/master/examples/...
     RCSwitch mySwitch = RCSwitch();
-
     mySwitch.enableTransmit(espatsettings.cc1101Gdo0Pin);
-
-    mySwitch.setProtocol(protocol); // override
-    if (pulse) { mySwitch.setPulseLength(pulse); }
+    mySwitch.setProtocol(protocol);
+    if (pulse > 0) mySwitch.setPulseLength(pulse);
     mySwitch.setRepeatTransmit(repeat > 0 ? repeat : 6);
     mySwitch.send(data, bits);
-
     mySwitch.disableTransmit();
-
-    shutdownCC1101();
 }

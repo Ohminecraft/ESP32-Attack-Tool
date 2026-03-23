@@ -23,44 +23,34 @@ void RFModules::setFrequency(float freqMHz) {
 
 // https://github.com/BruceDevices/firmware/blob/main/src/modules/rf/rf_utils.cpp
 void RFModules::main() {
-    //pinMode(espatsettings.cc1101CsPin, OUTPUT);
-    //digitalWrite(espatsettings.cc1101CsPin, HIGH);
-    CC1101_SPI = &SPI;
-    CC1101_SPI->begin(espatsettings.spiSckPin,
-                     espatsettings.spiMisoPin,
-                     espatsettings.spiMosiPin);
-    ELECHOUSE_cc1101.setSPIinstance(CC1101_SPI);
-    ELECHOUSE_cc1101.setSpiPin(espatsettings.spiSckPin, espatsettings.spiMisoPin, espatsettings.spiMosiPin, espatsettings.cc1101CsPin);
+    ELECHOUSE_cc1101.setSpiPin(
+        espatsettings.spiSckPin,
+        espatsettings.spiMisoPin,
+        espatsettings.spiMosiPin,
+        espatsettings.cc1101CsPin
+    );
     ELECHOUSE_cc1101.setGDO0(espatsettings.cc1101Gdo0Pin);
     ELECHOUSE_cc1101.Init();
+ 
+    if (!ELECHOUSE_cc1101.getCC1101()) {
+        Serial.println("[ERROR] CC1101 Initialization Failed!");
+        cc1101_ready = false;
+        return;
+    }
+ 
+    cc1101_ready = true;
+ 
     if (startup) {
-        if (!ELECHOUSE_cc1101.getCC1101()) {
-            Serial.println("[ERROR] CC1101 Initialization Failed!");
-            return;
-        } else {
-            Serial.println("[INFO] CC1101 Initialized Successfully!");
-        }
-    } else cc1101_ready = true;
-    ELECHOUSE_cc1101.setRxBW(256);      // narrow band for better accuracy
-    ELECHOUSE_cc1101.setClb(1, 13, 15); // Calibration Offset
-    ELECHOUSE_cc1101.setClb(2, 16, 19); // Calibration Offset
-        // set modulation mode. 0 = 2-FSK, 1 = GFSK, 2 = ASK/OOK, 3 = 4-FSK, 4 = MSK.
-    ELECHOUSE_cc1101.setModulation(2);
-        // Set the Data Rate in kBaud. Value from 0.02 to 1621.83. Default is 99.97 kBaud!
-    ELECHOUSE_cc1101.setDRate(50);
-        // Format of RX and TX data.
-        //   0 = Normal mode, use FIFOs for RX and TX.
-        //   1 = Synchronous serial mode, Data in on GDO0 and data out on either of the GDOx pins.
-        //   2 = Random TX mode; sends random data using PN9 generator. Used for test. Works as normal mode,
-        // setting 0 (00), in RX.
-        //.  3 = Asynchronous serial mode, Data in on GDO0 and data out on either of the GDOx pins.
-    ELECHOUSE_cc1101.setPktFormat(3);
-    setFrequency(frequency);
-
-    if (startup) {
-        shutdownCC1101();
+        Serial.println("[INFO] CC1101 Initialized Successfully!");
         startup = false;
     }
+ 
+    // Cấu hình mặc định — sẽ bị ghi đè bởi sendCommand() nếu cần
+    ELECHOUSE_cc1101.setRxBW(270.0);
+    ELECHOUSE_cc1101.setDeviation(0);
+    ELECHOUSE_cc1101.setPA(12);
+    ELECHOUSE_cc1101.setModulation(2);
+    setFrequency(frequency); // dùng this->frequency (đã được set trước đó)
 }
 
 void RFModules::shutdownCC1101() {
@@ -78,16 +68,14 @@ bool RFModules::getCC1101() {
 }
 
 void RFModules::configureMode(int mode) {
-    main();
-    switch(mode) {
+    switch (mode) {
         case RF_RECEIVER_MODE:
-            rcSwitch.enableReceive(espatsettings.cc1101Gdo0Pin);
             ELECHOUSE_cc1101.SetRx();
-            rcSwitch.disableReceive();
             rcSwitch.enableReceive(espatsettings.cc1101Gdo0Pin);
             rcSwitch.resetAvailable();
             Serial.println("[INFO] Set CC1101 to Rx Mode");
-            break;
+            break; 
+ 
         case RF_TRANSMITTER_MODE:
             ELECHOUSE_cc1101.setSyncMode(0);
             ELECHOUSE_cc1101.setCrc(0);
@@ -95,6 +83,21 @@ void RFModules::configureMode(int mode) {
             ELECHOUSE_cc1101.SetTx();
             pinMode(espatsettings.cc1101Gdo0Pin, OUTPUT);
             digitalWrite(espatsettings.cc1101Gdo0Pin, LOW);
+            Serial.println("[INFO] Set CC1101 to Tx Mode");
+            break;
+        
+        case RF_FREQUENCY_ANALYZER_MODE:
+            ELECHOUSE_cc1101.setRxBW(812);         // bandwidth rộng để bắt được tín hiệu
+            ELECHOUSE_cc1101.setPA(10);          // TX power (không quan trọng khi chỉ RX)
+            ELECHOUSE_cc1101.SetRx();            // bật chế độ nhận
+            ELECHOUSE_cc1101.setSyncMode(0);     // tắt sync word → raw mode
+            ELECHOUSE_cc1101.setCCMode(0);       // ASK/OOK compatible mode
+            Serial.println("[INFO] Set CC1101 to Analyzer Mode");
+            break;
+
+        default:
+            Serial.println("[WARN] configureMode: unknown mode");
+            break;
     }
 }
 
@@ -113,6 +116,25 @@ float RFModules::getFrequency() {
 
 RfCodes RFModules::getCurrentData() {
     return keyData;
+}
+
+float RFModules::getFrequencyAnalyzer() {
+    return bestFreq;
+}
+
+void RFModules::stepRSSIThreshold(int step) {
+    RSSI_threshold = RSSI_threshold + step;
+    if (RSSI_threshold > -20) {
+        RSSI_threshold = RSSI_MIN_VALID;
+        return;
+    } else if (RSSI_threshold < RSSI_MIN_VALID) {
+        RSSI_threshold = -20;
+        return;
+    }
+}
+
+int8_t RFModules::getFreqAnalyzerRssiThreshold() {
+    return RSSI_threshold;
 }
 
 

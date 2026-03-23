@@ -329,6 +329,10 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("RF Menu", 0, 12);
 	else if (currentState == RF_RECEIVER_RUNNING && infrequencychange)
 		display.displayStringwithCoordinates("RF Freq Change", 0, 12);
+	else if (currentState == RF_FREQUENCY_ANALYZER_RUNNING && inRssichange)
+		display.displayStringwithCoordinates("Rssi Change", 0, 12);
+	else if (currentState == RF_FREQUENCY_ANALYZER_RUNNING)
+		display.displayStringwithCoordinates("Freq Analyzer", 0, 12);
 	else if (currentState == SD_MENU)
 		display.displayStringwithCoordinates("File Menu", 0, 12);
 	else if (currentState == SD_UPDATE_MENU)
@@ -1229,7 +1233,7 @@ void displayRFMenu() {
 		"RF Read (Raw)",
 		"RF Send",
 		"RF Jammer",
-		"RF Brute Force",
+		"RF Freq Analyzer",
 		"< Back"
 	};
 
@@ -1237,6 +1241,7 @@ void displayRFMenu() {
 }
 
 void displayRFRead(bool available_data) {
+	display.clearScreen();
 	if (available_data) {
 		String buff = "";
 		RfCodes key = rf.getCurrentData();
@@ -1268,8 +1273,26 @@ void displayRFRead(bool available_data) {
 }
 
 void displayRFFrequencychange() {
+	display.clearScreen();
 	displayStatusBar();
 	display.displayStringwithCoordinates("Frequency: " + (String)rf.getFrequency(), 0, 24, true);
+}
+
+void displayRFFrequencyAnalyzer() {
+	display.clearScreen();
+	displayStatusBar();
+	display.setFont(u8g2_font_ncenB12_tr);
+	String buf = (String)rf.getFrequencyAnalyzer() + " MHz";
+	display.displayStringwithCoordinates(buf, (espatsettings.displayWidth - ((buf.length() * 6)) / 2) - 83, (espatsettings.displayHeight / 2));
+	display.setFont(u8g2_font_ncenB08_tr);
+	display.displayStringwithCoordinates("SEL to change RSSI", 0, 48);
+	display.displayStringwithCoordinates("LEFT to exit", 0, 60, true);
+}
+
+void displayRFFrequencyAnalyzerRssichange() {
+	display.clearScreen();
+	displayStatusBar();
+	display.displayStringwithCoordinates("RSSI: " + (String)rf.getFreqAnalyzerRssiThreshold(),0, 24, true);
 }
 
 void displaySDMenu() {
@@ -3157,9 +3180,14 @@ void selectCurrentItem() {
 				goBack();
 			} else if (currentSelection == RF_READ) {
 				currentState = RF_RECEIVER_RUNNING;
+				rf.main();
 				rf.configureMode(RF_RECEIVER_MODE);
-				display.clearScreen();
 				displayRFRead(false);
+			} else if (currentSelection == RF_FREQ_ANALYZER) {
+				currentState = RF_FREQUENCY_ANALYZER_RUNNING;
+				rf.main();
+				rf.configureMode(RF_FREQUENCY_ANALYZER_MODE);
+				displayRFFrequencyAnalyzer();
 			}
 			break;
 		case RF_RECEIVER_RUNNING:
@@ -3175,23 +3203,28 @@ void selectCurrentItem() {
 				display.clearScreen();
 				display.drawingCenterString("Sended!", 32, true);
 				vTaskDelay(700 / portTICK_PERIOD_MS);
-				display.clearScreen();
 				displayRFRead(true);
 			} else {
 				rf.shutdownCC1101();
 				rf.main();
 				if (infrequencychange) {
 					infrequencychange = false;
-					rf.main();
 					rf.configureMode(RF_RECEIVER_MODE);
-					display.clearScreen();
 					displayRFRead(rf.getKeyDetect());
 					break;
 				}
 				infrequencychange = true;
-				display.clearScreen();
 				displayRFFrequencychange();
 			}
+			break;
+		case RF_FREQUENCY_ANALYZER_RUNNING:
+			if (inRssichange) {
+				inRssichange = false;
+				displayRFFrequencyAnalyzer();
+				break;
+			}
+			inRssichange = true;
+			displayRFFrequencyAnalyzerRssichange();
 			break;
 		case SD_MENU:
 			if (currentSelection == SD_BACK) {
@@ -3825,7 +3858,9 @@ void goBack() {
 			displayMainMenu();
 			break;
 		case RF_RECEIVER_RUNNING:
+		case RF_FREQUENCY_ANALYZER_RUNNING:
 			rf.shutdownCC1101();
+			itemoffset = 0;
 			currentState = RF_MENU;
 			currentSelection = 0;
 			maxSelections = RF_MENU_COUNT;
@@ -3972,7 +4007,6 @@ void handleInput(MenuState handle_state) {
 		}
 		else if (handle_state == RF_RECEIVER_RUNNING) {
 			if (infrequencychange) {
-				display.clearScreen();
 				rf.stepFrequency(-1);
 				displayRFFrequencychange();
 			}
@@ -3986,8 +4020,13 @@ void handleInput(MenuState handle_state) {
 					rf.main();
 					rf.configureMode(RF_RECEIVER_MODE);
 				}
-				display.clearScreen();
 				displayRFRead(false);
+			} else goBack();
+		}
+		else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING) {
+			if (inRssichange) {
+				rf.stepRSSIThreshold(-1);
+				displayRFFrequencyAnalyzerRssichange();
 			} else goBack();
 		}
 		else {
@@ -4026,6 +4065,10 @@ void handleInput(MenuState handle_state) {
 				rf.stepFrequency(1);
 				displayRFFrequencychange();
 			}
+		}
+		else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING && inRssichange) {
+			rf.stepRSSIThreshold(1);
+			displayRFFrequencyAnalyzerRssichange();
 		}
 		else {
 			if (handleStateRunningCheck ||
@@ -4319,6 +4362,16 @@ void handleTasks(MenuState handle_state) {
 					displayRFRead(true);
 					blink_led(0, 0, 255, 3);
 				}
+			}
+		}
+	}
+
+	else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING) {
+		if (!inRssichange) {
+			rf.frequencyAnalyzerLoop();
+			if (rf.redraw) {
+				rf.redraw = false;
+				displayRFFrequencyAnalyzer();
 			}
 		}
 	}
@@ -4740,6 +4793,7 @@ void menuloop() {
 							!(currentState == BADUSB_RUNNING) &&
 							!(currentState == IR_READ_RUNNING) &&
 							!(currentState == RF_RECEIVER_RUNNING) &&
+							!(currentState == RF_FREQUENCY_ANALYZER_RUNNING) &&
 							!(currentState == CLOCK_MENU) && 
 							!(currentState == BLE_KEYMOTE_MENU) && 
 							!(currentState == BLE_TT_SCROLL_MENU) && 
