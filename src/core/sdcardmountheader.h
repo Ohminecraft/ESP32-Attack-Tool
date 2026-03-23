@@ -19,6 +19,7 @@ extern ESP32ATSetting espatsettings;
 class SDCardModules {
 public: 
     bool mounted = false;
+    bool littlefsmounted = false;
     void main();
     void close();
     bool deleteFile(String path);

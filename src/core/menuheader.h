@@ -28,6 +28,7 @@
 #include "modules/ir/irsend_header.h"
 #include "modules/ir/irread_header.h"
 #include "modules/badble/badscript_header.h"
+#include "modules/rf/rfheader.h"
 
 #include "configs.h"
 
@@ -47,6 +48,7 @@ enum MenuState {
     WIFI_MENU,
     NRF24_MENU,
     IR_MENU,
+    RF_MENU,
     SD_MENU,
     CLOCK_MENU,
     SD_UPDATE_MENU,
@@ -61,6 +63,8 @@ enum MenuState {
     NRF24_SCANNER_RUNNING,
     NRF24_JAMMER_RUNNING,
     NRF24_JAMMER_MENU,
+    RF_RECEIVER_RUNNING,
+    RF_RECEIVER_RAW_RUNNING,
     WIFI_UTILS_MENU,
     WIFI_UTILS_SET_MAC_MENU,
     WIFI_GENERAL_MENU,
@@ -98,6 +102,7 @@ enum MainMenuItem {
     MAIN_WIFI,
     MAIN_NRF24,
     MAIN_IR,
+    MAIN_RF,
     MAIN_SD,
     MAIN_CLOCK,
     MAIN_DEEP_SLEEP,
@@ -317,6 +322,16 @@ enum UniversalPowerRemoteRegion {
     IR_UNIVERSAL_POWER_MODE_COUNT
 };
 
+enum RFMenuItem {
+    RF_READ,
+    RF_READ_RAW,
+    RF_SEND,
+    RF_JAMMER,
+    RF_BRUTE_FORCE,
+    RF_BACK,
+    RF_MENU_COUNT
+};
+
 enum SDMenuItem {
     SD_UPDATE,
     SD_DELETE,
@@ -388,6 +403,12 @@ bool selectforevilportal = false;
 bool nrfAnalyzerSetupOneShot = false;
 bool nrfJammerSetupOneShot = false;
 bool nrfScannerSetupOneShot = false;
+
+// RF
+
+bool rfreplaycode = false;
+bool fixRfDisplayLoop = false;
+bool infrequencychange = false;
 
 // IRSend/Recv
 

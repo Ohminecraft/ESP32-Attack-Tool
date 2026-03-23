@@ -116,6 +116,9 @@ JsonDocument ESP32ATSetting::getConfig() {
     config["nrf24CePin"] = nrfCePin; 
     config["nrf24CsPin"] = nrfCsPin;
 
+    config["cc1101CsPin"] = cc1101CsPin;
+    config["cc1101Gdo0Pin"] = cc1101Gdo0Pin;
+
     config["usingEncoder"] = usingEncoder;
     config["encPinA"] = encPinA; 
     config["encPinB"] = encPinB; 
@@ -214,6 +217,9 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
 
     defaultSetting["nrf24CePin"] = NRF24_CE_PIN; // default NRF24 CE pin
     defaultSetting["nrf24CsPin"] = NRF24_CSN_PIN; // default NRF24 CSN pin
+
+    defaultSetting["cc1101CsPin"] = CC1101_CS_PIN; // default CC1101 CS pin
+    defaultSetting["cc1101Gdo0Pin"] = CC1101_GDO0_PIN; // default CC1101 GDO0 pin
 
     defaultSetting["usingEncoder"] = true; // default using encoder for input
     defaultSetting["encPinA"] = ENC_PIN_A; // default encoder pin A
@@ -650,6 +656,20 @@ void ESP32ATSetting::loadSettings() {
         Serial.println("nrfCsPin: " + String(nrfCsPin));
     } else {
         Serial.println("[WARN] Failed to get 'nrf24CsPin' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["cc1101CsPin"].isNull()) {
+        cc1101CsPin = _settings["cc1101CsPin"].as<uint8_t>();
+        Serial.println("cc1101CsPin: " + String(cc1101CsPin));
+    } else {
+        Serial.println("[WARN] Failed to get 'cc1101CsPin' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["cc1101Gdo0Pin"].isNull()) {
+        cc1101Gdo0Pin = _settings["cc1101Gdo0Pin"].as<uint8_t>();
+        Serial.println("cc1101Gdo0Pin: " + String(cc1101Gdo0Pin));
+    } else {
+        Serial.println("[WARN] Failed to get 'cc1101Gdo0Pin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["usingEncoder"].isNull()) {

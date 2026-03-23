@@ -16,6 +16,7 @@ BadScriptModules badScript;
 DisplayModules display;
 EvilPortalAddtional eportal;
 NRF24Modules nrf;
+RFModules rf;
 IRSendModules irtx;
 IRReadModules irrx;
 SDCardModules sdcard;
@@ -124,7 +125,6 @@ void connectWiFi(void *pvParameters) {
 	wifi.set_channel = 1;
 	first_scan = false;
 	wifi.StartMode(WIFI_SCAN_OFF);
-	WiFi.disconnect(true);
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 	WiFi.mode(WIFI_MODE_STA);
 	wifi.setMac();
@@ -189,6 +189,7 @@ void menuinit() {
 	sdcard.main();
 	logutils.begin();
 	nrf.main();
+	rf.main();
 	eportal.main();
 	if (espatsettings.autoConnectWiFi) {
 		xTaskCreate(connectWiFi, "wifiConnect", 4096, NULL, 2, NULL);
@@ -324,8 +325,12 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("IR Read", 0, 12);
 	else if (currentState == IR_CODE_SELECT)
 		display.displayStringwithCoordinates("IR Codes", 0, 12);
+	else if (currentState == RF_MENU)
+		display.displayStringwithCoordinates("RF Menu", 0, 12);
+	else if (currentState == RF_RECEIVER_RUNNING && infrequencychange)
+		display.displayStringwithCoordinates("RF Freq Change", 0, 12);
 	else if (currentState == SD_MENU)
-		display.displayStringwithCoordinates("SD Menu", 0, 12);
+		display.displayStringwithCoordinates("File Menu", 0, 12);
 	else if (currentState == SD_UPDATE_MENU)
 		display.displayStringwithCoordinates("SD Update", 0, 12);
 	else if (currentState == BADUSB_KEY_LAYOUT_MENU)
@@ -354,6 +359,24 @@ void displayStatusBar(bool sendDisplay = false) {
 	display.displayStringwithCoordinates(heapInfo, espatsettings.displayWidth - 38, 12);
 	display.setColor(WHITE);
 	if (sendDisplay) display.sendDisplay();
+}
+
+void blink_led(int r, int g, int b, int times) {
+    while(times--) {
+        #ifndef BUILTIN_RGB_LED
+			digitalWrite(espatsettings.statusLedPin, HIGH);
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+			digitalWrite(espatsettings.statusLedPin, LOW);
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+		#else
+		    pixels.setPixelColor(0, pixels.Color(r, g, b));
+		    pixels.show();
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+			pixels.clear();
+		    pixels.show();
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+		#endif
+    }
 }
 
 void menuNode(String items[], int itemCount) {
@@ -430,6 +453,7 @@ void displayMainMenu() {
 		"WiFi",
 		"NRF24",
 		"IR",
+		"RF",
 		"SD",
 		"Clock",
 		"Deep Sleep",
@@ -1085,9 +1109,6 @@ void displayEvilPortalInfo() {
 		display.clearScreen();
 	}
 
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 36, true);
-	}
 	/*
 	display.clearScreen();
 	display.displayString("This Feature Is", true);
@@ -1137,11 +1158,6 @@ void displayNRFJammerStatus() {
 	
 	// Hiển thị thông tin thêm
 	display.displayStringwithCoordinates("Press SELECT to stop", 0, 48);
-	
-	// Hiển thị memory info nếu cần
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 60);
-	}
 	
 	display.sendDisplay();
 }
@@ -1203,6 +1219,57 @@ void displayUniversalPowerRemoteModeMenu() {
 	};
 
 	menuNode(items, IR_UNIVERSAL_POWER_MODE_COUNT);
+}
+
+void displayRFMenu() {
+	displayStatusBar();
+
+	String items[RF_MENU_COUNT] = {
+		"RF Read",
+		"RF Read (Raw)",
+		"RF Send",
+		"RF Jammer",
+		"RF Brute Force",
+		"< Back"
+	};
+
+	menuNode(items, RF_MENU_COUNT);
+}
+
+void displayRFRead(bool available_data) {
+	if (available_data) {
+		String buff = "";
+		RfCodes key = rf.getCurrentData();
+		if (key.preset != "") {
+			if (key.fix != 0) {
+				display.displayStringwithCoordinates("Proto: KeeLoq", 0, 12);
+			} else display.displayStringwithCoordinates("Proto: " + String(key.protocol) + "(" + key.preset + ")", 0, 12);
+		} else display.displayStringwithCoordinates("Proto: " + String(key.protocol), 0, 12);
+		if (key.key > 0) {
+			if (key.protocol == "RAW") {
+            	display.displayStringwithCoordinates("Length: " + String(key.Bit) + " trans", 0, 24);
+			} else {
+				if (key.fix == 0) {
+					display.displayStringwithCoordinates("Length: " + String(key.Bit) + " bits", 0, 24);
+					const char *b = dec2binWzerofill(key.key, min(key.Bit, 40));
+					// tft.setCursor(tft.getCursorX(), tft.getCursorY() + 2);
+					display.displayStringwithCoordinates("Binary: " + String(b), 0, 36);
+				}
+			}
+		} else {
+			display.displayStringwithCoordinates("Length: No code identified", 0, 24);
+		}
+		display.displayStringwithCoordinates("SEL = replay", 0, 48);
+		display.displayStringwithCoordinates("RB = save, LB = discard", 0, 60, true);
+	} else {
+		display.displayStringwithCoordinates("Waiting for data...", 0, 12);
+		display.displayStringwithCoordinates("or LEFT to go back", 0, 60, true);
+	}
+}
+
+void displayRFFrequencychange() {
+	displayStatusBar();
+	display.displayStringwithCoordinates("Frequency: " + (String)rf.getFrequency(), 0, 24, true);
 }
 
 void displaySDMenu() {
@@ -1340,7 +1407,7 @@ void displayAttackStatus() {
 				attackName = "Assoc Sleep All";
 				break;
 			case WIFI_ATTACK_CSA:
-				attackName = "Channel Switch Announce";
+				attackName = "Channel Switch Annou";
 				break;
 			case WIFI_ATTACK_QUIET:
 				attackName = "Quiet Time";
@@ -1362,11 +1429,6 @@ void displayAttackStatus() {
 		String adpacketstr = "SendedAdv: ";
 		adpacketstr.concat(ble.AdvertisedPacketCount);
 		display.displayStringwithCoordinates(adpacketstr, 0, 36, true);
-	}
-	
-	// Display memory info
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 48, true);
 	}
 }
 
@@ -1391,10 +1453,6 @@ void displayDeauthFloodInfo() {
 			display.displayStringwithCoordinates("SELECT->Exit", 0, 36, true);
 			fixDeauthFloodDisplayLoop = true;
 		}
-	}
-
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 48, true);
 	}
 }
 
@@ -1932,13 +1990,15 @@ void performDeepSleep() {
 	display.clearScreen();
 	display.displayStringwithCoordinates("Deep Sleep", 0, 12);
 
-	display.displayStringwithCoordinates("Tip: Press Sel", 0, 24);
+	display.displayStringwithCoordinates("Tip: Press SELECT", 0, 24);
 	display.displayStringwithCoordinates("to wake up", 0, 36);
 	display.displayStringwithCoordinates("device", 0, 48, true);
 	if (autoSleep) display.displayStringwithCoordinates("Forcing by System", 0, 60, true);
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
 	display.clearScreen();
 	display.sendDisplay();
+	digitalWrite(POWER_PIN, LOW); // Cut off power to peripherals (if using a power control circuit)
+	Serial.println("[INFO] Powering down peripherals...");
 	// Restart ESP32
 	esp_deep_sleep_enable_gpio_wakeup(1 << espatsettings.selectBtnPin, ESP_GPIO_WAKEUP_GPIO_LOW);
 	esp_deep_sleep_start();
@@ -1964,111 +2024,7 @@ void navigateUp() {
 		}
 	}
 	
-	// Redraw menu
-   
-	switch(currentState) {
-		case MAIN_MENU:
-			displayMainMenu();
-			break;
-		case BLE_MENU:
-			displayBLEMenu();
-			break;
-		case BLE_INFO_MENU_LIST:
-			displayBLEInfoListMenu();
-			break;
-		case BLE_SPOOFER_MAIN_MENU:
-			displayMainSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_MENU:
-			displayAppleSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
-			displayAppleDeviceColorSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_MENU:
-			displaySamsungSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
-			displaySamsungBudsDeviceMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
-			displaySamsungWatchsDeviceMenu();
-			break;
-		case BLE_SPOOFER_CONN_MODE_MENU:
-			displayConnectableModeSpooferMenu();
-			break;
-		case BLE_SPOOFER_DISC_MODE_MENU:
-			displayDiscoverableModeSpooferMenu();
-			break;
-		case BLE_EXPLOIT_ATTACK_MENU:
-			displayExploitAttackBLEMenu();
-			break;
-		case WIFI_MENU:
-			displayWiFiMenu();
-			break;
-		case WIFI_GENERAL_MENU:
-			displayWiFiGeneralMenu();
-			break;
-		case WIFI_UTILS_MENU:
-			displayWiFiUtilsMenu();
-			break;
-		case WIFI_ATTACK_MENU:
-			displayWiFiAttackMenu();
-			break;
-		case WIFI_SELECT_MENU:
-			displayWiFiSelectMenu();
-			break;
-		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
-			displayWiFiSelectProbeReqSsidsMenu();
-			break;
-		case WIFI_SELECT_STA_AP_MENU:
-			displayWiFiSelectAptoSta();
-			break;
-		case WIFI_SELECT_STA_MENU:
-			displayWiFiSelectStaInAp();
-			break;
-		case WIFI_JOIN_MENU:
-			displayWiFiListMenu();
-			break;
-		case NRF24_MENU:
-			displayNRF24Menu();
-			break;
-		case NRF24_JAMMER_MENU:
-			displayNRF24JammerMenu();
-			break;
-		case IR_MENU:
-			displayIRMenu();
-			break;
-		case IR_UNIVERSAL_POWER_REMOTE_MENU:
-			displayUniversalPowerRemoteModeMenu();
-			break;
-		case SD_MENU:
-			displaySDMenu();
-			break;
-		case SD_UPDATE_MENU:
-			break;
-		case SELECTION_LIST:
-			displaySelectionList();
-			break;
-		case BADUSB_KEY_LAYOUT_MENU:
-			displayBadUSBKeyboardLayout();
-			break;
-		case BLE_MEDIA_MENU:
-			displayMediaCtrlBLEMenu();
-			break;
-		case BLE_KEYMOTE_MENU:
-			displayKeymoteBLEMenu();
-			break;
-		case BLE_TT_SCROLL_MENU:
-			displayTikTokScrollMenu();
-			break;
-		case IR_READ_MENU:
-			displayIRReadMenu();
-			break;
-		case IR_CODE_SELECT:
-			displayIrCodeDataInFile();
-			break;
-	}
+	redrawTasks();
 }
 
 void navigateDown() {
@@ -2086,112 +2042,7 @@ void navigateDown() {
 		itemoffset = 0;
 	}
 	
-	// Redraw menu
-   
-	switch(currentState) {
-		case MAIN_MENU:
-			displayMainMenu();
-			break;
-		case BLE_MENU:
-			displayBLEMenu();
-			break;
-		case BLE_INFO_MENU_LIST:
-			displayBLEInfoListMenu();
-			break;
-		case BLE_SPOOFER_MAIN_MENU:
-			displayMainSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_MENU:
-			displayAppleSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
-			displayAppleDeviceColorSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_MENU:
-			displaySamsungSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
-			displaySamsungBudsDeviceMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
-			displaySamsungWatchsDeviceMenu();
-			break;
-		case BLE_SPOOFER_CONN_MODE_MENU:
-			displayConnectableModeSpooferMenu();
-			break;
-		case BLE_SPOOFER_DISC_MODE_MENU:
-			displayDiscoverableModeSpooferMenu();
-			break;
-		case BLE_EXPLOIT_ATTACK_MENU:
-			displayExploitAttackBLEMenu();
-			break;
-		case WIFI_MENU:
-			displayWiFiMenu();
-			break;
-		case WIFI_GENERAL_MENU:
-			displayWiFiGeneralMenu();
-			break;
-		case WIFI_UTILS_MENU:
-			displayWiFiUtilsMenu();
-			break;
-		case WIFI_ATTACK_MENU:
-			displayWiFiAttackMenu();
-			break;
-		case WIFI_SELECT_MENU:
-			displayWiFiSelectMenu();
-			break;
-		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
-			displayWiFiSelectProbeReqSsidsMenu();
-			break;
-		case WIFI_SELECT_STA_AP_MENU:
-			displayWiFiSelectAptoSta();
-			break;
-		case WIFI_SELECT_STA_MENU:
-			displayWiFiSelectStaInAp();
-			break;
-		case WIFI_JOIN_MENU:
-			displayWiFiListMenu();
-			break;
-		case NRF24_MENU:
-			displayNRF24Menu();
-			break;
-		case NRF24_JAMMER_MENU:
-			displayNRF24JammerMenu();
-			break;
-		case IR_MENU:
-			displayIRMenu();
-			break;
-		case IR_UNIVERSAL_POWER_REMOTE_MENU:
-			displayUniversalPowerRemoteModeMenu();
-			break;
-		case SD_MENU:
-			displaySDMenu();
-			break;
-		case SD_UPDATE_MENU:
-			break;
-		case SELECTION_LIST:
-			displaySelectionList();
-			break;
-		case BADUSB_KEY_LAYOUT_MENU:
-			displayBadUSBKeyboardLayout();
-			break;
-		case BLE_MEDIA_MENU:
-			displayMediaCtrlBLEMenu();
-			break;
-		case BLE_KEYMOTE_MENU:
-			displayKeymoteBLEMenu();
-			break;
-		case BLE_TT_SCROLL_MENU:
-			displayTikTokScrollMenu();
-			break;
-		case IR_READ_MENU:
-			displayIRReadMenu();
-			break;
-		case IR_CODE_SELECT:
-			displayIrCodeDataInFile();
-			break;
-	}
-	
+	redrawTasks();
 }
 
 void selectCurrentItem() {
@@ -2237,6 +2088,21 @@ void selectCurrentItem() {
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					displayMainMenu();
 					return;
+				}
+			} else if (currentSelection == MAIN_RF) {
+				if (rf.getCC1101() && (espatsettings.cc1101CsPin != 99 && espatsettings.cc1101Gdo0Pin != 99)) {
+					currentState = RF_MENU;
+					currentSelection = 0;
+					maxSelections = RF_MENU_COUNT;
+					displayRFMenu();
+				} else {
+					displayStatusBar();
+					display.displayStringwithCoordinates("Your Device not have", 0, 24);
+					display.displayStringwithCoordinates("RF connected!", 0, 36);
+					display.displayStringwithCoordinates("or was disabled in", 0, 48);
+					display.displayStringwithCoordinates("Config!", 0, 60, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					displayMainMenu();
 				}
 			} else if (currentSelection == MAIN_SD) {
 				currentState = SD_MENU;
@@ -2505,7 +2371,7 @@ void selectCurrentItem() {
 					currentState = BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU;
 					currentSelection = 0;
 					maxSelections = pp_models[spooferDeviceIndex].colors_count + 1;
-					displayAppleDeviceColorSpooferMenu();
+					redrawTasks();
 				} else {
 					currentState = BLE_SPOOFER_CONN_MODE_MENU;
 					currentSelection = 0;
@@ -2925,8 +2791,11 @@ void selectCurrentItem() {
 			} else {
 				if (currentSelection < access_points->size()) {
 					AccessPoint ap = access_points->get(currentSelection);
-					String pwd = display.keyboard();
-					if (pwd == "espattacktool_command_exit") {
+					String pwd1 = espatsettings.getApPassword(ap.essid);
+					String pwd2 = "";
+					if (pwd1.isEmpty()) pwd2 = display.keyboard();
+					else pwd2 = pwd1;
+					if (pwd2 == "espattacktool_command_exit") {
 						goBack();
 						return;
 					}
@@ -2937,8 +2806,8 @@ void selectCurrentItem() {
 					esp_wifi_set_storage(WIFI_STORAGE_RAM);
 					esp_wifi_start();
 					wifi.setMac();
-					Serial.println("[INFO] Connecting to '" + ap.essid+ "' WiFi, " +  "PWD: " + pwd);
-					WiFi.begin(ap.essid.c_str(), pwd.c_str());
+					Serial.println("[INFO] Connecting to '" + ap.essid+ "' WiFi, " +  "PWD: " + pwd2 + (pwd1.isEmpty() ? " (from input)" : " (from settings)"));
+					WiFi.begin(ap.essid.c_str(), pwd2.c_str());
 					wifi_initialized = true;
 					int count = 0;
 					String text = "Connecting";
@@ -2948,8 +2817,10 @@ void selectCurrentItem() {
 						display.displayStringwithCoordinates(text, 0, 12, true);
 						if (WiFi.status() == WL_CONNECTED) {
 							Serial.println("[INFO] Successfully connected '" + ap.essid + "' WiFi");
-							espatsettings.wifi[ap.essid] = pwd;
-							espatsettings.updateConfig();
+							if (pwd1.isEmpty()) { // If we didn't have a saved password, save the one we just used
+								espatsettings.wifi[ap.essid] = pwd2;
+								espatsettings.updateConfig();
+							}
 							wifi_connected = true;
 							display.clearScreen();
 							display.displayStringwithCoordinates("Connected!", 0, 12, true);
@@ -3068,7 +2939,10 @@ void selectCurrentItem() {
 					 currentSelection == WIFI_ATK_BAD_MSG ||
 					 currentSelection == WIFI_ATK_BAD_MSG_ALL ||
 					 currentSelection == WIFI_ATK_SLEEP ||
-					 currentSelection == WIFI_ATK_SLEEP_ALL) && 
+					 currentSelection == WIFI_ATK_SLEEP_ALL ||
+					 currentSelection == WIFI_ATK_CSA ||
+					 currentSelection == WIFI_ATK_QUIET ||
+					 currentSelection == WIFI_ATK_SAE_COMMIT) &&
 					(!access_points || !hasSelectedAPs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO AP SELECTED!", 0, 12);
@@ -3114,9 +2988,7 @@ void selectCurrentItem() {
 				if (currentSelection == WIFI_ATK_DEAUTH ||
 					currentSelection == WIFI_ATK_STA_DEAUTH ||
 					currentSelection == WIFI_ATK_AUTH ||
-					currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH ||
-					currentSelection == WIFI_ATK_QUIET ||
-					currentSelection == WIFI_ATK_CSA) {
+					currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH) {
 					if (hasWPA3APs()) {
 						display.clearScreen();
 						display.displayStringwithCoordinates("WPA3 AP Selected!", 0, 12);
@@ -3130,7 +3002,6 @@ void selectCurrentItem() {
 							return;
 						}
 					}
-
 				}
 				
 				// Check memory before starting attack
@@ -3278,6 +3149,48 @@ void selectCurrentItem() {
 				}
 				currentState = IR_SEND_RUNNING;
 				startuniversalpowerremote = true;
+			}
+			break;
+
+		case RF_MENU:
+			if (currentSelection == RF_BACK) {
+				goBack();
+			} else if (currentSelection == RF_READ) {
+				currentState = RF_RECEIVER_RUNNING;
+				rf.configureMode(RF_RECEIVER_MODE);
+				display.clearScreen();
+				displayRFRead(false);
+			}
+			break;
+		case RF_RECEIVER_RUNNING:
+			if (rf.getKeyDetect()) {
+				display.clearScreen();
+				display.drawingCenterString("Sending Code...", 32, true);
+				rf.shutdownCC1101();
+				rf.sendCommand(rf.keyData);
+				//rf.sendCommand(rf.keyData);
+				rfreplaycode = true;
+				if (rf.keyData.fix != 0 && rf.keyData.protocol != "RAW") { rf.keyData.keeloq_step(1); }
+
+				display.clearScreen();
+				display.drawingCenterString("Sended!", 32, true);
+				vTaskDelay(700 / portTICK_PERIOD_MS);
+				display.clearScreen();
+				displayRFRead(true);
+			} else {
+				rf.shutdownCC1101();
+				rf.main();
+				if (infrequencychange) {
+					infrequencychange = false;
+					rf.main();
+					rf.configureMode(RF_RECEIVER_MODE);
+					display.clearScreen();
+					displayRFRead(rf.getKeyDetect());
+					break;
+				}
+				infrequencychange = true;
+				display.clearScreen();
+				displayRFFrequencychange();
 			}
 			break;
 		case SD_MENU:
@@ -3795,6 +3708,12 @@ void goBack() {
 				} 
 				break;
 		case BLE_SPOOFER_RUNNING:
+		#ifndef BUILTIN_RGB_LED
+				digitalWrite(espatsettings.statusLedPin, HIGH);
+			#else
+				pixels.clear();
+				pixels.show();
+			#endif
 			bleSpooferDone = false;
 			samsungbuds = false;
 			spooferDeviceIndex = -1;
@@ -3898,6 +3817,19 @@ void goBack() {
 					displaySelectionList();
 				}
 			}
+			break;
+		case RF_MENU:
+			currentState = MAIN_MENU;
+			currentSelection = 0;
+			maxSelections = MAIN_MENU_COUNT;
+			displayMainMenu();
+			break;
+		case RF_RECEIVER_RUNNING:
+			rf.shutdownCC1101();
+			currentState = RF_MENU;
+			currentSelection = 0;
+			maxSelections = RF_MENU_COUNT;
+			displayRFMenu();
 			break;
 		case SD_MENU:
 			currentState = MAIN_MENU;
@@ -4038,6 +3970,26 @@ void handleInput(MenuState handle_state) {
 		else if (handle_state == IR_READ_RUNNING) {
 			irrx.discard_code();
 		}
+		else if (handle_state == RF_RECEIVER_RUNNING) {
+			if (infrequencychange) {
+				display.clearScreen();
+				rf.stepFrequency(-1);
+				displayRFFrequencychange();
+			}
+			else if (rf.getKeyDetect()) {
+				fixRfDisplayLoop = false;
+				rf.resetKeyDetect();
+				rf.rcSwitch.resetAvailable();
+				Serial.println("[INFO] Discard Rf code");
+				if (rfreplaycode) {
+					rfreplaycode = false;
+					rf.main();
+					rf.configureMode(RF_RECEIVER_MODE);
+				}
+				display.clearScreen();
+				displayRFRead(false);
+			} else goBack();
+		}
 		else {
 			if (handleStateRunningCheck ||
 				(handle_state == BLE_TT_SCROLL_MENU ||
@@ -4068,6 +4020,12 @@ void handleInput(MenuState handle_state) {
 		} 
 		else if (handle_state == IR_READ_RUNNING) {
 			irrx.save_code();
+		} else if (handle_state == RF_RECEIVER_RUNNING) {
+			if (infrequencychange) {
+				display.clearScreen();
+				rf.stepFrequency(1);
+				displayRFFrequencychange();
+			}
 		}
 		else {
 			if (handleStateRunningCheck ||
@@ -4349,6 +4307,22 @@ void handleTasks(MenuState handle_state) {
 		}
 	}
 
+	else if (handle_state == RF_RECEIVER_RUNNING || handle_state == RF_RECEIVER_RAW_RUNNING) {
+		if (handle_state == RF_RECEIVER_RUNNING) {
+			if (rf.rcSwitch.available()) {
+				rf.parseReceivedData();
+			}
+			if (rf.getKeyDetect()) {
+				if (!fixRfDisplayLoop) {
+					fixRfDisplayLoop = true;
+					display.clearScreen();
+					displayRFRead(true);
+					blink_led(0, 0, 255, 3);
+				}
+			}
+		}
+	}
+
 	else if (handle_state == BLE_SPOOFER_RUNNING) {
 		if (!bleSpooferDone) {
 			if (bleSpooferBrandType == BLE_SPO_BRAND_APPLE)
@@ -4622,8 +4596,17 @@ void redrawTasks() {
 		case BLE_SPOOFER_APPLE_MENU:
 			displayAppleSpooferMenu();
 			break;
+		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
+			displayAppleDeviceColorSpooferMenu();
+			break;
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			displaySamsungSpooferMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
+			displaySamsungBudsDeviceMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
+			displaySamsungWatchsDeviceMenu();
 			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			displayConnectableModeSpooferMenu();
@@ -4673,11 +4656,19 @@ void redrawTasks() {
 		case IR_UNIVERSAL_POWER_REMOTE_MENU:
 			displayUniversalPowerRemoteModeMenu();
 			break;
+		case RF_MENU:
+			displayRFMenu();
+			break;
 		case SD_MENU:
 			displaySDMenu();
 			break;
+		case SD_UPDATE_MENU:
+			break;
 		case SELECTION_LIST:
 			displaySelectionList();
+			break;
+		case BADUSB_KEY_LAYOUT_MENU:
+			displayBadUSBKeyboardLayout();
 			break;
 		case BLE_MEDIA_MENU:
 			displayMediaCtrlBLEMenu();
@@ -4687,9 +4678,6 @@ void redrawTasks() {
 			break;
 		case BLE_TT_SCROLL_MENU:
 			displayTikTokScrollMenu();
-			break;
-		case BADUSB_KEY_LAYOUT_MENU:
-			displayBadUSBKeyboardLayout();
 			break;
 		case IR_READ_MENU:
 			displayIRReadMenu();
@@ -4726,6 +4714,18 @@ void autoSleepCheck() {
 }
 
 void menuloop() {
+	// Check for critical low memory
+	if (getHeap(GET_USED_HEAP_PERCENT) > 95) { // Critical low memory threshold
+		if (!low_memory_warning) {
+			Serial.println("[CRITICAL] Critical low memory detected! Stop add to buffer...");
+			low_memory_warning = true;
+			display.clearScreen();
+			display.drawingCenterString("Low Memory!", 32, true);
+			vTaskDelay(2000 / portTICK_PERIOD_MS);
+		}
+	} else {
+		low_memory_warning = false;
+	}
 	handleStateRunningCheck = !(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep mode when in attack mode 
 							!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
 							!(currentState == BLE_SCAN_RUNNING) &&
@@ -4739,13 +4739,14 @@ void menuloop() {
 							!(currentState == IR_SEND_RUNNING) &&
 							!(currentState == BADUSB_RUNNING) &&
 							!(currentState == IR_READ_RUNNING) &&
+							!(currentState == RF_RECEIVER_RUNNING) &&
 							!(currentState == CLOCK_MENU) && 
 							!(currentState == BLE_KEYMOTE_MENU) && 
 							!(currentState == BLE_TT_SCROLL_MENU) && 
 							!(currentState == BLE_MEDIA_MENU);
 	autoSleepCheck();
-	handleInput(currentState);
 	handleTasks(currentState);
+	handleInput(currentState);
 	logutils.save();
 	if (standby) {
 		display.setColor(WHITE);
@@ -4761,14 +4762,4 @@ void menuloop() {
 			vTaskDelay(20 / portTICK_PERIOD_MS);
 		}
 	}
-	// Check for critical low memory and auto-reboot
-	if (getHeap(GET_FREE_HEAP) < MEM_LOWER_LIM) { // Critical low memory threshold
-		if (!low_memory_warning) {
-			Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Stop add to buffer...");
-			low_memory_warning = true;
-		}
-	} else {
-		low_memory_warning = false;
-	}
-
 }

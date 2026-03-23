@@ -47,6 +47,8 @@ class ESP32ATSetting {
         uint8_t sdcardCsPin = SD_CS_PIN;
         uint8_t nrfCePin = NRF24_CE_PIN;
         uint8_t nrfCsPin = NRF24_CSN_PIN;
+        uint8_t cc1101CsPin = CC1101_CS_PIN;
+        uint8_t cc1101Gdo0Pin = CC1101_GDO0_PIN;
         bool usingEncoder = true;
         uint8_t encPinA = ENC_PIN_A;
         uint8_t encPinB = ENC_PIN_B;

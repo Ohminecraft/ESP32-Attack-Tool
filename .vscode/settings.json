@@ -64,5 +64,6 @@
         "typeinfo": "cpp"
     },
     "git.useEditorAsCommitInput": false,
-    "cmake.sourceDirectory": "C:/Users/Administrator/Desktop/ESP32/ESP32-Attack-Tool/lib/AsyncTCP-esphome"
+    "cmake.sourceDirectory": "C:/Users/Administrator/Desktop/ESP32/ESP32-Attack-Tool/lib/AsyncTCP-esphome",
+    "cmake.ignoreCMakeListsMissing": true
 }

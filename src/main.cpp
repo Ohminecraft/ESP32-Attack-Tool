@@ -18,6 +18,10 @@ void setup() {
     Serial.begin(115200);
     Serial.println(" ");
     Serial.println("[INFO] Starting ESP32 Attack Tool...");
+
+    pinMode(POWER_PIN, OUTPUT);
+    digitalWrite(POWER_PIN, HIGH); // Power on the device
+    Serial.println("[INFO] Powering on the device...");
     
     espatsettings.loadSettings();
     

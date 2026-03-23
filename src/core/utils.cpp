@@ -23,6 +23,50 @@ String generateRandomString() {
 	return randomName;
 }
 
+uint64_t reverse_bits(uint64_t num, uint8_t bits) {
+    uint64_t res = 0;
+
+    for (uint8_t i = 0; i < bits; ++i) {
+        res <<= 1;
+        res |= bitAt(num, i);
+    }
+
+    return res;
+}
+
+// Function to compute CRC-64-ECMA
+uint64_t crc64_ecma(const std::vector<int> &data) {
+    uint64_t crc = CRC64_ECMA_INIT;
+
+    for (int value : data) {
+        crc ^= (uint64_t)value << 56; // Use the value as the high byte
+        for (int i = 0; i < 8; i++) {
+            if (crc & 0x8000000000000000) {
+                crc = (crc << 1) ^ CRC64_ECMA_POLY;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+
+    return crc;
+}
+
+char *dec2binWzerofill(uint64_t Dec, unsigned int bitLength) {
+    // Allocate memory dynamically for safety
+    char *bin = (char *)malloc(bitLength + 1);
+    if (!bin) return NULL; // Handle allocation failure
+
+    bin[bitLength] = '\0'; // Null-terminate string
+
+    for (int i = bitLength - 1; i >= 0; i--) {
+        bin[i] = (Dec & 1) ? '1' : '0';
+        Dec >>= 1;
+    }
+
+    return bin;
+}
+
 void generateRandomString(char* buffer, size_t length) {
     const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     size_t charsetSize = sizeof(charset) - 1; // Exclude null terminator
@@ -179,6 +223,41 @@ int splitStringToVector(String str, char delimiter, std::vector<String>& result)
     }
     
     return count;
+}
+
+String hexStrToBinStr(const String &hexStr) {
+    String binStr = "";
+    String hexByte = "";
+
+    // Variables for decimal value
+    int value;
+
+    for (int i = 0; i < hexStr.length(); i++) {
+        char c = hexStr.charAt(i);
+
+        // Check if the character is a hexadecimal digit
+        if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')) {
+            hexByte += c;
+            if (hexByte.length() == 2) {
+                // Convert the hexadecimal pair to a decimal value
+                value = strtol(hexByte.c_str(), NULL, 16);
+
+                // Convert the decimal value to binary and add to the binary string
+                for (int j = 7; j >= 0; j--) { binStr += (value & (1 << j)) ? '1' : '0'; }
+                // binStr += ' ';
+
+                // Clear the hexByte string for the next byte
+                hexByte = "";
+            }
+        }
+    }
+
+    // Remove the extra trailing space, if any
+    if (binStr.length() > 0 && binStr.charAt(binStr.length() - 1) == ' ') {
+        binStr.remove(binStr.length() - 1);
+    }
+
+    return binStr;
 }
 
 String uint32ToString(uint32_t value) {
