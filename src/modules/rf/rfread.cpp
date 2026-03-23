@@ -40,35 +40,10 @@ void RFModules::parseReceivedData() {
     rcSwitch.resetAvailable();
 }
 
-int8_t RFModules::readRSSI() {
-  uint8_t raw = ELECHOUSE_cc1101.SpiReadStatus(CC1101_RSSI);
-  int16_t rssi_dbm;
-  if (raw >= 128) {
-    rssi_dbm = ((int16_t)raw - 256) / 2 - 74;
-  } else {
-    rssi_dbm = (int16_t)raw / 2 - 74;
-  }
-  return (int8_t)constrain(rssi_dbm, -120, 0);
-}
-
-int8_t RFModules::measureRSSI(float freqMHz) {
-  ELECHOUSE_cc1101.setMHZ(freqMHz);
-  ELECHOUSE_cc1101.SetRx();
-  delayMicroseconds(COARSE_SETTLE_US);
-
-  int16_t sum = 0;
-  for (int i = 0; i < RSSI_SAMPLES; i++) {
-    sum += readRSSI();
-    delayMicroseconds(RSSI_SAMPLE_DELAY_US);
-  }
-  return (int8_t)(sum / RSSI_SAMPLES);
-}
-
 float RFModules::fineScan(float freqCenter, int8_t &bestRssiOut) {
   float fineStart = freqCenter - FINE_RANGE_MHZ;
   float fineEnd   = freqCenter + FINE_RANGE_MHZ;
 
-  // Clamp vào dải hợp lệ của CC1101
   fineStart = constrain(fineStart, 300.0, 928.0);
   fineEnd   = constrain(fineEnd, 300.0, 928.0);
 
@@ -76,7 +51,8 @@ float RFModules::fineScan(float freqCenter, int8_t &bestRssiOut) {
   int8_t  peakRSSI = RSSI_MIN_VALID;
 
   for (float f = fineStart; f <= fineEnd; f += FINE_STEP_MHZ) {
-    int8_t rssi = measureRSSI(f);
+    ELECHOUSE_cc1101.setMHZ(f);
+    int8_t rssi = ELECHOUSE_cc1101.getRssi();
     if (rssi > peakRSSI) {
       peakRSSI = rssi;
       peakFreq = f;
@@ -91,7 +67,8 @@ void RFModules::frequencyAnalyzerLoop() {
     static int coarseIdx = 0;
 
     float coarseFreq = subghz_frequency_list[coarseIdx];
-    int8_t coarseRSSI = measureRSSI(coarseFreq);
+    ELECHOUSE_cc1101.setMHZ(coarseFreq);
+    int8_t coarseRSSI = ELECHOUSE_cc1101.getRssi();
 
     if (coarseRSSI > RSSI_threshold) {
 

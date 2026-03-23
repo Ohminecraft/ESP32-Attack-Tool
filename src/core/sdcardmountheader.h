@@ -23,7 +23,7 @@ public:
     void main();
     void close();
     bool deleteFile(String path);
-    File getFile(String path, String mode);
+    File getFile(String path, String mode, bool create = false);
     void addListFileToLinkedList(LinkedList<String> *file_names, String str_dir = "/", String ext = "");
     int8_t update();
     bool isExists(String path);

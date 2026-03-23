@@ -260,6 +260,46 @@ String hexStrToBinStr(const String &hexStr) {
     return binStr;
 }
 
+void decimalToHexString(uint64_t decimal, char *output) {
+    char hexDigits[] = "0123456789ABCDEF";
+    char temp[65];
+    int index = 15;
+
+    // Initialize tem string with zeros
+    for (int i = 0; i < 64; i++) { temp[i] = '0'; }
+    temp[65] = '\0';
+
+    // Convert decimal to hexadecimal
+    while (decimal > 0) {
+        temp[index--] = hexDigits[decimal % 16];
+        decimal /= 16;
+    }
+
+    // Format string with spaces
+    int outputIndex = 0;
+    for (int i = 0; i < 16; i++) {
+        output[outputIndex++] = temp[i];
+        if ((i % 2) == 1 && i != 15) { output[outputIndex++] = ' '; }
+    }
+    output[outputIndex] = '\0';
+}
+
+uint32_t hexStringToDecimal(const char *hexString) {
+    uint32_t decimal = 0;
+    int length = strlen(hexString);
+
+    for (int i = 0; i < length; i += 3) {
+        decimal <<= 8; // Shift left to accommodate next byte
+
+        // Converts two characters hex to a single byte
+        uint8_t highNibble = hexCharToDecimal(hexString[i]);
+        uint8_t lowNibble = hexCharToDecimal(hexString[i + 1]);
+        decimal |= (highNibble << 4) | lowNibble;
+    }
+
+    return decimal;
+}
+
 String uint32ToString(uint32_t value) {
     char buffer[12] = {0}; // 8 hex digits + 3 spaces + 1 null terminator
     snprintf(

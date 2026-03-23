@@ -37,9 +37,9 @@ void SDCardModules::main() {
     }
 }
 
-File SDCardModules::getFile(String path, String mode) {
+File SDCardModules::getFile(String path, String mode, bool create) {
     if (mounted) {
-        File file = SD.open("/ESP32AttackTool" + path, mode.c_str());
+        File file = SD.open("/ESP32AttackTool" + path, mode.c_str(), create);
         if (file) {
             //Serial.println("[INFO] File opened/created successfully: " + path);
             return file;
@@ -49,7 +49,7 @@ File SDCardModules::getFile(String path, String mode) {
         }
     } else {
         if (littlefsmounted) {
-            File file = LittleFS.open("/" + path, mode.c_str());
+            File file = LittleFS.open("/" + path, mode.c_str(), create);
             if (file) {
             //Serial.println("[INFO] File opened/created successfully: " + path);
             return file;

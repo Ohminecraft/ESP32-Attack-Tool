@@ -333,6 +333,10 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("Rssi Change", 0, 12);
 	else if (currentState == RF_FREQUENCY_ANALYZER_RUNNING)
 		display.displayStringwithCoordinates("Freq Analyzer", 0, 12);
+	else if (currentState == RF_SEND_SELECT_SUB_FILE)
+		display.displayStringwithCoordinates("RF Sub Sel", 0, 12);
+	else if (currentState == RF_SEND_RUNNING && inkeeloqstepchange)
+		display.displayStringwithCoordinates("Keeloq Step", 0, 12);
 	else if (currentState == SD_MENU)
 		display.displayStringwithCoordinates("File Menu", 0, 12);
 	else if (currentState == SD_UPDATE_MENU)
@@ -1278,6 +1282,13 @@ void displayRFFrequencychange() {
 	display.displayStringwithCoordinates("Frequency: " + (String)rf.getFrequency(), 0, 24, true);
 }
 
+void displayRFReadSave() {
+	display.clearScreen();
+	display.displayStringwithCoordinates("Saved Successfully!" , 0, 12);
+	display.displayStringwithCoordinates("Name File:" , 0, 24);
+	display.displayStringwithCoordinates(rf.getSavedFileName(), 0, 36, true);
+}
+
 void displayRFFrequencyAnalyzer() {
 	display.clearScreen();
 	displayStatusBar();
@@ -1295,11 +1306,48 @@ void displayRFFrequencyAnalyzerRssichange() {
 	display.displayStringwithCoordinates("RSSI: " + (String)rf.getFreqAnalyzerRssiThreshold(),0, 24, true);
 }
 
+void displayRFTxData() {
+	display.clearScreen();
+	if (rf.keyData.serial != 0) {
+		display.displayStringwithCoordinates("Proto: Keeloq", 0, 12);
+		display.displayStringwithCoordinates("Manuf: " + rf.keyData.mf_name, 0, 24);
+		char hexchar[64];
+		decimalToHexString(rf.keyData.serial, hexchar);
+		display.displayStringwithCoordinates("Serial: " + (String)hexchar, 0, 36);
+	} else {
+		display.displayStringwithCoordinates("Proto: " + (String)rf.keyData.protocol  + "(" + rf.keyData.preset + ")", 0, 12);
+	}
+	if (rf.keeloq_loop_emulate) {
+		display.displayStringwithCoordinates("SEL = Send, LB = exit", 0, 48);
+		display.displayStringwithCoordinates("RB = Config", 0, 60, true);
+	} else {
+		display.displayStringwithCoordinates("SEL = Send, LB = exit", 0, 60, true);
+	}
+}
+
+void displayRFSubFile() {
+	display.clearScreen();
+	displayStatusBar();
+	String items[selection_list->size() + 1];
+	for (int i = 0; i < selection_list->size(); i++) {
+		items[i] = selection_list->get(i);
+	}
+	items[selection_list->size()] = "< Back";
+
+	menuNode(items, selection_list->size() + 1);
+}
+
+void displayRFKeeloqStepChange() {
+	display.clearScreen();
+	displayStatusBar();
+	display.displayStringwithCoordinates("Step: " + (String)rf.num_keeloq_steps, 0, 24, true);
+}
+
 void displaySDMenu() {
 
 	String items[SD_MENU_COUNT] = {
 		"SD Card Update",
-		"SD Card Delete",
+		"FS Delete",
 		"< Back"
 	};
 
@@ -3188,6 +3236,13 @@ void selectCurrentItem() {
 				rf.main();
 				rf.configureMode(RF_FREQUENCY_ANALYZER_MODE);
 				displayRFFrequencyAnalyzer();
+			} else if (currentSelection == RF_SEND) {
+				currentState = RF_SEND_SELECT_SUB_FILE;
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list, "/", ".sub");
+				currentSelection = 0;
+				maxSelections = selection_list ? selection_list->size() + 1 : 1;
+				displayRFSubFile();
 			}
 			break;
 		case RF_RECEIVER_RUNNING:
@@ -3225,6 +3280,44 @@ void selectCurrentItem() {
 			}
 			inRssichange = true;
 			displayRFFrequencyAnalyzerRssichange();
+			break;
+		case RF_SEND_SELECT_SUB_FILE:
+			if (currentSelection == selection_list->size()) {
+				goBack();
+			} else {
+				rf.selectedSubFile(selection_list->get(currentSelection));
+				if (rf.keyData.protocol == "RcSwitch" && rf.keyData.serial != 0) rf.keeloqLoopEmulate_pre(rf.keyData);
+				currentState = RF_SEND_RUNNING;
+				displayRFTxData();
+			}
+			break;
+		case RF_SEND_RUNNING:
+			if (inkeeloqstepchange) {
+				inkeeloqstepchange = false;
+				displayRFTxData();
+				break;
+			}
+			display.clearScreen();
+			display.drawingCenterString("Sending...", 32, true);
+			if (rf.keyData.protocol == "RcSwitch") {
+				if (rf.keyData.serial == 0) {
+					for (int i = 0; uint64_t key : rf.keyList) {
+						rf.keyData.Bit = rf.bitList[i++];
+						rf.keyData.key = key;
+						rf.sendCommand(rf.keyData);
+					}
+				} else {
+					rf.sendCommand(rf.keyData);
+					rf.keyData.keeloq_step(rf.num_keeloq_steps);
+					rf.keeloq_save(rf.keyData);
+				}
+			} else {
+				rf.transmittedCommand(rf.keyData);
+			}
+			display.clearScreen();
+			display.drawingCenterString("Sended!", 32, true);
+			vTaskDelay(2000 / portTICK_PERIOD_MS);
+			displayRFTxData();
 			break;
 		case SD_MENU:
 			if (currentSelection == SD_BACK) {
@@ -3857,6 +3950,7 @@ void goBack() {
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
+		case RF_SEND_SELECT_SUB_FILE:
 		case RF_RECEIVER_RUNNING:
 		case RF_FREQUENCY_ANALYZER_RUNNING:
 			rf.shutdownCC1101();
@@ -4029,6 +4123,21 @@ void handleInput(MenuState handle_state) {
 				displayRFFrequencyAnalyzerRssichange();
 			} else goBack();
 		}
+		else if (handle_state == RF_SEND_RUNNING) {
+			if (rf.keeloq_loop_emulate && inkeeloqstepchange) {
+				rf.stepKeeLoqStep(-1);
+				displayRFKeeloqStepChange();
+				return;
+			} else if (rf.keeloq_loop_emulate) {
+				rf.keyList.clear();
+				rf.bitList.clear();
+				rf.keeloq_loop_emulate = false;
+			}
+			currentState = RF_SEND_SELECT_SUB_FILE;
+			currentSelection = 0;
+			maxSelections = selection_list ? selection_list->size() + 1 : 1;
+			displayRFSubFile();
+		}
 		else {
 			if (handleStateRunningCheck ||
 				(handle_state == BLE_TT_SCROLL_MENU ||
@@ -4065,10 +4174,25 @@ void handleInput(MenuState handle_state) {
 				rf.stepFrequency(1);
 				displayRFFrequencychange();
 			}
+			if (rf.getKeyDetect()) {
+				rf.save();
+				displayRFReadSave();
+				vTaskDelay(2000 / portTICK_PERIOD_MS);
+				displayRFRead(true);
+			}
 		}
 		else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING && inRssichange) {
 			rf.stepRSSIThreshold(1);
 			displayRFFrequencyAnalyzerRssichange();
+		}
+		else if (handle_state == RF_SEND_RUNNING && rf.keeloq_loop_emulate) {
+			if (inkeeloqstepchange) {
+				rf.stepKeeLoqStep(1);
+				displayRFKeeloqStepChange();
+			} else {
+				inkeeloqstepchange = true;
+				displayRFKeeloqStepChange();
+			}
 		}
 		else {
 			if (handleStateRunningCheck ||
@@ -4712,6 +4836,9 @@ void redrawTasks() {
 		case RF_MENU:
 			displayRFMenu();
 			break;
+		case RF_SEND_SELECT_SUB_FILE:
+			displayRFSubFile();
+			break;
 		case SD_MENU:
 			displaySDMenu();
 			break;
@@ -4794,6 +4921,7 @@ void menuloop() {
 							!(currentState == IR_READ_RUNNING) &&
 							!(currentState == RF_RECEIVER_RUNNING) &&
 							!(currentState == RF_FREQUENCY_ANALYZER_RUNNING) &&
+							!(currentState == RF_SEND_RUNNING) &&
 							!(currentState == CLOCK_MENU) && 
 							!(currentState == BLE_KEYMOTE_MENU) && 
 							!(currentState == BLE_TT_SCROLL_MENU) && 

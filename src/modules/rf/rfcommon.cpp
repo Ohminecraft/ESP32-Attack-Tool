@@ -9,8 +9,6 @@
     * This file contains common functions and definitions for RF modules.
 */
 
-SPIClass *CC1101_SPI;
-
 void RFModules::setFrequency(float freqMHz) {
     if (freqMHz < 300.0 || freqMHz > 928.0) {
         Serial.println("[ERROR] Frequency out of range! Must be between 300 MHz and 928 MHz, Using default 433.92 MHz.");
@@ -137,10 +135,116 @@ int8_t RFModules::getFreqAnalyzerRssiThreshold() {
     return RSSI_threshold;
 }
 
-
 void RFModules::resetKeyDetect() { keyDetected = false; }
     
 bool RFModules::getKeyDetect() { return keyDetected; }
+
+String RFModules::getSavedFileName() { return filenametosave; }
+
+void RFModules::save() {
+    char hexchar[64];
+    decimalToHexString(keyData.key, hexchar);
+    saveSignal(frequency, keyData, hexchar);
+    Serial.println("[INFO] Save code to FS successfully");
+    redraw = true;
+}
+
+bool RFModules::saveSignal(float frequency, RfCodes codes, char *key) {
+    if (!codes.key && codes.data == "") return false;
+
+    String fileout = "Filetype: ESP32 Attack Tool - Rf File\n";
+    fileout += "Frequency: " + String(int(frequency * 1000000)) + "\n";
+    fileout += "Preset: " + String(codes.preset) + "\n";
+    fileout += "Protocol: RcSwitch\n";
+    fileout += "Bit: " + String(codes.Bit) + "\n";
+    if (codes.hop != 0) {
+        fileout += "Manufacturer: " + String(codes.mf_name) + "\n";
+        char hexString[64] = {0};
+
+        decimalToHexString(codes.serial, hexString);
+
+        fileout += "Serial: " + String(hexString) + "\n";
+        fileout += "Button: " + String(codes.btn) + "\n";
+        fileout += "Counter: " + String(codes.cnt) + "\n";
+    } else {
+        fileout += "Key: " + String(key) + "\n";
+    }
+    fileout += "TE: " + String(codes.te) + "\n";
+
+    String filename = display.keyboard();
+    filename.trim();
+
+    if (sdcard.isExists(filename + ".sub")) {
+        int i = 1;
+        filename += "_";
+        while (sdcard.isExists(filename + String(i) + ".sub")) i++;
+        filename += String(i);
+    }
+
+    filenametosave = filename + ".sub";
+
+    File file = sdcard.getFile(filename + ".sub", FILE_WRITE);
+    if (file) file.println(fileout);
+    file.close();
+    return true;
+}
+
+void RFModules::readSubFile(String filename, RfCodes &data) {
+    struct RfCodes selected_code;
+    File databaseFile;
+    String line;
+    String txt;
+
+    databaseFile = sdcard.getFile(filename, FILE_READ);
+
+    if (!databaseFile) {
+        Serial.println("[ERROR] Failed to open database file.");
+        return;
+    }
+    Serial.println("[INFO] Successfully opened sub file.");
+
+    // Store the code(s) in the signal
+    while (databaseFile.available()) {
+        line = databaseFile.readStringUntil('\n');
+        txt = line.substring(line.indexOf(":") + 1);
+        if (txt.endsWith("\r")) txt.remove(txt.length() - 1);
+        txt.trim();
+        if (line.startsWith("Protocol:")) selected_code.protocol = txt;
+        if (line.startsWith("Preset:")) selected_code.preset = txt;
+        if (line.startsWith("Frequency:")) selected_code.frequency = txt.toInt();
+        if (line.startsWith("TE:")) selected_code.te = txt.toInt();
+        if (line.startsWith("Bit:")) bitList.push_back(txt.toInt()); // selected_code.Bit = txt.toInt();
+
+        if (line.startsWith("Manufacturer:")) selected_code.mf_name = txt;
+        if (line.startsWith("Serial:")) selected_code.serial = hexStringToDecimal(txt.c_str());
+        if (line.startsWith("Button:")) selected_code.btn = txt.toInt();
+        if (line.startsWith("Counter:")) selected_code.cnt = txt.toInt();
+
+        if (line.startsWith("Bit_RAW:"))
+            bitRawList.push_back(txt.toInt()); // selected_code.BitRAW = txt.toInt();
+        if (line.startsWith("Key:"))
+            keyList.push_back(
+                hexStringToDecimal(txt.c_str())
+            ); // selected_code.key = hexStringToDecimal(txt.c_str());
+        if (line.startsWith("RAW_Data:") || line.startsWith("Data_RAW:"))
+            rawDataList.push_back(txt); // selected_code.data = txt;
+    }
+
+    databaseFile.close();
+
+    data = selected_code;
+}
+
+void RFModules::selectedSubFile(String filename) {
+    txfilename = filename;
+    readSubFile(filename, keyData);
+}
+
+void RFModules::stepKeeLoqStep(int step) {
+    keeloq_steps_index = (keeloq_steps_index + step + GET_SIZE(keeloq_steps)) % GET_SIZE(keeloq_steps);
+    num_keeloq_steps = keeloq_steps[keeloq_steps_index];
+    Serial.println("[INFO] Change Step for Keeloq Protocol to: " + (String)num_keeloq_steps);
+}
 
 bool RfCodes::keeloq_check_decrypt(uint32_t decrypt) {
     uint16_t end_serial = serial & 0xFF;
@@ -346,4 +450,30 @@ void keeloq_identify(RfCodes &instance) {
             }
         }
     }
+}
+
+
+void RFModules::keeloq_save(RfCodes data) {
+    String subfile_out = "Filetype: ESP32 Attack Tool - Rf File\n";
+    subfile_out += "Frequency: " + String(data.frequency) + "\n";
+    subfile_out += "Preset: " + String(data.preset) + "\n";
+    subfile_out += "Protocol: RcSwitch\n";
+    subfile_out += "Bit: " + String(data.Bit) + "\n";
+
+    subfile_out += "Manufacturer: " + String(data.mf_name) + "\n";
+    char hexString[64] = {0};
+
+    decimalToHexString(data.serial, hexString);
+
+    subfile_out += "Serial: " + String(hexString) + "\n";
+    subfile_out += "Button: " + String(data.btn) + "\n";
+    subfile_out += "Counter: " + String(data.cnt) + "\n";
+
+    subfile_out += "TE: " + String(data.te) + "\n";
+
+    File file = sdcard.getFile(txfilename, "w", true);
+
+    if (file) { file.println(subfile_out); }
+
+    file.close();
 }

@@ -79,6 +79,8 @@ uint64_t reverse_bits(uint64_t num, uint8_t bits);
 uint64_t crc64_ecma(const std::vector<int> &data);
 char *dec2binWzerofill(uint64_t Dec, unsigned int bitLength);
 String hexStrToBinStr(const String &hexStr);
+void decimalToHexString(uint64_t decimal, char *output);
+uint32_t hexStringToDecimal(const char *hexString);
 
 extern volatile bool nextPress;
 extern volatile bool prevPress; 

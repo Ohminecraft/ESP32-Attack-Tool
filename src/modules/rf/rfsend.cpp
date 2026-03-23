@@ -8,8 +8,68 @@
     * Licensed under the MIT License.
 */
 
+void RFModules::keeloqLoopEmulate_pre(RfCodes &codes) {
+    if (codes.serial != 0) {
+        codes.fix = codes.btn << 28 | codes.serial;
+        codes.Bit = 64;
+        codes.keeloq_step(0);
+    }
+    keeloq_loop_emulate = true;
+}
 
-// https://github.com/BruceDevices/firmware/blob/main/src/modules/rf/rf_send.cpp
+void RFModules::keeloqLoopEmulate_post() {
+    if (prevPress) {
+            keyList.clear();
+            bitList.clear();
+            keeloq_loop_emulate = false;
+        }
+
+
+    if (check(selPress)) {
+        if (keyData.serial == 0) {
+            for (int i = 0; uint64_t key : keyList) {
+                keyData.Bit = bitList[i++];
+                keyData.key = key;
+                sendCommand(keyData);
+            }
+        } else {
+            sendCommand(keyData);
+            keyData.keeloq_step(num_keeloq_steps);
+            keeloq_save(keyData);
+        }
+    }
+}
+
+void RFModules::transmittedCommand(RfCodes &codes) {
+    int total = bitList.size() + bitRawList.size() + keyList.size() + rawDataList.size() > 0 ? 1 : 0;
+    Serial.printf("[INFO] Total signals found: %d\n", total);
+
+    if (codes.protocol != "" && codes.preset != "" && codes.frequency > 0) {
+        for (int bit : bitList) {
+            codes.Bit = bit;
+            sendCommand(codes);
+        }
+        for (int bitRaw : bitRawList) {
+            codes.Bit = bitRaw;
+            sendCommand(codes);
+        }
+        for (uint64_t key : keyList) {
+            codes.key = key;
+            sendCommand(codes);
+        }
+
+        for (String rawData : rawDataList) {
+            codes.data = rawData;
+            sendCommand(codes);
+        }
+    }
+
+    bitList.clear();
+    bitRawList.clear();
+    keyList.clear();
+    rawDataList.clear();
+}
+
 // https://github.com/BruceDevices/firmware/blob/main/src/modules/rf/rf_send.cpp
 void RFModules::sendCommand(const RfCodes& code) {
     uint32_t frequency  = code.frequency;
@@ -130,7 +190,6 @@ void RFModules::sendCommand(const RfCodes& code) {
         sendType(code.key, code.Bit, 270, 11, 10);
     }
  
-    // FIX #5: shutdown 1 lần duy nhất ở đây
     shutdownCC1101();
 }
 

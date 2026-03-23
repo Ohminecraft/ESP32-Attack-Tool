@@ -66,6 +66,8 @@ enum MenuState {
     RF_RECEIVER_RUNNING,
     RF_RECEIVER_RAW_RUNNING,
     RF_FREQUENCY_ANALYZER_RUNNING,
+    RF_SEND_SELECT_SUB_FILE,
+    RF_SEND_RUNNING,
     WIFI_UTILS_MENU,
     WIFI_UTILS_SET_MAC_MENU,
     WIFI_GENERAL_MENU,
@@ -411,6 +413,7 @@ bool rfreplaycode = false;
 bool fixRfDisplayLoop = false;
 bool infrequencychange = false;
 bool inRssichange = false;
+bool inkeeloqstepchange = false;
 
 // IRSend/Recv
 
