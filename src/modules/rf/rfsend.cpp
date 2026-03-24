@@ -17,29 +17,6 @@ void RFModules::keeloqLoopEmulate_pre(RfCodes &codes) {
     keeloq_loop_emulate = true;
 }
 
-void RFModules::keeloqLoopEmulate_post() {
-    if (prevPress) {
-            keyList.clear();
-            bitList.clear();
-            keeloq_loop_emulate = false;
-        }
-
-
-    if (check(selPress)) {
-        if (keyData.serial == 0) {
-            for (int i = 0; uint64_t key : keyList) {
-                keyData.Bit = bitList[i++];
-                keyData.key = key;
-                sendCommand(keyData);
-            }
-        } else {
-            sendCommand(keyData);
-            keyData.keeloq_step(num_keeloq_steps);
-            keeloq_save(keyData);
-        }
-    }
-}
-
 void RFModules::transmittedCommand(RfCodes &codes) {
     int total = bitList.size() + bitRawList.size() + keyList.size() + rawDataList.size() > 0 ? 1 : 0;
     Serial.printf("[INFO] Total signals found: %d\n", total);

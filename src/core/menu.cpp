@@ -1284,9 +1284,14 @@ void displayRFFrequencychange() {
 
 void displayRFReadSave() {
 	display.clearScreen();
-	display.displayStringwithCoordinates("Saved Successfully!" , 0, 12);
-	display.displayStringwithCoordinates("Name File:" , 0, 24);
-	display.displayStringwithCoordinates(rf.getSavedFileName(), 0, 36, true);
+	if (rf.signalsaved) {
+		rf.signalsaved = false;
+		display.displayStringwithCoordinates("Saved Successfully!" , 0, 12);
+		display.displayStringwithCoordinates("Name File:" , 0, 24);
+		display.displayStringwithCoordinates(rf.getSavedFileName(), 0, 36, true);	
+	} else {
+		display.displayStringwithCoordinates("Failed save to FS!" , 0, 12, true);
+	}
 }
 
 void displayRFFrequencyAnalyzer() {
@@ -2866,7 +2871,7 @@ void selectCurrentItem() {
 					String pwd2 = "";
 					if (pwd1.isEmpty()) pwd2 = display.keyboard();
 					else pwd2 = pwd1;
-					if (pwd2 == "espattacktool_command_exit") {
+					if (pwd2 == "\x01") {
 						goBack();
 						return;
 					}

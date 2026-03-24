@@ -9,6 +9,8 @@
     * This file contains common functions and definitions for RF modules.
 */
 
+SPIClass *CC_SPI;
+
 void RFModules::setFrequency(float freqMHz) {
     if (freqMHz < 300.0 || freqMHz > 928.0) {
         Serial.println("[ERROR] Frequency out of range! Must be between 300 MHz and 928 MHz, Using default 433.92 MHz.");
@@ -21,6 +23,9 @@ void RFModules::setFrequency(float freqMHz) {
 
 // https://github.com/BruceDevices/firmware/blob/main/src/modules/rf/rf_utils.cpp
 void RFModules::main() {
+    CC_SPI = &SPI;
+    CC_SPI->begin(espatsettings.spiSckPin, espatsettings.spiMisoPin, espatsettings.spiMosiPin, espatsettings.cc1101CsPin);
+    ELECHOUSE_cc1101.setSPIinstance(CC_SPI);
     ELECHOUSE_cc1101.setSpiPin(
         espatsettings.spiSckPin,
         espatsettings.spiMisoPin,
@@ -43,11 +48,14 @@ void RFModules::main() {
         startup = false;
     }
  
-    // Cấu hình mặc định — sẽ bị ghi đè bởi sendCommand() nếu cần
-    ELECHOUSE_cc1101.setRxBW(270.0);
-    ELECHOUSE_cc1101.setDeviation(0);
-    ELECHOUSE_cc1101.setPA(12);
+    ELECHOUSE_cc1101.setRxBW(256);      // narrow band for better accuracy
+    ELECHOUSE_cc1101.setClb(1, 13, 15); // Calibration Offset
+    ELECHOUSE_cc1101.setClb(2, 16, 19); // Calibration Offset
+        // set modulation mode. 0 = 2-FSK, 1 = GFSK, 2 = ASK/OOK, 3 = 4-FSK, 4 = MSK.
     ELECHOUSE_cc1101.setModulation(2);
+        // Set the Data Rate in kBaud. Value from 0.02 to 1621.83. Default is 99.97 kBaud!
+    ELECHOUSE_cc1101.setDRate(50);
+    ELECHOUSE_cc1101.setPktFormat(3);
     setFrequency(frequency); // dùng this->frequency (đã được set trước đó)
 }
 
@@ -55,10 +63,10 @@ void RFModules::shutdownCC1101() {
     if (cc1101_ready) {
         ELECHOUSE_cc1101.setSidle();
         cc1101_ready = false;
+        digitalWrite(espatsettings.cc1101Gdo0Pin, LOW);
+        digitalWrite(espatsettings.cc1101CsPin, HIGH);
+        Serial.println("[INFO] Shutdown CC1101 Successfully!");
     }
-    digitalWrite(espatsettings.cc1101Gdo0Pin, LOW);
-    digitalWrite(espatsettings.cc1101CsPin, HIGH);
-    Serial.println("[INFO] Shutdown CC1101 Successfully!");
 }
 
 bool RFModules::getCC1101() {
@@ -68,6 +76,7 @@ bool RFModules::getCC1101() {
 void RFModules::configureMode(int mode) {
     switch (mode) {
         case RF_RECEIVER_MODE:
+            pinMode(espatsettings.cc1101Gdo0Pin, INPUT);
             ELECHOUSE_cc1101.SetRx();
             rcSwitch.enableReceive(espatsettings.cc1101Gdo0Pin);
             rcSwitch.resetAvailable();
@@ -75,18 +84,15 @@ void RFModules::configureMode(int mode) {
             break; 
  
         case RF_TRANSMITTER_MODE:
-            ELECHOUSE_cc1101.setSyncMode(0);
-            ELECHOUSE_cc1101.setCrc(0);
-            ELECHOUSE_cc1101.setPktFormat(3);
-            ELECHOUSE_cc1101.SetTx();
             pinMode(espatsettings.cc1101Gdo0Pin, OUTPUT);
-            digitalWrite(espatsettings.cc1101Gdo0Pin, LOW);
+            ELECHOUSE_cc1101.setPA(12); // set TxPower. The following settings are possible depending
+            ELECHOUSE_cc1101.SetTx();
             Serial.println("[INFO] Set CC1101 to Tx Mode");
             break;
         
         case RF_FREQUENCY_ANALYZER_MODE:
-            ELECHOUSE_cc1101.setRxBW(812);         // bandwidth rộng để bắt được tín hiệu
-            ELECHOUSE_cc1101.setPA(10);          // TX power (không quan trọng khi chỉ RX)
+            pinMode(espatsettings.cc1101Gdo0Pin, INPUT);
+            ELECHOUSE_cc1101.setRxBW(614);         // bandwidth rộng để bắt được tín hiệu
             ELECHOUSE_cc1101.SetRx();            // bật chế độ nhận
             ELECHOUSE_cc1101.setSyncMode(0);     // tắt sync word → raw mode
             ELECHOUSE_cc1101.setCCMode(0);       // ASK/OOK compatible mode
@@ -144,7 +150,7 @@ String RFModules::getSavedFileName() { return filenametosave; }
 void RFModules::save() {
     char hexchar[64];
     decimalToHexString(keyData.key, hexchar);
-    saveSignal(frequency, keyData, hexchar);
+    if(saveSignal(frequency, keyData, hexchar)) signalsaved = true;
     Serial.println("[INFO] Save code to FS successfully");
     redraw = true;
 }
@@ -172,6 +178,9 @@ bool RFModules::saveSignal(float frequency, RfCodes codes, char *key) {
     fileout += "TE: " + String(codes.te) + "\n";
 
     String filename = display.keyboard();
+    if (filename == "\x01") {
+        return false;
+    }
     filename.trim();
 
     if (sdcard.isExists(filename + ".sub")) {

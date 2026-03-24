@@ -66,7 +66,7 @@ float RFModules::fineScan(float freqCenter, int8_t &bestRssiOut) {
 void RFModules::frequencyAnalyzerLoop() {
     static int coarseIdx = 0;
 
-    float coarseFreq = subghz_frequency_list[coarseIdx];
+    float coarseFreq = freq_analyzer_list_frequency[coarseIdx];
     ELECHOUSE_cc1101.setMHZ(coarseFreq);
     int8_t coarseRSSI = ELECHOUSE_cc1101.getRssi();
 

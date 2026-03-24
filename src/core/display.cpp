@@ -196,7 +196,7 @@ String DisplayModules::keyboard() {
 
                 case '\x04': setFont(u8g2_font_ncenB08_tr); return input;    // OK
 
-				case '\x05': setFont(u8g2_font_ncenB08_tr); return "espattacktool_command_exit";   // EXIT
+				case '\x05': setFont(u8g2_font_ncenB08_tr); return "\x01";   // EXIT
 
                 default:
                     input += ch;

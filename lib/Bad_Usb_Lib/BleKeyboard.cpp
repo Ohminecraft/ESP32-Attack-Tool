@@ -406,9 +406,9 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   
   hid->setManufacturer(deviceManufacturer.c_str());
   hid->setPnp(0x02, vid, pid, version);
-  hid->setHidInfo(0x00, 0x02);
+  hid->setHidInfo(0x00, 0x01);
 
-  NimBLEDevice::setSecurityAuth(true, false, true); // man in the middle protection (mitm) cause keyboard mouse, etc can't using when device reconnect so disable it
+  NimBLEDevice::setSecurityAuth(true, false, false); // man in the middle protection (mitm) cause keyboard mouse, etc can't using when device reconnect so disable it
   
   if (mode == BLE_KEYBOARD_MODE_ALL)
   hid->setReportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
@@ -437,8 +437,15 @@ void BleKeyboard::begin(const uint8_t *layout, uint16_t showAs, uint8_t mode)
   AdvData_Raw[i++] = 0x80;
   memcpy(&AdvData_Raw[i], deviceName.c_str(), deviceName.length());
   i += deviceName.length();
-  AdvData.addData(AdvData_Raw, 7 + deviceName.length());
-  if (usingSwiftpair) advertising->setAdvertisementData(AdvData);
+
+  AdvData.setFlags(BLE_HS_ADV_F_BREDR_UNSUP | BLE_HS_ADV_F_DISC_GEN);
+  AdvData.setName(deviceName.c_str(), true);
+  
+  if (usingSwiftpair) {
+    AdvData.addData(AdvData_Raw, 7 + deviceName.length());
+  }
+
+  advertising->setAdvertisementData(AdvData);
   ///////////////////////////////////////////////////////////////////////
   advertising->setAppearance(appearance);
   if (_randUUID) {

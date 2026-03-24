@@ -111,6 +111,30 @@ const float subghz_frequency_list[] = {
     928.000f
 };
 
+const float freq_analyzer_list_frequency[] = {
+  // Band 300-348 MHz
+  300.0, 303.0, 303.875, 304.25,
+  307.0, 307.5, 308.0,
+  310.0, 312.0, 312.0, 313.0, 314.0,
+  314.85, 315.0,
+  318.0,
+  // Band 387-464 MHz  
+  390.0,
+  418.0,
+  430.0, 430.5, 431.0, 431.5,
+  433.075, 433.92, 434.0, 434.42, 434.775,
+  438.9,
+  440.0,
+  446.0,
+  447.0, 
+  // Band 779-928 MHz
+  779.0,
+  868.0, 868.35,
+  915.0,
+  925.0,
+  928.0
+};
+
 const int keeloq_steps[] = {
     -50,
     -10,
@@ -189,6 +213,8 @@ class RFModules {
         bool keeloq_loop_emulate = false;
         int num_keeloq_steps = keeloq_steps[keeloq_steps_index];
 
+        bool signalsaved = false;
+
         RCSwitch rcSwitch = RCSwitch();
         RfCodes keyData;
         void main();
@@ -212,7 +238,6 @@ class RFModules {
         void save();
         void readSubFile(String filename, RfCodes &data);
         void sendCommand(const RfCodes& code);
-        void keeloqLoopEmulate_post();
         void resetKeyDetect();
         void shutdownCC1101();
 
