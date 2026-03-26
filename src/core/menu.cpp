@@ -1276,6 +1276,80 @@ void displayRFRead(bool available_data) {
 	}
 }
 
+void displayRFRawRecord() {
+    display.clearScreen();
+    display.setFont(u8g2_font_5x7_tf);
+    // Không gọi displayStatusBar() — tận dụng toàn bộ 64px
+
+    const RawRecordingStatus &st = g_rfRawRecordSt.status;
+
+    if (st.frequency <= 0) {
+        // ── Đang scan tần số ──────────────────────────────────────────────────
+        display.displayStringwithCoordinates("Scanning freq...", 0, 8);
+        // Hiện range đang dùng + hint đổi range
+        char rangeBuf[22];
+        snprintf(rangeBuf, sizeof(rangeBuf), "%.16s", rf._rawScan.rangeLabel());
+        display.displayStringwithCoordinates(rangeBuf,    0, 18);
+        display.displayStringwithCoordinates("RB range", 68, 18); // góc phải
+        static float         phase    = 0.0f;
+        static unsigned long lastAnim = 0;
+        if (millis() - lastAnim >= 30) {
+            int cy = 42, amp = 18;
+            for (int x = 0; x < espatsettings.displayWidth; x++) {
+                int y = cy + (int)(amp * sinf(phase + x * 0.05f));
+                if (y >= 20 && y < 64) display.drawingPixel(x, y);
+            }
+            phase += 0.15f;
+            if (phase >= 2 * PI) phase = 0.0f;
+            lastAnim = millis();
+        }
+
+    } else if (!st.recordingStarted) {
+        // ── Có freq, chờ tín hiệu ─────────────────────────────────────────────
+        char freqBuf[20];
+        snprintf(freqBuf, sizeof(freqBuf), "%.2f MHz", st.frequency);
+        display.displayStringwithCoordinates(freqBuf,            0, 8);
+        display.displayStringwithCoordinates("Waiting signal...", 0, 18);
+        static float         phase2    = 0.0f;
+        static unsigned long lastAnim2 = 0;
+        if (millis() - lastAnim2 >= 30) {
+            int cy = 42, amp = 18;
+            for (int x = 0; x < espatsettings.displayWidth; x++) {
+                int y = cy + (int)(amp * sinf(phase2 + x * 0.05f));
+                if (y >= 20 && y < 64) display.drawingPixel(x, y);
+            }
+            phase2 += 0.15f;
+            if (phase2 >= 2 * PI) phase2 = 0.0f;
+            lastAnim2 = millis();
+        }
+
+    } else if (st.recordingFinished) {
+        // ── Xong — hiện options ───────────────────────────────────────────────
+        display.displayStringwithCoordinates("Done!",         0,  8);
+        display.displayStringwithCoordinates("SEL Replay",  0, 22);
+        display.displayStringwithCoordinates("RB  Save",    0, 36);
+        display.displayStringwithCoordinates("LB  Discard", 0, 50);
+
+    } else {
+        // ── Đang ghi ──────────────────────────────────────────────────────────
+        char buf[22];
+        snprintf(buf, sizeof(buf), "REC %.2f MHz", st.frequency);
+        display.displayStringwithCoordinates(buf,         0,  8);
+        display.displayStringwithCoordinates("SEL stop", 0, 18);
+
+        // Bar RSSI — vùng y=20..63 (44px chiều cao)
+        if (st.rssiCount > 0) {
+            const int maxH = 40;
+            int barH = map(st.latestRssi, -90, -45, 1, maxH);
+            int x    = (int)(st.rssiCount * 1.2f) % espatsettings.displayWidth;
+            int yTop = 20 + (maxH - barH);
+            display.drawingVLine(x, yTop, barH * 2);
+        }
+    }
+
+    display.sendDisplay();
+}
+
 void displayRFFrequencychange() {
 	display.clearScreen();
 	displayStatusBar();
@@ -3241,6 +3315,21 @@ void selectCurrentItem() {
 				rf.main();
 				rf.configureMode(RF_FREQUENCY_ANALYZER_MODE);
 				displayRFFrequencyAnalyzer();
+			} else if (currentSelection == RF_READ_RAW) {
+		  	    currentState      = RF_RECEIVER_RAW_RUNNING;
+				g_rfRawSaved      = false;
+		        g_rfRawStopRecord = false;
+		        g_rfRawStopEmit   = false;
+		        g_rfRawRecordSt   = RawRecordState{};
+		        g_rfRawEmitSt     = RawEmitState{};
+		        if (rf.getCC1101()) {
+		            rf._raw_scan_begin();
+		        } else {
+		        	 g_rfRawRecordSt.recording.frequency = rf.getFrequency();
+		            g_rfRawRecordSt.status.frequency    = rf.getFrequency();
+		            rf._raw_record_begin(g_rfRawRecordSt);
+		        }
+		        displayRFRawRecord();
 			} else if (currentSelection == RF_SEND) {
 				currentState = RF_SEND_SELECT_SUB_FILE;
 				selection_list->clear();
@@ -3256,7 +3345,7 @@ void selectCurrentItem() {
 				display.drawingCenterString("Sending Code...", 32, true);
 				rf.shutdownCC1101();
 				rf.sendCommand(rf.keyData);
-				//rf.sendCommand(rf.keyData);
+				  rf.sendCommand(rf.keyData);
 				rfreplaycode = true;
 				if (rf.keyData.fix != 0 && rf.keyData.protocol != "RAW") { rf.keyData.keeloq_step(1); }
 
@@ -3276,6 +3365,9 @@ void selectCurrentItem() {
 				infrequencychange = true;
 				displayRFFrequencychange();
 			}
+			break;
+		case RF_RECEIVER_RAW_RUNNING:
+			// Input được xử lý ở đầu handleInput() trước khi check() generic tiêu thụ nút
 			break;
 		case RF_FREQUENCY_ANALYZER_RUNNING:
 			if (inRssichange) {
@@ -4047,6 +4139,70 @@ void goBack() {
 }
 
 void handleInput(MenuState handle_state) {
+	// ── RF Raw Record: xử lý TRƯỚC tất cả check() generic ────────────────────
+	// Lý do: check() tiêu thụ bool về false ngay, nếu để generic chạy trước
+	// thì vào selectCurrentItem() sẽ không còn giá trị nào để đọc.
+	if (handle_state == RF_RECEIVER_RAW_RUNNING) {
+		bool lb  = check(prevPress);
+		bool sel = check(selPress);
+		bool rb  = check(nextPress);
+
+		const RawRecordingStatus &st = g_rfRawRecordSt.status;
+
+		// ── Đang emit ─────────────────────────────────────────────────────────
+		if (!g_rfRawEmitSt.done && g_rfRawEmitSt.codeIdx > 0) {
+			if (lb || sel) g_rfRawStopEmit = true;
+			return;
+		}
+
+		// ── Đang scan / waiting / recording ───────────────────────────────────
+		if (!st.recordingFinished) {
+			if (lb) {
+				display.setFont(u8g2_font_ncenB08_tr);
+				for (auto &c : g_rfRawRecordSt.recording.codes) free(c);
+				g_rfRawRecordSt   = RawRecordState{};
+				g_rfRawEmitSt     = RawEmitState{};
+				g_rfRawSaved      = false;
+				g_rfRawStopRecord = false;
+				g_rfRawStopEmit   = false;
+				currentState      = RF_MENU;
+				currentSelection  = 0;
+				maxSelections     = RF_MENU_COUNT;
+				rf.shutdownCC1101();
+				displayRFMenu();
+			} else if (sel && st.recordingStarted) {
+				g_rfRawStopRecord = true;
+			} else if (rb && !st.recordingStarted) {
+				uint8_t nextRange = (rf._rawScan.rangeSelect + 1) % RAW_SCAN_RANGE_COUNT;
+				rf._raw_scan_set_range(nextRange);
+				g_rfRawRecordSt.status.frequency = 0;
+			}
+			return;
+		}
+
+		// ── Màn Done ──────────────────────────────────────────────────────────
+		if (lb) {
+			display.setFont(u8g2_font_ncenB08_tr);
+			for (auto &c : g_rfRawRecordSt.recording.codes) free(c);
+			g_rfRawRecordSt   = RawRecordState{};
+			g_rfRawEmitSt     = RawEmitState{};
+			g_rfRawSaved      = false;
+			g_rfRawStopRecord = false;
+			g_rfRawStopEmit   = false;
+			currentState      = RF_MENU;
+			currentSelection  = 0;
+			maxSelections     = RF_MENU_COUNT;
+			displayRFMenu();
+		} else if (sel) {
+			g_rfRawEmitSt = RawEmitState{};
+			rf._raw_emit_begin(g_rfRawEmitSt, g_rfRawRecordSt.recording);
+		} else if (rb) {
+			rf.raw_save(g_rfRawRecordSt.recording);
+			g_rfRawSaved = true;
+		}
+		return; // không chạy xuống generic check() bên dưới
+	}
+
 	// Handle Input
 	if (check(selPress)) {
 		if ((wifiScanRunning && handle_state == WIFI_SCAN_RUNNING) ||
@@ -4479,21 +4635,51 @@ void handleTasks(MenuState handle_state) {
 		}
 	}
 
-	else if (handle_state == RF_RECEIVER_RUNNING || handle_state == RF_RECEIVER_RAW_RUNNING) {
-		if (handle_state == RF_RECEIVER_RUNNING) {
-			if (rf.rcSwitch.available()) {
-				rf.parseReceivedData();
-			}
-			if (rf.getKeyDetect()) {
-				if (!fixRfDisplayLoop) {
-					fixRfDisplayLoop = true;
-					display.clearScreen();
-					displayRFRead(true);
-					blink_led(0, 0, 255, 3);
-				}
-			}
-		}
-	}
+         else if (handle_state == RF_RECEIVER_RUNNING || handle_state == RF_RECEIVER_RAW_RUNNING) {
+             if (handle_state == RF_RECEIVER_RUNNING) {
+                if (rf.rcSwitch.available()) rf.parseReceivedData();
+                if (rf.getKeyDetect()) {
+                    if (!fixRfDisplayLoop) {
+                        fixRfDisplayLoop = true;
+                        display.clearScreen();
+                        displayRFRead(true);
+                        blink_led(0, 0, 255, 3);
+                    }
+                }
+            } else {
+                RawRecordingStatus &st = g_rfRawRecordSt.status;
+      
+                if (!st.recordingFinished) {
+                    if (st.frequency <= 0) {
+                        // Scan tần số: 1 bước/frame, không dùng vTaskDelay
+                        float found = rf.raw_scan_tick();
+                        if (found > 0) {
+                            st.frequency = found;
+                            g_rfRawRecordSt.recording.frequency = found;
+                            // Defer sang frame sau để display kịp flush SPI
+                            // trước khi gọi rmt_new_rx_channel (cần scheduler running)
+                            g_rfRawNeedBegin = true;
+                        }
+                    } else if (g_rfRawNeedBegin) {
+                        // Frame sau scan — scheduler chắc chắn running, gọi begin an toàn
+                        g_rfRawNeedBegin = false;
+                        rf._raw_record_begin(g_rfRawRecordSt);
+                    } else {
+                        rf.raw_record_tick(g_rfRawRecordSt, g_rfRawStopRecord);
+                        g_rfRawStopRecord = false;
+                    }
+                }
+                else if (!g_rfRawEmitSt.done && g_rfRawEmitSt.codeIdx > 0) {
+                    RfRawState es = rf.raw_emit_tick(g_rfRawEmitSt, g_rfRawRecordSt.recording, g_rfRawStopEmit);
+                    g_rfRawStopEmit = false;
+                    if (es == RfRawState::IDLE) {
+                        g_rfRawEmitSt = RawEmitState{};
+                    }
+                }
+      
+                displayRFRawRecord();
+            }
+        }
 
 	else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING) {
 		if (!inRssichange) {
@@ -4925,6 +5111,7 @@ void menuloop() {
 							!(currentState == BADUSB_RUNNING) &&
 							!(currentState == IR_READ_RUNNING) &&
 							!(currentState == RF_RECEIVER_RUNNING) &&
+							!(currentState == RF_RECEIVER_RAW_RUNNING) &&
 							!(currentState == RF_FREQUENCY_ANALYZER_RUNNING) &&
 							!(currentState == RF_SEND_RUNNING) &&
 							!(currentState == CLOCK_MENU) && 

@@ -410,6 +410,12 @@ bool nrfScannerSetupOneShot = false;
 // RF
 
 bool rfreplaycode = false;
+static RawRecordState  g_rfRawRecordSt;
+static RawEmitState    g_rfRawEmitSt;
+static bool            g_rfRawSaved      = false;
+static bool            g_rfRawStopRecord = false; 
+static bool            g_rfRawStopEmit   = false;
+static bool            g_rfRawNeedBegin  = false;
 bool fixRfDisplayLoop = false;
 bool infrequencychange = false;
 bool inRssichange = false;

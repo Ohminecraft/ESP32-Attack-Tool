@@ -7,6 +7,9 @@
 #include <ELECHOUSE_CC1101_SRC_DRV.h>
 #include <RCSwitch.h>
 
+#include <driver/rmt_rx.h>
+#include <driver/rmt_tx.h>
+
 #include "core/settingheader.h"
 #include "core/utilsheader.h"
 #include "core/sdcardmountheader.h"
@@ -29,6 +32,9 @@ extern DisplayModules display;
 #define RSSI_MIN_VALID        -120  // dBm — limit signal strength
 #define FINE_STEP_MHZ         0.05  // fine scan step (50 kHz)
 #define FINE_RANGE_MHZ        1.0   // ±1 MHz scan around scanned signal
+
+#define RMT_RESOLUTION_HZ   1000000UL
+#define RMT_1MS_TICKS       1000UL
 
 struct KeeloqKey {
     String mf_name{};
@@ -168,6 +174,93 @@ struct RfCodes {
     void keeloq_step(uint16_t step);
 };
 
+struct RawRecording {
+    float frequency;
+    std::vector<rmt_symbol_word_t *> codes;
+    std::vector<uint16_t> codeLengths;
+    std::vector<uint16_t> gaps;
+};
+
+struct FreqFound {
+    float freq;
+    int rssi;
+};
+
+struct RawRecordingStatus {
+    float frequency = 0.f;
+    int rssiCount = 0;  // Counter for the number of RSSI readings
+    int latestRssi = 0; // Store the latest RSSI value
+    bool recordingStarted = false;
+    bool recordingFinished = false;
+    unsigned long firstSignalTime = 0; // Store the time of the latest signal
+    unsigned long lastSignalTime = 0;  // Store the time of the latest signal
+    unsigned long lastRssiUpdate = 0;
+};
+
+enum class RfRawState : uint8_t {
+    IDLE,
+    FREQ_SCANNING,    
+    WAITING_SIGNAL, 
+    RECORDING,       
+    RECORDING_DONE,  
+    EMITTING,         
+    SAVING,     
+    ERROR,
+};
+
+struct RawScanRangeLimits { int start; int end; const char *label; };
+static const RawScanRangeLimits RAW_SCAN_RANGES[] = {
+    {  0, 23, "300-348 MHz" },
+    { 24, 47, "387-464 MHz" },
+    { 48, 56, "779-928 MHz" },
+    {  0, 56, "All ranges"  },
+};
+#define RAW_SCAN_RANGE_COUNT 4
+ 
+struct FreqRawScanState {
+    int     idx          = 0;
+    int     idxStart     = 0;  
+    int     idxEnd       = 56; 
+    uint8_t rangeSelect  = 3;  
+    uint8_t attempt      = 0;
+    int     rssiThreshold = -65;
+    FreqFound best[5];
+
+    void reset(uint8_t range = 3) {
+        rangeSelect = range < RAW_SCAN_RANGE_COUNT ? range : 3;
+        idxStart    = RAW_SCAN_RANGES[rangeSelect].start;
+        idxEnd      = RAW_SCAN_RANGES[rangeSelect].end;
+        idx         = idxStart;
+        attempt     = 0;
+        for (int i = 0; i < 5; i++) { best[i].freq = 433.92f; best[i].rssi = -75; }
+    }
+
+    const char *rangeLabel() const {
+        return RAW_SCAN_RANGES[rangeSelect < RAW_SCAN_RANGE_COUNT ? rangeSelect : 3].label;
+    }
+};
+ 
+ 
+struct RawRecordState {
+    RawRecording        recording;
+    RawRecordingStatus  status;
+    rmt_channel_handle_t rx_ch        = NULL;
+    QueueHandle_t        receiveQueue = NULL;
+    bool                 fakeRssi     = false;
+    bool                 rssiFeature  = false;
+    bool                 returnToMenu = false;
+};
+
+struct RawEmitState {
+    size_t   codeIdx    = 0;
+    int      symbolIdx  = 0;
+    uint32_t gapStart   = 0;
+    bool     inGap      = false;
+    bool     done       = false;
+    bool     returnToMenu = false;
+    gpio_num_t txPin;
+};
+
 
 void keeloq_identify(RfCodes &instance);
 uint32_t keeloq_encrypt(const uint32_t data, const uint64_t key);
@@ -204,6 +297,12 @@ class RFModules {
         void sendType(uint64_t data, unsigned int bits, int pulse, int protocol, int repeat);
 
         bool saveSignal(float frequency, RfCodes codes, char *key);
+
+
+        // ISR callback cho RMT (phải static)
+        static bool _rmt_rx_done_cb(rmt_channel_t *ch,
+                                    const rmt_rx_done_event_data_t *edata,
+                                    void *user_data);
     public:
         std::vector<int> bitList;
         std::vector<int> bitRawList;
@@ -244,5 +343,16 @@ class RFModules {
         void frequencyAnalyzerLoop();
         void stepRSSIThreshold(int step);
         int8_t getFreqAnalyzerRssiThreshold();
+
+        FreqRawScanState _rawScan;
+
+        void        _raw_scan_begin(uint8_t range = 3);
+        void        _raw_scan_set_range(uint8_t range);
+        float       raw_scan_tick();                          // 0=scanning, >0=found, -1=error
+        bool        _raw_record_begin(RawRecordState &rs);
+        RfRawState  raw_record_tick(RawRecordState &rs, bool stopRequested);
+        bool        _raw_emit_begin(RawEmitState &es, RawRecording &rec);
+        RfRawState  raw_emit_tick(RawEmitState &es, RawRecording &rec, bool stopRequested);
+        bool        raw_save(RawRecording &rec);
 };
 #endif

@@ -461,7 +461,6 @@ void keeloq_identify(RfCodes &instance) {
     }
 }
 
-
 void RFModules::keeloq_save(RfCodes data) {
     String subfile_out = "Filetype: ESP32 Attack Tool - Rf File\n";
     subfile_out += "Frequency: " + String(data.frequency) + "\n";
