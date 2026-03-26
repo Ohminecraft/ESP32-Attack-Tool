@@ -60,6 +60,7 @@ void RFModules::sendCommand(const RfCodes& code) {
     float dataRate   = 10;
     int   rcswitch_protocol_no = 1;
  
+    // ── Giải mã preset ──────────────────────────────────────
     if (preset == "FuriHalSubGhzPresetOok270Async") {
         rcswitch_protocol_no = 1;
         modulation = 2;
@@ -85,6 +86,7 @@ void RFModules::sendCommand(const RfCodes& code) {
         deviation  = 19.042969;
         dataRate   = 9.996;
     } else {
+        // FIX #6: bỏ loop thừa, dùng toInt() trực tiếp
         int n = preset.toInt();
         if (n > 0 && n <= 30) {
             rcswitch_protocol_no = n;
@@ -95,22 +97,29 @@ void RFModules::sendCommand(const RfCodes& code) {
         }
     }
  
+    // ── Khởi tạo CC1101 đúng thứ tự ────────────────────────
+    // FIX #1: set this->frequency TRƯỚC rồi mới gọi main(),
+    //         main() sẽ dùng đúng tần số này.
     setFrequency(frequency / 1000000.0);
-    main();
+    main(); // Init SPI, getCC1101(), setFrequency(this->frequency)
     if (!cc1101_ready) {
         Serial.println("[ERROR] CC1101 not ready, aborting send.");
         return;
     }
  
+    // Ghi đè các tham số theo preset
     ELECHOUSE_cc1101.setPA(12);
     ELECHOUSE_cc1101.setModulation(modulation);
     if (deviation > 0) ELECHOUSE_cc1101.setDeviation(deviation);
     if (rxBW > 0)      ELECHOUSE_cc1101.setRxBW(rxBW);
     if (dataRate > 0)  ELECHOUSE_cc1101.setDRate(dataRate);
  
+    // FIX #1: configureMode KHÔNG gọi main() nữa → tần số không bị ghi đè
     configureMode(RF_TRANSMITTER_MODE);
  
+    // ── Gửi theo protocol ───────────────────────────────────
     if (protocol == "RAW") {
+        // FIX #4: đếm buff_size đúng
         int buff_size = 1;
         for (int i = 0; i < (int)data.length(); i++) {
             if (data[i] == ' ') buff_size++;
@@ -133,12 +142,13 @@ void RFModules::sendCommand(const RfCodes& code) {
             }
             startIndex = spaceIdx + 1;
         }
-        transmittimings[buff_size] = 0; 
+        transmittimings[buff_size] = 0; // terminator
  
         sendRAW(transmittimings);
         free(transmittimings);
  
     } else if (protocol == "BinRAW") {
+        // FIX (pass by value): dùng local copy thay vì sửa code
         RfCodes localCode = code;
         localCode.data = hexStrToBinStr(code.data);
         localCode.data.trim();
@@ -160,9 +170,11 @@ void RFModules::sendCommand(const RfCodes& code) {
     shutdownCC1101();
 }
 
+
 void RFModules::sendRAW(int *ptrtransmittimings) {
     if (!ptrtransmittimings) return;
-
+ 
+    // Tính tổng thời gian để ước lượng số lần repeat
     bool hasNeg = false;
     unsigned long sum_us = 0;
     for (int i = 0; ptrtransmittimings[i] != 0; i++) {
@@ -184,9 +196,11 @@ void RFModules::sendRAW(int *ptrtransmittimings) {
             unsigned int t;
  
             if (hasNeg) {
+                // signed: dương = HIGH, âm = LOW
                 lvl = (dur >= 0);
                 t   = (unsigned int)abs(dur);
             } else {
+                // unsigned: xen kẽ HIGH/LOW
                 lvl   = level;
                 t     = (unsigned int)dur;
                 level = !level;
@@ -195,6 +209,7 @@ void RFModules::sendRAW(int *ptrtransmittimings) {
             digitalWrite(espatsettings.cc1101Gdo0Pin, lvl ? HIGH : LOW);
             delayMicroseconds(t);
         }
+        // Gap cuối mỗi lần repeat
         digitalWrite(espatsettings.cc1101Gdo0Pin, LOW);
         delayMicroseconds(8000);
     }
@@ -203,6 +218,7 @@ void RFModules::sendRAW(int *ptrtransmittimings) {
 void RFModules::sendRAWBit(const RfCodes& data) {
     if (data.data.length() == 0) return;
  
+    // FIX #5: bắt đầu từ index hợp lệ (length-1), không phải length
     for (int nRepeat = 0; nRepeat < 1; nRepeat++) {
         for (int currentBit = (int)data.data.length() - 1; currentBit >= 0; currentBit--) {
             char c = data.data[currentBit];
@@ -231,77 +247,4 @@ void RFModules::sendType(uint64_t data, unsigned int bits, int pulse, int protoc
     mySwitch.setRepeatTransmit(repeat > 0 ? repeat : 6);
     mySwitch.send(data, bits);
     mySwitch.disableTransmit();
-}
-
-bool RFModules::_raw_emit_begin(RawEmitState &es, RawRecording &rec) {
-    es.codeIdx      = 0;
-    es.symbolIdx    = 0;
-    es.inGap        = false;
-    es.done         = false;
-    es.returnToMenu = false;
-
-    setFrequency(rec.frequency);
-    main();
-    if (!cc1101_ready) {
-        Serial.println("[ERROR] _raw_emit_begin: CC1101 not ready");
-        return false;
-    }
-    configureMode(RF_TRANSMITTER_MODE);
-
-    es.txPin = (gpio_num_t)espatsettings.cc1101Gdo0Pin;
-    pinMode(es.txPin, OUTPUT);
-    Serial.println("[INFO] RF Raw Emit Begin: " + String(rec.frequency) + " MHz");
-    return true;
-}
-
-// Gọi mỗi frame — không có while(), không check nút.
-// stopRequested = true khi handleInput() muốn dừng (LB hoặc SEL).
-// Trả về:  EMITTING = đang phát
-//          IDLE     = xong hoặc dừng
-RfRawState RFModules::raw_emit_tick(RawEmitState &es, RawRecording &rec, bool stopRequested) {
-    if (stopRequested) es.done = true;
-
-    if (es.done || es.codeIdx >= rec.codes.size()) {
-        shutdownCC1101();
-        Serial.println("[INFO] RF Raw Emit Done");
-        return RfRawState::IDLE;
-    }
-
-    // ── Đang chờ gap giữa 2 code block (non-blocking) ────────────────────────
-    if (es.inGap) {
-        if (millis() - es.gapStart >= rec.gaps[es.codeIdx - 1]) {
-            es.inGap = false; // gap xong → sang code tiếp
-        } else {
-            return RfRawState::EMITTING; // vẫn trong gap, trả về ngay
-        }
-    }
-
-    // ── Phát 1 code block (delayMicroseconds blocking theo thiết kế) ─────────
-    // RF timing yêu cầu độ chính xác microsecond — không thể yield giữa chừng.
-    // Một code block thường < 50ms nên UI vẫn update kịp sau mỗi block.
-    size_t codeLen = rec.codeLengths[es.codeIdx];
-    for (size_t j = 0; j < codeLen && !es.done; j++) {
-        auto &sym = rec.codes[es.codeIdx][j];
-        digitalWrite(es.txPin, sym.level0 == 1 ? HIGH : LOW);
-        delayMicroseconds(sym.duration0);
-        digitalWrite(es.txPin, sym.level1 == 1 ? HIGH : LOW);
-        delayMicroseconds(sym.duration1);
-    }
-    digitalWrite(es.txPin, LOW); // đảm bảo kết thúc ở mức thấp
-
-    es.codeIdx++;
-
-    // ── Bắt đầu gap sau code này (non-blocking) ───────────────────────────────
-    if (!es.done && es.codeIdx < rec.codes.size()) {
-        es.inGap    = true;
-        es.gapStart = millis();
-    }
-
-    if (es.done || es.codeIdx >= rec.codes.size()) {
-        shutdownCC1101();
-        Serial.println("[INFO] RF Raw Emit Done");
-        return RfRawState::IDLE;
-    }
-
-    return RfRawState::EMITTING;
 }

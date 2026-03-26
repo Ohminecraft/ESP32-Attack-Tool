@@ -3,6 +3,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 
+#include "core/displayheader.h"
 #include "core/menuheader.h"
 
 /*
@@ -61,5 +62,4 @@ void setup() {
 
 void loop() {
     menuloop();
-    //vTaskDelay(1 / portTICK_PERIOD_MS); // Small delay to prevent excessive CPU usage
 }
