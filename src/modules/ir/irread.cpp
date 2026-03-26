@@ -273,9 +273,10 @@ void IRReadModules::processSignalToContent(String btn_name) {
 }
 
 bool IRReadModules::saveintoSD() {
-    String file_name = "";
-    if (quickRemoteTV) file_name = "TvRemote_";
-    else file_name = "Code_";
+    String file_name = display.keyboard();
+    if (file_name == "\x01") {
+        return false;
+    }
     int i = 1;
 
     while(sdcard.isExists("/" + file_name + String(i) + ".ir")) i++;

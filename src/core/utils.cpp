@@ -9,7 +9,7 @@
 	* Licensed under the MIT License.
 */
 
-String generateRandomName() {
+String generateRandomString() {
 	int len = rand() % 10 + 1; // Limit length to 1-10 characters
 	String randomName = "";
 	
@@ -21,6 +21,60 @@ String generateRandomName() {
 	}
 	
 	return randomName;
+}
+
+uint64_t reverse_bits(uint64_t num, uint8_t bits) {
+    uint64_t res = 0;
+
+    for (uint8_t i = 0; i < bits; ++i) {
+        res <<= 1;
+        res |= bitAt(num, i);
+    }
+
+    return res;
+}
+
+// Function to compute CRC-64-ECMA
+uint64_t crc64_ecma(const std::vector<int> &data) {
+    uint64_t crc = CRC64_ECMA_INIT;
+
+    for (int value : data) {
+        crc ^= (uint64_t)value << 56; // Use the value as the high byte
+        for (int i = 0; i < 8; i++) {
+            if (crc & 0x8000000000000000) {
+                crc = (crc << 1) ^ CRC64_ECMA_POLY;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+
+    return crc;
+}
+
+char *dec2binWzerofill(uint64_t Dec, unsigned int bitLength) {
+    // Allocate memory dynamically for safety
+    char *bin = (char *)malloc(bitLength + 1);
+    if (!bin) return NULL; // Handle allocation failure
+
+    bin[bitLength] = '\0'; // Null-terminate string
+
+    for (int i = bitLength - 1; i >= 0; i--) {
+        bin[i] = (Dec & 1) ? '1' : '0';
+        Dec >>= 1;
+    }
+
+    return bin;
+}
+
+void generateRandomString(char* buffer, size_t length) {
+    const char charset[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    size_t charsetSize = sizeof(charset) - 1; // Exclude null terminator
+
+    for (size_t i = 0; i < length - 1; i++) {
+        buffer[i] = charset[random(0, charsetSize)];
+    }
+    buffer[length - 1] = '\0'; // Null-terminate the string
 }
 
 uint32_t getHeap(uint8_t type) {
@@ -55,6 +109,30 @@ bool checkLeftMemory() {
 
 void getMAC(char *addr, uint8_t* data, uint16_t offset) {
 	sprintf(addr, "%02x:%02x:%02x:%02x:%02x:%02x", data[offset+0], data[offset+1], data[offset+2], data[offset+3], data[offset+4], data[offset+5]);
+}
+
+void getMAC(uint8_t* mac, const uint8_t* data, uint16_t offset) {
+  for (int i = 0; i < 6; i++)
+    mac[i] = data[offset + i];
+}
+
+String hexDump(const uint8_t *buf, size_t len) {
+  String out;
+  out.reserve(len * 3);  // "FF " per byte (approx)
+
+  for (size_t i = 0; i < len; i++) {
+    if (buf[i] < 0x10) {
+      out += '0';
+    }
+    out += String(buf[i], HEX);
+
+    if (i < len - 1) {
+      out += ' ';
+    }
+  }
+
+  out.toUpperCase();
+  return out;
 }
 
 void generateRandomMac(uint8_t* mac) {
@@ -147,6 +225,81 @@ int splitStringToVector(String str, char delimiter, std::vector<String>& result)
     return count;
 }
 
+String hexStrToBinStr(const String &hexStr) {
+    String binStr = "";
+    String hexByte = "";
+
+    // Variables for decimal value
+    int value;
+
+    for (int i = 0; i < hexStr.length(); i++) {
+        char c = hexStr.charAt(i);
+
+        // Check if the character is a hexadecimal digit
+        if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')) {
+            hexByte += c;
+            if (hexByte.length() == 2) {
+                // Convert the hexadecimal pair to a decimal value
+                value = strtol(hexByte.c_str(), NULL, 16);
+
+                // Convert the decimal value to binary and add to the binary string
+                for (int j = 7; j >= 0; j--) { binStr += (value & (1 << j)) ? '1' : '0'; }
+                // binStr += ' ';
+
+                // Clear the hexByte string for the next byte
+                hexByte = "";
+            }
+        }
+    }
+
+    // Remove the extra trailing space, if any
+    if (binStr.length() > 0 && binStr.charAt(binStr.length() - 1) == ' ') {
+        binStr.remove(binStr.length() - 1);
+    }
+
+    return binStr;
+}
+
+void decimalToHexString(uint64_t decimal, char *output) {
+    char hexDigits[] = "0123456789ABCDEF";
+    char temp[65];
+    int index = 15;
+
+    // Initialize tem string with zeros
+    for (int i = 0; i < 64; i++) { temp[i] = '0'; }
+    temp[65] = '\0';
+
+    // Convert decimal to hexadecimal
+    while (decimal > 0) {
+        temp[index--] = hexDigits[decimal % 16];
+        decimal /= 16;
+    }
+
+    // Format string with spaces
+    int outputIndex = 0;
+    for (int i = 0; i < 16; i++) {
+        output[outputIndex++] = temp[i];
+        if ((i % 2) == 1 && i != 15) { output[outputIndex++] = ' '; }
+    }
+    output[outputIndex] = '\0';
+}
+
+uint32_t hexStringToDecimal(const char *hexString) {
+    uint32_t decimal = 0;
+    int length = strlen(hexString);
+
+    for (int i = 0; i < length; i += 3) {
+        decimal <<= 8; // Shift left to accommodate next byte
+
+        // Converts two characters hex to a single byte
+        uint8_t highNibble = hexCharToDecimal(hexString[i]);
+        uint8_t lowNibble = hexCharToDecimal(hexString[i + 1]);
+        decimal |= (highNibble << 4) | lowNibble;
+    }
+
+    return decimal;
+}
+
 String uint32ToString(uint32_t value) {
     char buffer[12] = {0}; // 8 hex digits + 3 spaces + 1 null terminator
     snprintf(
@@ -191,6 +344,24 @@ uint8_t hexCharToDecimal(char c) {
     return 0;
 }
 
+bool getNextLine(const String &src, int &index, String &line) {
+    if (index >= src.length()) return false;
+
+    int next = src.indexOf('\n', index);
+    if (next == -1) {
+        line = src.substring(index);
+        index = src.length();
+    } else {
+        line = src.substring(index, next);
+        index = next + 1;
+    }
+
+    if (line.endsWith("\r")) {
+        line.remove(line.length() - 1);
+    }
+    return true;
+}
+
 volatile bool nextPress = false;
 volatile bool prevPress = false;
 volatile bool selPress = false;
@@ -204,6 +375,9 @@ bool low_memory_warning = false; // Low Memory Warning Flag
 
 // Encoder Object
 RotaryEncoder *encoder = nullptr;
+
+// Selection list
+LinkedList<String> *selection_list;
 
 IRAM_ATTR void checkPosition() {
     encoder->tick(); // just call tick() to check the state.

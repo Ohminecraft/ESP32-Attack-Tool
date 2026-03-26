@@ -27,7 +27,8 @@
 #include "modules/nrf24/nrf24header.h"
 #include "modules/ir/irsend_header.h"
 #include "modules/ir/irread_header.h"
-#include "modules/badusb/ducky_usb_header.h"
+#include "modules/badble/badscript_header.h"
+#include "modules/rf/rfheader.h"
 
 #include "configs.h"
 
@@ -42,17 +43,18 @@
 // Menu states
 enum MenuState {
     MAIN_MENU,
+    SELECTION_LIST,
     BLE_MENU,
     WIFI_MENU,
     NRF24_MENU,
     IR_MENU,
+    RF_MENU,
     SD_MENU,
     CLOCK_MENU,
     SD_UPDATE_MENU,
-    SD_DELETE_MENU,
     BADUSB_KEY_LAYOUT_MENU,
     BADUSB_RUNNING,
-    IR_TV_B_GONE_REGION,
+    IR_UNIVERSAL_POWER_REMOTE_MENU,
     IR_READ_MENU,
     IR_READ_RUNNING,
     IR_CODE_SELECT,
@@ -61,9 +63,15 @@ enum MenuState {
     NRF24_SCANNER_RUNNING,
     NRF24_JAMMER_RUNNING,
     NRF24_JAMMER_MENU,
+    RF_RECEIVER_RUNNING,
+    RF_RECEIVER_RAW_RUNNING,
+    RF_FREQUENCY_ANALYZER_RUNNING,
+    RF_SEND_SELECT_SUB_FILE,
+    RF_SEND_RUNNING,
     WIFI_UTILS_MENU,
     WIFI_UTILS_SET_MAC_MENU,
     WIFI_GENERAL_MENU,
+    WIFI_JOIN_MENU,
     WIFI_SCAN_RUNNING,
     WIFI_SCAN_SNIFFER_RUNNING,
     WIFI_SELECT_MENU,
@@ -97,6 +105,7 @@ enum MainMenuItem {
     MAIN_WIFI,
     MAIN_NRF24,
     MAIN_IR,
+    MAIN_RF,
     MAIN_SD,
     MAIN_CLOCK,
     MAIN_DEEP_SLEEP,
@@ -164,6 +173,7 @@ enum BLEExploitAttackMenuItem {
     BLE_ATK_SAMSUNG_SPAM,
     BLE_ATK_GOOGLE_SPAM,
     BLE_ATK_NAME_FLOOD_SPAM,
+    BLE_ATK_FLIPPER_ZERO_SPAM,
     BLE_ATK_SPAM_ALL,
     BLE_ATK_BACK,
     BLE_ATK_MENU_COUNT
@@ -237,6 +247,8 @@ enum WiFiGeneralItem {
     WIFI_GENERAL_EAPOL_SCAN,
     WIFI_GENERAL_EAPOL_DEAUTH_SCAN,
     WIFI_GENERAL_CH_ANALYZER,
+    WIFI_GENERAL_SAE_COMMIT_SCAN,
+    WIFI_GENERAL_JOIN_WIFI,
     WIFI_GENERAL_BACK,
     WIFI_GENERAL_MENU_COUNT
 };
@@ -246,6 +258,7 @@ enum WiFiAttackMenuItem {
     WIFI_ATK_DEAUTH,
     WIFI_ATK_STA_DEAUTH,
     WIFI_ATK_DEAUTH_FLOOD,
+    WIFI_ATK_SAE_COMMIT,
     WIFI_ATK_AUTH,
     WIFI_ATK_RIC_BEACON,
     WIFI_ATK_FUN_BEACON,
@@ -258,6 +271,8 @@ enum WiFiAttackMenuItem {
     WIFI_ATK_BAD_MSG_ALL,
     WIFI_ATK_SLEEP,
     WIFI_ATK_SLEEP_ALL,
+    WIFI_ATK_CSA,
+    WIFI_ATK_QUIET,
     WIFI_ATK_BACK,
     WIFI_ATK_MENU_COUNT
 };
@@ -287,7 +302,7 @@ enum NRFJammerItem {
 enum IRMenuItem {
     IR_READ,
     IR_SEND,
-    IR_TV_B_GONE,
+    IR_UNIVERSAL_POWER_REMOTE,
     IR_BACK,
     IR_MENU_COUNT
 };
@@ -299,11 +314,25 @@ enum IRReadMenuItem {
     IR_READ_MENU_COUNT
 };
 
-enum IRTVBGoneRegion {
-    IR_TV_B_GONE_NA,
-    IR_TV_B_GONE_EU,
-    IR_TV_B_GONE_BACK,
-    IR_TV_B_GONE_REGION_COUNT
+enum UniversalPowerRemoteRegion {
+    IR_UNIVERSAL_POWER_TV,
+    IR_UNIVERSAL_POWER_PROJECTOR,
+    IR_UNIVERSAL_POWER_AC,
+    IR_UNIVERSAL_POWER_FAN,
+    IR_UNIVERSAL_POWER_LED,
+    IR_UNIVERSAL_POWER_MONITOR,
+    IR_UNIVERSAL_POWER_BACK,
+    IR_UNIVERSAL_POWER_MODE_COUNT
+};
+
+enum RFMenuItem {
+    RF_READ,
+    RF_READ_RAW,
+    RF_SEND,
+    RF_JAMMER,
+    RF_FREQ_ANALYZER,
+    RF_BACK,
+    RF_MENU_COUNT
 };
 
 enum SDMenuItem {
@@ -378,10 +407,17 @@ bool nrfAnalyzerSetupOneShot = false;
 bool nrfJammerSetupOneShot = false;
 bool nrfScannerSetupOneShot = false;
 
+// RF
+
+bool rfreplaycode = false;
+bool fixRfDisplayLoop = false;
+bool infrequencychange = false;
+bool inRssichange = false;
+bool inkeeloqstepchange = false;
+
 // IRSend/Recv
 
-TvBeGoneRegion irTvBGoneRegion;
-bool starttvbgone = false;
+bool startuniversalpowerremote = false;
 
 //bool irtxRedraw = false;
 bool send_select_code = false;
@@ -391,8 +427,25 @@ String irSendFile;
 bool irreadOneShot = false;
 
 // BadUSB
+
+const uint8_t *keyboardLayouts[] = {
+    KeyboardLayout_en_US, // 0
+    KeyboardLayout_da_DK, // 1
+    KeyboardLayout_en_UK, // 2
+    KeyboardLayout_fr_FR, // 3
+    KeyboardLayout_de_DE, // 4
+    KeyboardLayout_hu_HU, // 5
+    KeyboardLayout_it_IT, // 6
+    KeyboardLayout_en_US, // 7
+    KeyboardLayout_pt_BR, // 8
+    KeyboardLayout_pt_PT, // 9
+    KeyboardLayout_si_SI, // 10
+    KeyboardLayout_es_ES, // 11
+    KeyboardLayout_sv_SE, // 12
+    KeyboardLayout_tr_TR  // 13
+};
+
 bool selectforbadusb = false;
-bool badble = false;
 String badusbFile;
 
 bool need_restart = false;
@@ -401,6 +454,9 @@ bool need_restart = false;
 bool autoSleep = false;
 bool standby = false;
 bool handleStateRunningCheck = false; // Used to check if the handle state is running
+
+// SD
+bool selectforsddelete = false;
 
 void displayWelcome();
 void displayMainMenu();

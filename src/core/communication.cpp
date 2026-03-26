@@ -40,6 +40,8 @@ RTL8720DNCommunication::~RTL8720DNCommunication() {
         RTL_START_EAPOL_SNIFFER // Start EAPOL Sniffer
         RTL_START_EAPOL_DEAUTH_SNIFFER // Start EAPOL Sniffer with Deauthentication
         RTL_START_DEAUTH_SNIFFER // Start Deauthentication Sniffer
+
+        // Sorry I sell my rtl8720dn module so I can't implement these features, but I will try to add them in the future if I have the chance to get another module
         ///////////////////////////////////////
 */
 

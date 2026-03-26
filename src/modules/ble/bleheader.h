@@ -27,11 +27,12 @@ DisplayModules ble_display_obj;
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C2) || \
     defined(CONFIG_IDF_TARGET_ESP32S3)
 #define MAX_TX_POWER ESP_PWR_LVL_P21 // ESP32C3 ESP32C2 ESP32S3
-#elif defined(CONFIG_IDF_TARGET_ESP32H2) || defined(CONFIG_IDF_TARGET_ESP32C6)
-#define MAX_TX_POWER ESP_PWR_LVL_P20 // ESP32H2 ESP32C6
+#elif defined(CONFIG_IDF_TARGET_ESP32H2) || defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32C5)
+#define MAX_TX_POWER ESP_PWR_LVL_P20 // ESP32H2 ESP32C6 ESP32C5
 #else
 #define MAX_TX_POWER ESP_PWR_LVL_P9 // Default
 #endif
+
 enum BLEScanState {
     BLE_SCAN_OFF,
     BLE_SCAN_DEVICE,
@@ -47,6 +48,7 @@ enum BLEScanState {
     BLE_ATTACK_EXPLOIT_SAMSUNG,
     BLE_ATTACK_EXPLOIT_GOOGLE,
     BLE_ATTACK_EXPLOIT_NAME_FLOOD,
+    BLE_ATTACK_EXPLOIT_FLIPPER,
     BLE_ATTACK_EXPLOIT_SPAM_ALL
 };
 
@@ -59,7 +61,8 @@ enum EBLEPayloadType
     AppleJuice,
     Samsung,
     Google,
-    NameFlood
+    NameFlood,
+    Flipper
 };
 
 #define CONN_MODE_NON 0
@@ -73,7 +76,7 @@ enum EBLEPayloadType
 #define BLE_SPOOFER_DEVICE_BRAND_APPLE 0
 #define BLE_SPOOFER_DEVICE_BRAND_SAMSUNG 1
 
-struct Flipper {
+struct FlipperData {
     String name;
     String variant;
 };
@@ -87,7 +90,7 @@ struct BLEScanResult {
     int rssi;
     BLEAddress addr;
     bool isFlipper;
-    Flipper flipperdata;
+    FlipperData flipperdata;
     bool isAirtags;
     Airtags airtagsdata;
 };

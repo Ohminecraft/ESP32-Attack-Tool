@@ -16,22 +16,21 @@
 #include <IRSend.h>
 #include <IRutils.h>
 #include "configs.h"
-#include "WORLD_IR_CODES.h"
 
 #include "core/settingheader.h"
 #include "core/sdcardmountheader.h"
 #include "core/utilsheader.h"
 
+#include "universal_power_ir_code/tv.h"
+#include "universal_power_ir_code/projectors.h"
+#include "universal_power_ir_code/ac.h"
+#include "universal_power_ir_code/fans.h"
+#include "universal_power_ir_code/leds.h"
+#include "universal_power_ir_code/monitors.h"
+
 extern ESP32ATSetting espatsettings;
 
-#define NOPP __asm__ __volatile__("nop")
-
-enum TvBeGoneRegion {
-    NA = 0,
-    EU = 1
-};
-
-extern TvBeGoneRegion begoneregion;
+extern String universal_power_mode;
 extern SDCardModules sdcard;
 
 struct IRCode {
@@ -67,14 +66,15 @@ extern LinkedList<IRCode> *ir_codes;
 
 class IRSendModules {
     private:
-        IRsend irsend;
-        uint32_t size_num_codes;
+        //IRsend irsend;
+        //uint32_t size_num_codes;
     public:
         IRSendModules();
 
-        uint8_t begone_code_sended = 0;
+        uint16_t universal_power_code_sended = 0;
         void main();
-        void startTVBGone();
+        void startUniversalPowerRemote();
+        IRCode parseIrData(const String &rawText);
         void sendIRTx(String filename);
         void getCodesToSendIR(String filename);
         void sendIRCommand(IRCode *code);

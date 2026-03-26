@@ -8,35 +8,38 @@
     * Licensed under the MIT License.
 */
 
-LinkedList<String> *sdcard_buffer;
 SPIClass *SDCardSPI;
 
 void SDCardModules::main() {
     SDCardSPI = &SPI;
-    sdcard_buffer = new LinkedList<String>();
     SDCardSPI->begin(espatsettings.spiSckPin,
                      espatsettings.spiMisoPin,
                      espatsettings.spiMosiPin);
     if (!SD.begin(espatsettings.sdcardCsPin, *SDCardSPI)) {
-        Serial.println("[ERROR] SD Card Mount Failed!");
+        Serial.println("[ERROR] SD Card Mount Failed! | Fallback to LittleFS");
+        if(LittleFS.begin(true)) {
+            Serial.println("[INFO] Successfully mount LittleFS");
+            littlefsmounted = true;
+        }
         return;
-    }
-    mounted = true;
-    Serial.println("[INFO] SD Card Mounted Successfully!");
-    Serial.print("[INFO] SD Card Size: ");
-    Serial.print(SD.cardSize() / (1024 * 1024));
-    Serial.println(" MB");
+    } else mounted = true;
+    if (mounted) {
+        Serial.println("[INFO] SD Card Mounted Successfully!");
+        Serial.print("[INFO] SD Card Size: ");
+        Serial.print(SD.cardSize() / (1024 * 1024));
+        Serial.println(" MB");
 
-    if(!SD.exists("/ESP32AttackTool")) {
-        Serial.println("[INFO] Main Directory does not exist. Creating...");
-        SD.mkdir("/ESP32AttackTool");
-        Serial.println("[INFO] Main Directory created successfully.");
+        if(!SD.exists("/ESP32AttackTool")) {
+            Serial.println("[INFO] Main Directory does not exist. Creating...");
+            SD.mkdir("/ESP32AttackTool");
+            Serial.println("[INFO] Main Directory created successfully.");
+        }
     }
 }
 
-File SDCardModules::getFile(String path, String mode) {
+File SDCardModules::getFile(String path, String mode, bool create) {
     if (mounted) {
-        File file = SD.open("/ESP32AttackTool" + path, mode.c_str());
+        File file = SD.open("/ESP32AttackTool" + path, mode.c_str(), create);
         if (file) {
             //Serial.println("[INFO] File opened/created successfully: " + path);
             return file;
@@ -45,7 +48,17 @@ File SDCardModules::getFile(String path, String mode) {
             return File(); // Return an empty File object if opening failed
         }
     } else {
-        Serial.println("[WARN] SD Card is not mounted!");
+        if (littlefsmounted) {
+            File file = LittleFS.open("/" + path, mode.c_str(), create);
+            if (file) {
+            //Serial.println("[INFO] File opened/created successfully: " + path);
+            return file;
+            } else {
+                Serial.println("[ERROR] Failed to open/created file: " + path);
+                return File(); // Return an empty File object if opening failed
+            }
+        }
+        //Serial.println("[WARN] SD Card is not mounted!");
     }
     return File(); // Return an empty File object if SD card is not mounted
 }
@@ -56,12 +69,17 @@ void SDCardModules::close() {
         mounted = false;
         Serial.println("[INFO] SD Card Unmounted Successfully!");
     } else {
-        Serial.println("[WARN] SD Card is not mounted!");
+        if (littlefsmounted) {
+            LittleFS.end();
+            littlefsmounted = false;
+            Serial.println("[INFO] LittleFS Unmounted Successfully!");
+        }
     }
 }
-
 bool SDCardModules::isMounted() {
-    return mounted;
+    if (mounted) return mounted;
+    else if (littlefsmounted) return littlefsmounted;
+    return false;
 }
 
 bool SDCardModules::deleteFile(String path) {
@@ -72,6 +90,16 @@ bool SDCardModules::deleteFile(String path) {
         } else {
             Serial.println("[INFO] File deleted successfully: " + path);
             return true;
+        }
+    } else {
+        if (littlefsmounted) {
+            if(!LittleFS.remove("/" + path)) {
+                Serial.println("[ERROR] Failed to delete file: " + path);
+                return false;
+            } else {
+                Serial.println("[INFO] File deleted successfully: " + path);
+                return true;
+            }
         }
     }
     return true;
@@ -85,37 +113,47 @@ bool SDCardModules::isExists(String path) {
             return false;
         }
     } else {
-        Serial.println("[WARN] SD Card is not mounted!");
+        if (littlefsmounted) {
+            if (LittleFS.exists("/" + path)) {
+                return true;
+            } else {
+                return false;
+            }
+        }
     }
     return false; // Default return if SD card is not mounted
 }
 
 void SDCardModules::addListFileToLinkedList(LinkedList<String> *file_names, String str_dir, String ext) {
+    File dir;
     if (mounted) {
-        File dir;
         if (str_dir == "/") {
             dir = SD.open("/ESP32AttackTool");
         } else {
             dir = SD.open("/ESP32AttackTool" + str_dir);
         }
-        while (true) {
-            File entry = dir.openNextFile();
-            if (!entry) {
-                break;
-            }
-            if (entry.isDirectory()) continue;
-
-            String file_name = entry.name();
-            if (ext != "") {
-                if (file_name.endsWith(ext)) {
-                    file_names->add(file_name);
-                }
-            } else {
-                file_names->add(file_name);
-            }
+    } else if (littlefsmounted) {
+        if (str_dir == "/") {
+            dir = LittleFS.open("/");
+        } else {
+            dir = LittleFS.open("/" + str_dir);
         }
-    } else {
-        Serial.println("[WARN] SD Card is not mounted!");
+    }
+    while (true) {
+        File entry = dir.openNextFile();
+        if (!entry) {
+            break;
+        }
+        if (entry.isDirectory()) continue;
+
+        String file_name = entry.name();
+        if (ext != "") {
+            if (file_name.endsWith(ext)) {
+                   file_names->add(file_name);
+            }
+        } else {
+            file_names->add(file_name);
+        }
     }
 }
 

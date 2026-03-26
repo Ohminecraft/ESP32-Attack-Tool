@@ -43,6 +43,169 @@ bool DisplayModules::main()
     return true;
 }
 
+String DisplayModules::keyboard() {
+
+    // ── Key layouts (3 modes, 4 rows each) ───────────────────────
+    // Sentinel characters (non-printable):
+    //   \x01 = SHIFT (cycle mode)
+    //   \x02 = BACKSPACE
+    //   \x03 = SPACE
+    //   \x04 = DONE / OK
+    const char* rows[3][4] = {
+		{ "qwertyuiop", "asdfghjkl", "\x01zxcvbnm\x02", "\x03\x04\x05" },
+		{ "QWERTYUIOP", "ASDFGHJKL", "\x01ZXCVBNM\x02", "\x03\x04\x05" },
+		{ "1234567890", "!@#$%^&*()", "\x01-_=+[]{}\x02", ".,;:'\"~`\x04\x05" },
+	};
+
+    // ── Layout constants ──────────────────────────────────────────
+    const uint8_t KEY_W   = 12;
+    const uint8_t KEY_H   = 12;
+    const uint8_t KEY_GAP =  1;
+    const uint8_t STEP    = KEY_W + KEY_GAP;
+    const uint8_t KB_Y    = 14;   // Keyboard top Y (below input bar)
+    const uint8_t INPUT_H = 12;
+
+    // ── State ─────────────────────────────────────────────────────
+    String  input   = "";
+    uint8_t mode    = 0;
+    uint8_t curRow  = 0;
+    uint8_t curCol  = 0;
+
+    // Compute total key count for current mode (used for linear wrap)
+    auto totalKeys = [&]() -> uint8_t {
+        uint8_t total = 0;
+        for (uint8_t r = 0; r < 4; r++)
+            total += strlen(rows[mode][r]);
+        return total;
+    };
+
+    // Convert flat linear index → (row, col)
+    auto indexToRC = [&](uint8_t idx) {
+        for (uint8_t r = 0; r < 4; r++) {
+            uint8_t len = strlen(rows[mode][r]);
+            if (idx < len) { curRow = r; curCol = idx; return; }
+            idx -= len;
+        }
+    };
+
+    // Convert (row, col) → flat linear index
+    auto rcToIndex = [&]() -> uint8_t {
+        uint8_t idx = 0;
+        for (uint8_t r = 0; r < curRow; r++)
+            idx += strlen(rows[mode][r]);
+        return idx + curCol;
+    };
+
+	clearScreen();
+
+    // ── Main loop ─────────────────────────────────────────────────
+    while (true) {
+
+        // ── Render ────────────────────────────────────────────────
+        clearScreen();
+        setFont(u8g2_font_5x7_tf);
+
+        // Input bar
+        drawRBox(0, 0, 128, INPUT_H, 2);
+        setDrawColor(0);
+        String displaytext = input.length() > 18
+                         ? input.substring(input.length() - 18)
+                         : input;
+        displaytext += "_";
+        displayStringwithCoordinates(displaytext, 2, INPUT_H - 2);
+
+		// Mode indicator
+        const char* modeLabel[] = { "ab", "AB", "!1" };
+        displayStringwithCoordinates(modeLabel[mode], 110, INPUT_H - 2);
+
+        setDrawColor(1);
+
+        // Draw all keys
+        for (uint8_t r = 0; r < 4; r++) {
+            const char* row    = rows[mode][r];
+            uint8_t     len    = strlen(row);
+            uint8_t     rowPx  = len * STEP - KEY_GAP;
+            uint8_t     startX = (128 - rowPx) / 2;
+            uint8_t     y      = KB_Y + r * (KEY_H + KEY_GAP);
+
+            for (uint8_t c = 0; c < len; c++) {
+                uint8_t x   = startX + c * STEP;
+                char    ch  = row[c];
+                bool    sel = (r == curRow && c == curCol);
+
+                if (sel) {
+                    drawRBox(x, y, KEY_W, KEY_H, 2);
+                } else {
+                    drawRFrame(x, y, KEY_W, KEY_H, 2);
+                }
+
+                setDrawColor(sel ? 0 : 1);
+
+                // Key label
+                char lbl[3] = {0};
+                switch (ch) {
+                    case '\x01': lbl[0] = '^';               break; // SHIFT
+                    case '\x02': lbl[0] = '<';               break; // BACK
+                    case '\x03': lbl[0] = '_';               break; // SPACE
+                    case '\x04': lbl[0] = 'O'; lbl[1] = 'K'; break;
+					case '\x05': lbl[0] = 'E'; lbl[1] = 'X'; break;
+                    default:     lbl[0] = ch;                break;
+                }
+
+                uint8_t lw = (lbl[1] ? 10 : 5);
+                displayStringwithCoordinates(lbl, x + (KEY_W - lw) / 2, y + KEY_H - 2);
+
+                setDrawColor(1);
+            }
+        }
+
+        sendDisplay();
+
+        // ── Button handling ───────────────────────────────────────
+        if (check(nextPress)) {
+            uint8_t idx  = rcToIndex();
+            uint8_t total = totalKeys();
+            indexToRC((idx + 1) % total);   // move forward, wrap to key 0
+        }
+
+        if (check(prevPress)) {
+            uint8_t idx   = rcToIndex();
+            uint8_t total = totalKeys();
+            indexToRC((idx + total - 1) % total); // move back, wrap to last key
+        }
+
+        if (check(selPress)) {
+            char ch = rows[mode][curRow][curCol];
+
+            switch (ch) {
+                case '\x01':
+                    // Cycle mode, reset cursor to first key
+                    mode   = (mode + 1) % 3;
+                    curRow = 0;
+                    curCol = 0;
+                    break;
+
+                case '\x02':
+                    if (input.length() > 0)
+                        input.remove(input.length() - 1);
+                    break;
+
+                case '\x03':
+                    input += ' ';
+                    break;
+
+                case '\x04': setFont(u8g2_font_ncenB08_tr); return input;    // OK
+
+				case '\x05': setFont(u8g2_font_ncenB08_tr); return "\x01";   // EXIT
+
+                default:
+                    input += ch;
+                    break;
+            }
+        }
+    }
+}
+
 void DisplayModules::clearScreen()
 {
     if (!screenInitialized) {
@@ -198,6 +361,18 @@ void DisplayModules::displayString(String msg, bool ln, bool senddisplay, int co
     if (senddisplay) {
         u8g2.sendBuffer();
     }
+}
+
+void DisplayModules::drawRBox(int x, int y, int w, int h, int r) {
+    u8g2.drawRBox(x, y, w, h, r);
+}
+
+void DisplayModules::setDrawColor(int color) {
+    u8g2.setDrawColor(color);
+}
+
+void DisplayModules::drawRFrame(int x, int y, int w, int h, int r) {
+    u8g2.drawRFrame(x, y, w, h, r);
 }
 
 void DisplayModules::drawingCenterString(String msg, int y, bool senddisplay, int color)

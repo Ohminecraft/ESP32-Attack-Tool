@@ -30,13 +30,14 @@ class ESP32ATSetting {
         uint8_t statusLedPin = STA_LED;
         String evilportalSSID = "ESP32AttackTool";
         std::map<String, String> wifi = {};
-        bool autoConnectWiFi = false;
+        bool autoConnectWiFi = true;
         bool savepcap = true;
         String bleName = "ESP32AttackTool";
         bool usingSwiftpairForBLEUtilty = true;
         uint16_t sourappleSpamDelay = SOUR_APPLE_SPAM_DELAY;
         uint16_t applejuiceSpamDelay = APPLE_JUICE_SPAM_DELAY;
         uint16_t swiftpairSpamDelay = SWIFTPAIR_SPAM_DELAY;
+        uint16_t badscriptKeyDelay = 50;
         bool useAppleJuicePaired = true; // Show Color of device
         bool useBleNameasnameofNameFlood = true;
         uint16_t spamAllDelay = 20;
@@ -46,13 +47,15 @@ class ESP32ATSetting {
         uint8_t sdcardCsPin = SD_CS_PIN;
         uint8_t nrfCePin = NRF24_CE_PIN;
         uint8_t nrfCsPin = NRF24_CSN_PIN;
+        uint8_t cc1101CsPin = CC1101_CS_PIN;
+        uint8_t cc1101Gdo0Pin = CC1101_GDO0_PIN;
         bool usingEncoder = true;
         uint8_t encPinA = ENC_PIN_A;
         uint8_t encPinB = ENC_PIN_B;
         uint8_t leftBtnPin = LEFT_BTN;
         uint8_t rightBtnPin = RIGHT_BTN;
         uint8_t selectBtnPin = SEL_BTN;
-        int8_t timeZone = 0;
+        int8_t timeZone = 7; // Bangkok, Hanoi, Jakarta
         bool autoDeepSleep = true;
         bool autoStandby = true;
 
@@ -60,6 +63,8 @@ class ESP32ATSetting {
         void loadSettings();
         void saveSettings();
         void resetSettings(bool useLittleFS);
+        JsonDocument getConfig();
+        void updateConfig();
         String getSetting(const String &key);
         String getApPassword(const String &ssid) const;
 };

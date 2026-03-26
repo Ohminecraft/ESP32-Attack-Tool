@@ -8,17 +8,15 @@
 	* Licensed under the MIT License.
 */
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch"
-
 ESP32ATSetting espatsettings;
 
 WiFiModules wifi;
 BLEModules ble;
-BadUSBModules badusb;
+BadScriptModules badScript;
 DisplayModules display;
 EvilPortalAddtional eportal;
 NRF24Modules nrf;
+RFModules rf;
 IRSendModules irtx;
 IRReadModules irrx;
 SDCardModules sdcard;
@@ -127,12 +125,12 @@ void connectWiFi(void *pvParameters) {
 	wifi.set_channel = 1;
 	first_scan = false;
 	wifi.StartMode(WIFI_SCAN_OFF);
-	WiFi.disconnect(true);
 	vTaskDelay(100 / portTICK_PERIOD_MS);
 	WiFi.mode(WIFI_MODE_STA);
 	wifi.setMac();
 
 	for (int i = 0; i < access_points->size(); i++) {
+		if (wifi_connected) break; // if already connected to wifi, break
 		String ssid = access_points->get(i).essid;
 		String pwd = espatsettings.getApPassword(ssid);
 		if (pwd == "") continue;
@@ -153,8 +151,8 @@ void connectWiFi(void *pvParameters) {
 	access_points->clear();
 	timeClock.main();
 	delay(1000);
-	wifi.StartMode(WIFI_SCAN_OFF);
-	wifi_connected = false;
+	if (!wifi_connected) wifi.StartMode(WIFI_SCAN_OFF);
+	//wifi_connected = false;
     vTaskDelete(NULL);
     return;
 }
@@ -191,10 +189,12 @@ void menuinit() {
 	sdcard.main();
 	logutils.begin();
 	nrf.main();
+	rf.main();
 	eportal.main();
 	if (espatsettings.autoConnectWiFi) {
 		xTaskCreate(connectWiFi, "wifiConnect", 4096, NULL, 2, NULL);
 	}
+	selection_list = new LinkedList<String>();
 	vTaskDelay(50 / portTICK_PERIOD_MS);
 	Serial.println("[INFO] All Modules initialized");
 	Serial.printf("[INFO] Total heap: %d bytes\n", String(getHeap(GET_TOTAL_HEAP)).toInt());
@@ -289,6 +289,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Sel Menu", 0, 12);
 	else if (currentState == WIFI_GENERAL_MENU)
 		display.displayStringwithCoordinates("WiFi Gen Menu", 0, 12);
+	else if (currentState == WIFI_JOIN_MENU)
+		display.displayStringwithCoordinates("WiFi Join", 0, 12);
 	else if (currentState == WIFI_ATTACK_MENU)
 		display.displayStringwithCoordinates("WiFi Atk Menu", 0, 12);
 	else if (currentState == WIFI_SCAN_RUNNING)
@@ -313,8 +315,8 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("WiFi Attack", 0, 12);
 	else if (currentState == IR_MENU)
 		display.displayStringwithCoordinates("IR Menu", 0, 12);
-	else if (currentState == IR_TV_B_GONE_REGION)
-		display.displayStringwithCoordinates("IR Tv-B-Gone", 0, 12);
+	else if (currentState == IR_UNIVERSAL_POWER_REMOTE_MENU)
+		display.displayStringwithCoordinates("Uni Pwr Rmt", 0, 12);
 	else if (currentState == IR_SEND_RUNNING)
 		display.displayStringwithCoordinates("IR Send", 0, 12);
 	else if (currentState == IR_READ_MENU)
@@ -323,26 +325,38 @@ void displayStatusBar(bool sendDisplay = false) {
 		display.displayStringwithCoordinates("IR Read", 0, 12);
 	else if (currentState == IR_CODE_SELECT)
 		display.displayStringwithCoordinates("IR Codes", 0, 12);
+	else if (currentState == RF_MENU)
+		display.displayStringwithCoordinates("RF Menu", 0, 12);
+	else if (currentState == RF_RECEIVER_RUNNING && infrequencychange)
+		display.displayStringwithCoordinates("RF Freq Change", 0, 12);
+	else if (currentState == RF_FREQUENCY_ANALYZER_RUNNING && inRssichange)
+		display.displayStringwithCoordinates("Rssi Change", 0, 12);
+	else if (currentState == RF_FREQUENCY_ANALYZER_RUNNING)
+		display.displayStringwithCoordinates("Freq Analyzer", 0, 12);
+	else if (currentState == RF_SEND_SELECT_SUB_FILE)
+		display.displayStringwithCoordinates("RF Sub Sel", 0, 12);
+	else if (currentState == RF_SEND_RUNNING && inkeeloqstepchange)
+		display.displayStringwithCoordinates("Keeloq Step", 0, 12);
 	else if (currentState == SD_MENU)
-		display.displayStringwithCoordinates("SD Menu", 0, 12);
+		display.displayStringwithCoordinates("File Menu", 0, 12);
 	else if (currentState == SD_UPDATE_MENU)
 		display.displayStringwithCoordinates("SD Update", 0, 12);
-	else if (currentState == SD_DELETE_MENU) {
-		if (selectforbadusb)
-			display.displayStringwithCoordinates("BadUSB Script", 0, 12);
-		else if (selectforirtx)
-			display.displayStringwithCoordinates("IR Code", 0, 12);
-		else if (selectforevilportal)
-			display.displayStringwithCoordinates("EP Html", 0, 12);
-		else
-			display.displayStringwithCoordinates("SD Delete", 0, 12);
-	}
 	else if (currentState == BADUSB_KEY_LAYOUT_MENU)
 		display.displayStringwithCoordinates("BadUSB Layout", 0, 12);
 	else if (currentState == BADUSB_RUNNING)
 		display.displayStringwithCoordinates("BadUSB Deploy", 0, 12);
 	else if (currentState == CLOCK_MENU)
 		display.displayStringwithCoordinates("Clock", 0, 12);
+	else if (currentState == SELECTION_LIST) {
+		if (selectforbadusb)
+			display.displayStringwithCoordinates("BadScript", 0, 12);
+		else if (selectforirtx)
+			display.displayStringwithCoordinates("IR Code", 0, 12);
+		else if (selectforevilportal)
+			display.displayStringwithCoordinates("EP Html", 0, 12);
+		else if (selectforsddelete)
+			display.displayStringwithCoordinates("SD Delete", 0, 12);
+	}
 	else
 		display.displayStringwithCoordinates("Unknown State", 0, 12);
 	
@@ -353,6 +367,24 @@ void displayStatusBar(bool sendDisplay = false) {
 	display.displayStringwithCoordinates(heapInfo, espatsettings.displayWidth - 38, 12);
 	display.setColor(WHITE);
 	if (sendDisplay) display.sendDisplay();
+}
+
+void blink_led(int r, int g, int b, int times) {
+    while(times--) {
+        #ifndef BUILTIN_RGB_LED
+			digitalWrite(espatsettings.statusLedPin, HIGH);
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+			digitalWrite(espatsettings.statusLedPin, LOW);
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+		#else
+		    pixels.setPixelColor(0, pixels.Color(r, g, b));
+		    pixels.show();
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+			pixels.clear();
+		    pixels.show();
+			vTaskDelay(20 / portTICK_PERIOD_MS);
+		#endif
+    }
 }
 
 void menuNode(String items[], int itemCount) {
@@ -429,6 +461,7 @@ void displayMainMenu() {
 		"WiFi",
 		"NRF24",
 		"IR",
+		"RF",
 		"SD",
 		"Clock",
 		"Deep Sleep",
@@ -444,7 +477,7 @@ void displayBLEScanMenu() {
 		if (!bleScanInProgress) {
 			bleScanDisplay = true;
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 			#else
 				pixels.clear();
 				pixels.show();
@@ -605,7 +638,7 @@ void displayDiscoverableModeSpooferMenu() {
 
 void displaySpooferRunning() {
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -616,7 +649,7 @@ void displaySpooferRunning() {
 
 void displayExploitAttackBLEMenu() {
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, LOW);
+		digitalWrite(espatsettings.statusLedPin, LOW);
 	#else
 		pixels.clear();
 		pixels.show();
@@ -630,6 +663,7 @@ void displayExploitAttackBLEMenu() {
 		"Samsung Spam",
 		"Google Spam",
 		"Name Flood",
+		"Flipper Zero",
 		"Spam All",
 		"< Back"
 	};
@@ -639,7 +673,7 @@ void displayExploitAttackBLEMenu() {
 
 void displayMediaCtrlBLEMenu() {
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, LOW);
+		digitalWrite(espatsettings.statusLedPin, LOW);
 	#else
 		pixels.clear();
 		pixels.show();
@@ -738,6 +772,8 @@ void displayWiFiGeneralMenu() {
 		"EAPOL/PMKID Scan",
 		"EAPOL.. Deauth Scan",
 		"Channel Analyzer",
+		"SAE Commit Scan",
+		"Join WiFi",
 		"< Back"
 	};
 
@@ -758,7 +794,7 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 			#endif
 				display.displayStringwithCoordinates("Found: " + String(access_points ? access_points->size() : 0), 0, 48, true);
 				#ifndef BUILTIN_RGB_LED
-					digialWrite(espatsettings.statusLedPin, LOW);
+					digitalWrite(espatsettings.statusLedPin, LOW);
 				#else
 					pixels.clear();
 					pixels.show();
@@ -772,7 +808,7 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 				display.displayStringwithCoordinates("AP Found: " + String(access_points ? access_points->size() : 0), 0, 48);
 				display.displayStringwithCoordinates("STA Found: " + String(device_station ? device_station->size() : 0), 0, 60, true);
 				#ifndef BUILTIN_RGB_LED
-					digialWrite(espatsettings.statusLedPin, LOW);
+					digitalWrite(espatsettings.statusLedPin, LOW);
 				#else
 					pixels.clear();
 					pixels.show();
@@ -788,6 +824,35 @@ void displayWiFiScanMenu(WiFiGeneralItem mode) {
 		display.displayStringwithCoordinates("start scan", 0, 36);
 		display.displayStringwithCoordinates("or LEFT to go back", 0, 48, true);
 	}
+}
+
+void displayWiFiListMenu() {
+	displayStatusBar();
+
+	String items[4] = {};
+	
+	if (currentSelection < access_points->size()) {
+
+		AccessPoint ap = access_points->get(currentSelection);
+		char bssidStr[18];
+
+		snprintf(bssidStr, sizeof(bssidStr), "%02X:%02X:%02X:%02X:%02X:%02X", 
+		ap.bssid[0], ap.bssid[1], ap.bssid[2], 
+		ap.bssid[3], ap.bssid[4], ap.bssid[5]);
+
+		items[0] = ap.essid;
+		items[1] = ("Ch:" + String(ap.channel) + " R:" + String(ap.rssi) + " Band:" + ((ap.band == WIFI_BAND_2_4Ghz) ? "2.4G" : "5G"));
+		items[2] = ("B:" + String(bssidStr));
+		items[3] = "SELECT to connect";
+		
+	}
+
+	String errorText[2] = {
+		"No APs found!",
+		"Scan First!"
+	};
+
+	menuNode(items, GET_SIZE(items), "APs: ", errorText, access_points->size());
 }
 
 void displayWiFiSelectMenu() {
@@ -922,6 +987,7 @@ void displayWiFiAttackMenu() {
 		"Deauth Tar Attack",
 		"Deauth Station Attack",
 		"Deauth Flood",
+		"SAE Commit Flood",
 		"Probe Attack",
 		"Rickroll Beacon",
 		"Funny Beacon",
@@ -934,6 +1000,8 @@ void displayWiFiAttackMenu() {
 		"Bad Msg",
 		"Target Assoc Sleep",
 		"Assoc Sleep",
+		"Channel Switch Atk",
+		"Quiet Time",
 		"< Back"
 	};
 	
@@ -1049,9 +1117,6 @@ void displayEvilPortalInfo() {
 		display.clearScreen();
 	}
 
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 36, true);
-	}
 	/*
 	display.clearScreen();
 	display.displayString("This Feature Is", true);
@@ -1102,11 +1167,6 @@ void displayNRFJammerStatus() {
 	// Hiển thị thông tin thêm
 	display.displayStringwithCoordinates("Press SELECT to stop", 0, 48);
 	
-	// Hiển thị memory info nếu cần
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 60);
-	}
-	
 	display.sendDisplay();
 }
 
@@ -1116,7 +1176,7 @@ void displayIRMenu() {
 	String items[IR_MENU_COUNT] = {
 		"IR Read",
 		"IR Send",
-		"Tv-B-Gone",
+		"Universal Pwr Remote",
 		"< Back"
 	};
 
@@ -1153,23 +1213,146 @@ void displayIrCodeDataInFile() {
 	menuNode(items, GET_SIZE(items), "Codes: ", errorText, ir_codes->size());
 }
 
-void displayIRTvBGoneRegionMenu() {
+void displayUniversalPowerRemoteModeMenu() {
 	displayStatusBar();
 
-	String items[IR_TV_B_GONE_REGION_COUNT] = {
-		"NA",
-		"EU",
+	String items[IR_UNIVERSAL_POWER_MODE_COUNT] = {
+		"TV",
+		"Projector",
+		"AC",
+		"Fan",
+		"LED",
+		"Monitor",
 		"< Back"
 	};
 
-	menuNode(items, IR_TV_B_GONE_REGION_COUNT);
+	menuNode(items, IR_UNIVERSAL_POWER_MODE_COUNT);
+}
+
+void displayRFMenu() {
+	displayStatusBar();
+
+	String items[RF_MENU_COUNT] = {
+		"RF Read",
+		"RF Read (Raw)",
+		"RF Send",
+		"RF Jammer",
+		"RF Freq Analyzer",
+		"< Back"
+	};
+
+	menuNode(items, RF_MENU_COUNT);
+}
+
+void displayRFRead(bool available_data) {
+	display.clearScreen();
+	if (available_data) {
+		String buff = "";
+		RfCodes key = rf.getCurrentData();
+		if (key.preset != "") {
+			if (key.fix != 0) {
+				display.displayStringwithCoordinates("Proto: KeeLoq", 0, 12);
+			} else display.displayStringwithCoordinates("Proto: " + String(key.protocol) + "(" + key.preset + ")", 0, 12);
+		} else display.displayStringwithCoordinates("Proto: " + String(key.protocol), 0, 12);
+		if (key.key > 0) {
+			if (key.protocol == "RAW") {
+            	display.displayStringwithCoordinates("Length: " + String(key.Bit) + " trans", 0, 24);
+			} else {
+				if (key.fix == 0) {
+					display.displayStringwithCoordinates("Length: " + String(key.Bit) + " bits", 0, 24);
+					const char *b = dec2binWzerofill(key.key, min(key.Bit, 40));
+					// tft.setCursor(tft.getCursorX(), tft.getCursorY() + 2);
+					display.displayStringwithCoordinates("Binary: " + String(b), 0, 36);
+				}
+			}
+		} else {
+			display.displayStringwithCoordinates("Length: No code identified", 0, 24);
+		}
+		display.displayStringwithCoordinates("SEL = replay", 0, 48);
+		display.displayStringwithCoordinates("RB = save, LB = discard", 0, 60, true);
+	} else {
+		display.displayStringwithCoordinates("Waiting for data...", 0, 12);
+		display.displayStringwithCoordinates("or LEFT to go back", 0, 60, true);
+	}
+}
+
+void displayRFFrequencychange() {
+	display.clearScreen();
+	displayStatusBar();
+	display.displayStringwithCoordinates("Frequency: " + (String)rf.getFrequency(), 0, 24, true);
+}
+
+void displayRFReadSave() {
+	display.clearScreen();
+	if (rf.signalsaved) {
+		rf.signalsaved = false;
+		display.displayStringwithCoordinates("Saved Successfully!" , 0, 12);
+		display.displayStringwithCoordinates("Name File:" , 0, 24);
+		display.displayStringwithCoordinates(rf.getSavedFileName(), 0, 36, true);	
+	} else {
+		display.displayStringwithCoordinates("Failed save to FS!" , 0, 12, true);
+	}
+}
+
+void displayRFFrequencyAnalyzer() {
+	display.clearScreen();
+	displayStatusBar();
+	display.setFont(u8g2_font_ncenB12_tr);
+	String buf = (String)rf.getFrequencyAnalyzer() + " MHz";
+	display.displayStringwithCoordinates(buf, (espatsettings.displayWidth - ((buf.length() * 6)) / 2) - 83, (espatsettings.displayHeight / 2));
+	display.setFont(u8g2_font_ncenB08_tr);
+	display.displayStringwithCoordinates("SEL to change RSSI", 0, 48);
+	display.displayStringwithCoordinates("LEFT to exit", 0, 60, true);
+}
+
+void displayRFFrequencyAnalyzerRssichange() {
+	display.clearScreen();
+	displayStatusBar();
+	display.displayStringwithCoordinates("RSSI: " + (String)rf.getFreqAnalyzerRssiThreshold(),0, 24, true);
+}
+
+void displayRFTxData() {
+	display.clearScreen();
+	if (rf.keyData.serial != 0) {
+		display.displayStringwithCoordinates("Proto: Keeloq", 0, 12);
+		display.displayStringwithCoordinates("Manuf: " + rf.keyData.mf_name, 0, 24);
+		char hexchar[64];
+		decimalToHexString(rf.keyData.serial, hexchar);
+		display.displayStringwithCoordinates("Serial: " + (String)hexchar, 0, 36);
+	} else {
+		display.displayStringwithCoordinates("Proto: " + (String)rf.keyData.protocol  + "(" + rf.keyData.preset + ")", 0, 12);
+	}
+	if (rf.keeloq_loop_emulate) {
+		display.displayStringwithCoordinates("SEL = Send, LB = exit", 0, 48);
+		display.displayStringwithCoordinates("RB = Config", 0, 60, true);
+	} else {
+		display.displayStringwithCoordinates("SEL = Send, LB = exit", 0, 60, true);
+	}
+}
+
+void displayRFSubFile() {
+	display.clearScreen();
+	displayStatusBar();
+	String items[selection_list->size() + 1];
+	for (int i = 0; i < selection_list->size(); i++) {
+		items[i] = selection_list->get(i);
+	}
+	items[selection_list->size()] = "< Back";
+
+	menuNode(items, selection_list->size() + 1);
+}
+
+void displayRFKeeloqStepChange() {
+	display.clearScreen();
+	displayStatusBar();
+	display.displayStringwithCoordinates("Step: " + (String)rf.num_keeloq_steps, 0, 24, true);
 }
 
 void displaySDMenu() {
 
 	String items[SD_MENU_COUNT] = {
 		"SD Card Update",
-		"SD Card Delete",
+		"FS Delete",
 		"< Back"
 	};
 
@@ -1195,12 +1378,12 @@ void displayUpdateSDCard(int8_t error_code) { // 0 for fail open file, -1 for fa
 	
 }
 
-void displayDeleteSDCard() {
+void displaySelectionList() {
 	display.clearScreen();
 	displayStatusBar();
 	String items[1];
-	if (currentSelection < sdcard_buffer->size()) {
-		String fileName = sdcard_buffer->get(currentSelection);
+	if (currentSelection < selection_list->size()) {
+		String fileName = selection_list->get(currentSelection);
 		items[0] = fileName;
 	}
 
@@ -1209,7 +1392,7 @@ void displayDeleteSDCard() {
 		"Or Smth Went Wrong!"
 	};
 
-	menuNode(items, GET_SIZE(items), "Files: ", error_text, sdcard_buffer->size());
+	menuNode(items, GET_SIZE(items), "Files: ", error_text, selection_list->size());
 }
 
 void displayBadUSBKeyboardLayout() {
@@ -1257,6 +1440,9 @@ void displayAttackStatus() {
 			case BLE_ATTACK_EXPLOIT_NAME_FLOOD:
 				attackName = "Name Flood";
 				break;
+			case BLE_ATTACK_EXPLOIT_FLIPPER:
+				attackName = "Flipper Zero";
+				break;
 			case BLE_ATTACK_EXPLOIT_SPAM_ALL:
 				attackName = "Spam All";
 				break;
@@ -1296,6 +1482,15 @@ void displayAttackStatus() {
 			case WIFI_ATTACK_SLEEP_ALL:
 				attackName = "Assoc Sleep All";
 				break;
+			case WIFI_ATTACK_CSA:
+				attackName = "Channel Switch Annou";
+				break;
+			case WIFI_ATTACK_QUIET:
+				attackName = "Quiet Time";
+				break;
+			case WIFI_ATTACK_SAE_COMMIT:
+				attackName = "SAE Commit Flood";
+				break;
 		}
 	}
 
@@ -1310,11 +1505,6 @@ void displayAttackStatus() {
 		String adpacketstr = "SendedAdv: ";
 		adpacketstr.concat(ble.AdvertisedPacketCount);
 		display.displayStringwithCoordinates(adpacketstr, 0, 36, true);
-	}
-	
-	// Display memory info
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 48, true);
 	}
 }
 
@@ -1339,10 +1529,6 @@ void displayDeauthFloodInfo() {
 			display.displayStringwithCoordinates("SELECT->Exit", 0, 36, true);
 			fixDeauthFloodDisplayLoop = true;
 		}
-	}
-
-	if (getHeap(GET_FREE_HEAP) <= MEM_LOWER_LIM + 2000) {
-		display.displayStringwithCoordinates("LOW MEM!", 80, 48, true);
 	}
 }
 
@@ -1459,6 +1645,7 @@ void startBLEAttack(BLEScanState attackType) {
 	else if (attackType == BLE_ATTACK_EXPLOIT_GOOGLE) strmode = "Android (Google)";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SAMSUNG) strmode = "Samsung";
 	else if (attackType == BLE_ATTACK_EXPLOIT_NAME_FLOOD) strmode = "NameFlood";
+	else if (attackType == BLE_ATTACK_EXPLOIT_FLIPPER) strmode = "Flipper Zero";
 	else if (attackType == BLE_ATTACK_EXPLOIT_SPAM_ALL) strmode = "Spam All";
 	Serial.println("[INFO] Starting BLE attack: " + strmode);
 	
@@ -1467,7 +1654,7 @@ void startBLEAttack(BLEScanState attackType) {
 	currentState = BLE_ATTACK_RUNNING;
 	
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -1522,6 +1709,15 @@ void startWiFiAttack(WiFiScanState attackType) {
 	else if (attackType == WIFI_ATTACK_SLEEP_ALL) {
 		strmode = "Assoc Sleep All";
 	}
+	else if (attackType == WIFI_ATTACK_CSA) {
+		strmode = "Channel Switch Announce";
+	}
+	else if (attackType == WIFI_ATTACK_QUIET) {
+		strmode = "Quiet Time";
+	}
+	else if (attackType == WIFI_ATTACK_SAE_COMMIT) {
+		strmode = "SAE Commit Flood";
+	}
 	#ifndef BOARD_ESP32_C5_DEVKIT_C1
 	if (wifi.dualBandInList && 
 		attackType != WIFI_ATTACK_DEAUTH &&
@@ -1550,7 +1746,7 @@ void startWiFiAttack(WiFiScanState attackType) {
 	currentState = WIFI_ATTACK_RUNNING;
 	
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -1581,7 +1777,7 @@ void startNRFJammer(NRFJammerMode jammer_mode) {
 	currentState = NRF24_JAMMER_RUNNING;
 
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 		pixels.show();
@@ -1598,7 +1794,7 @@ void startBLEScan() {
 	display.clearBuffer();
 	ble.StartMode(BLE_SCAN_DEVICE);
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 		pixels.show();
@@ -1658,7 +1854,7 @@ void startWiFiScan(WiFiGeneralItem mode) {
 void startSnifferScan(WiFiGeneralItem sniffer_mode) {
 	display.clearBuffer();
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, HIGH);
+		digitalWrite(espatsettings.statusLedPin, HIGH);
 	#else
 		pixels.setPixelColor(0, pixels.Color(0, 0, 255));
 		pixels.show();
@@ -1680,6 +1876,9 @@ void startSnifferScan(WiFiGeneralItem sniffer_mode) {
 	}
 	else if (sniffer_mode == WIFI_GENERAL_CH_ANALYZER) {
 		wifi.StartMode(WIFI_SCAN_CH_ANALYZER);
+	}
+	else if (sniffer_mode == WIFI_GENERAL_SAE_COMMIT_SCAN) {
+		wifi.StartMode(WIFI_SCAN_SAE_COMMIT);
 	} else {
 		Serial.println("[ERROR] Invalid sniffer mode selected: " + String(sniffer_mode));
 		return;
@@ -1721,7 +1920,7 @@ void stopCurrentAttack() {
 	}
 		
 	#ifndef BUILTIN_RGB_LED
-		digialWrite(espatsettings.statusLedPin, LOW);
+		digitalWrite(espatsettings.statusLedPin, LOW);
 	#else
 		pixels.clear();
 		pixels.show();
@@ -1740,6 +1939,19 @@ void stopCurrentAttack() {
 		maxSelections = WIFI_ATK_MENU_COUNT;
 		displayWiFiAttackMenu();
 	}
+}
+
+bool hasWPA3APs() {
+	if (!access_points || access_points->size() == 0) {
+		return false;
+	}
+	
+	for (int i = 0; i < access_points->size(); i++) {
+		if (access_points->get(i).selected && (access_points->get(i).wpa == WIFI_SECURITY_WPA3 || access_points->get(i).wpa == WIFI_SECURITY_WPA3_ENTERPRISE)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 bool hasSelectedAPs() {
@@ -1854,13 +2066,15 @@ void performDeepSleep() {
 	display.clearScreen();
 	display.displayStringwithCoordinates("Deep Sleep", 0, 12);
 
-	display.displayStringwithCoordinates("Tip: Press Sel", 0, 24);
+	display.displayStringwithCoordinates("Tip: Press SELECT", 0, 24);
 	display.displayStringwithCoordinates("to wake up", 0, 36);
 	display.displayStringwithCoordinates("device", 0, 48, true);
 	if (autoSleep) display.displayStringwithCoordinates("Forcing by System", 0, 60, true);
 	vTaskDelay(2000 / portTICK_PERIOD_MS);
 	display.clearScreen();
 	display.sendDisplay();
+	digitalWrite(POWER_PIN, LOW); // Cut off power to peripherals (if using a power control circuit)
+	Serial.println("[INFO] Powering down peripherals...");
 	// Restart ESP32
 	esp_deep_sleep_enable_gpio_wakeup(1 << espatsettings.selectBtnPin, ESP_GPIO_WAKEUP_GPIO_LOW);
 	esp_deep_sleep_start();
@@ -1886,108 +2100,7 @@ void navigateUp() {
 		}
 	}
 	
-	// Redraw menu
-   
-	switch(currentState) {
-		case MAIN_MENU:
-			displayMainMenu();
-			break;
-		case BLE_MENU:
-			displayBLEMenu();
-			break;
-		case BLE_INFO_MENU_LIST:
-			displayBLEInfoListMenu();
-			break;
-		case BLE_SPOOFER_MAIN_MENU:
-			displayMainSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_MENU:
-			displayAppleSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
-			displayAppleDeviceColorSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_MENU:
-			displaySamsungSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
-			displaySamsungBudsDeviceMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
-			displaySamsungWatchsDeviceMenu();
-			break;
-		case BLE_SPOOFER_CONN_MODE_MENU:
-			displayConnectableModeSpooferMenu();
-			break;
-		case BLE_SPOOFER_DISC_MODE_MENU:
-			displayDiscoverableModeSpooferMenu();
-			break;
-		case BLE_EXPLOIT_ATTACK_MENU:
-			displayExploitAttackBLEMenu();
-			break;
-		case WIFI_MENU:
-			displayWiFiMenu();
-			break;
-		case WIFI_GENERAL_MENU:
-			displayWiFiGeneralMenu();
-			break;
-		case WIFI_UTILS_MENU:
-			displayWiFiUtilsMenu();
-			break;
-		case WIFI_ATTACK_MENU:
-			displayWiFiAttackMenu();
-			break;
-		case WIFI_SELECT_MENU:
-			displayWiFiSelectMenu();
-			break;
-		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
-			displayWiFiSelectProbeReqSsidsMenu();
-			break;
-		case WIFI_SELECT_STA_AP_MENU:
-			displayWiFiSelectAptoSta();
-			break;
-		case WIFI_SELECT_STA_MENU:
-			displayWiFiSelectStaInAp();
-			break;
-		case NRF24_MENU:
-			displayNRF24Menu();
-			break;
-		case NRF24_JAMMER_MENU:
-			displayNRF24JammerMenu();
-			break;
-		case IR_MENU:
-			displayIRMenu();
-			break;
-		case IR_TV_B_GONE_REGION:
-			displayIRTvBGoneRegionMenu();
-			break;
-		case SD_MENU:
-			displaySDMenu();
-			break;
-		case SD_UPDATE_MENU:
-			break;
-		case SD_DELETE_MENU:
-			displayDeleteSDCard();
-			break;
-		case BADUSB_KEY_LAYOUT_MENU:
-			displayBadUSBKeyboardLayout();
-			break;
-		case BLE_MEDIA_MENU:
-			displayMediaCtrlBLEMenu();
-			break;
-		case BLE_KEYMOTE_MENU:
-			displayKeymoteBLEMenu();
-			break;
-		case BLE_TT_SCROLL_MENU:
-			displayTikTokScrollMenu();
-			break;
-		case IR_READ_MENU:
-			displayIRReadMenu();
-			break;
-		case IR_CODE_SELECT:
-			displayIrCodeDataInFile();
-			break;
-	}
+	redrawTasks();
 }
 
 void navigateDown() {
@@ -2005,109 +2118,7 @@ void navigateDown() {
 		itemoffset = 0;
 	}
 	
-	// Redraw menu
-   
-	switch(currentState) {
-		case MAIN_MENU:
-			displayMainMenu();
-			break;
-		case BLE_MENU:
-			displayBLEMenu();
-			break;
-		case BLE_INFO_MENU_LIST:
-			displayBLEInfoListMenu();
-			break;
-		case BLE_SPOOFER_MAIN_MENU:
-			displayMainSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_MENU:
-			displayAppleSpooferMenu();
-			break;
-		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
-			displayAppleDeviceColorSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_MENU:
-			displaySamsungSpooferMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
-			displaySamsungBudsDeviceMenu();
-			break;
-		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
-			displaySamsungWatchsDeviceMenu();
-			break;
-		case BLE_SPOOFER_CONN_MODE_MENU:
-			displayConnectableModeSpooferMenu();
-			break;
-		case BLE_SPOOFER_DISC_MODE_MENU:
-			displayDiscoverableModeSpooferMenu();
-			break;
-		case BLE_EXPLOIT_ATTACK_MENU:
-			displayExploitAttackBLEMenu();
-			break;
-		case WIFI_MENU:
-			displayWiFiMenu();
-			break;
-		case WIFI_GENERAL_MENU:
-			displayWiFiGeneralMenu();
-			break;
-		case WIFI_UTILS_MENU:
-			displayWiFiUtilsMenu();
-			break;
-		case WIFI_ATTACK_MENU:
-			displayWiFiAttackMenu();
-			break;
-		case WIFI_SELECT_MENU:
-			displayWiFiSelectMenu();
-			break;
-		case WIFI_SELECT_PROBE_REQ_SSIDS_MENU:
-			displayWiFiSelectProbeReqSsidsMenu();
-			break;
-		case WIFI_SELECT_STA_AP_MENU:
-			displayWiFiSelectAptoSta();
-			break;
-		case WIFI_SELECT_STA_MENU:
-			displayWiFiSelectStaInAp();
-			break;
-		case NRF24_MENU:
-			displayNRF24Menu();
-			break;
-		case NRF24_JAMMER_MENU:
-			displayNRF24JammerMenu();
-			break;
-		case IR_MENU:
-			displayIRMenu();
-			break;
-		case IR_TV_B_GONE_REGION:
-			displayIRTvBGoneRegionMenu();
-			break;
-		case SD_MENU:
-			displaySDMenu();
-			break;
-		case SD_UPDATE_MENU:
-			break;
-		case SD_DELETE_MENU:
-			displayDeleteSDCard();
-			break;
-		case BADUSB_KEY_LAYOUT_MENU:
-			displayBadUSBKeyboardLayout();
-			break;
-		case BLE_MEDIA_MENU:
-			displayMediaCtrlBLEMenu();
-			break;
-		case BLE_KEYMOTE_MENU:
-			displayKeymoteBLEMenu();
-			break;
-		case BLE_TT_SCROLL_MENU:
-			displayTikTokScrollMenu();
-			break;
-		case IR_READ_MENU:
-			displayIRReadMenu();
-			break;
-		case IR_CODE_SELECT:
-			displayIrCodeDataInFile();
-			break;
-	}
-	
+	redrawTasks();
 }
 
 void selectCurrentItem() {
@@ -2115,16 +2126,6 @@ void selectCurrentItem() {
 	switch(currentState) {
 		case MAIN_MENU:
 			if (currentSelection == MAIN_BLE) {
-				#ifndef BOARD_ESP32_C5_DEVKIT_C1
-					displayStatusBar();
-					display.displayStringwithCoordinates("BLE Mode Is Not", 0, 24);
-					display.displayStringwithCoordinates("Supported In This", 0, 36);
-					display.displayStringwithCoordinates("Board!", 0, 48, true);
-					vTaskDelay(1000 / portTICK_PERIOD_MS);
-					selPress = false;
-					displayMainMenu();
-					return;
-				#endif
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
@@ -2163,6 +2164,21 @@ void selectCurrentItem() {
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					displayMainMenu();
 					return;
+				}
+			} else if (currentSelection == MAIN_RF) {
+				if (rf.getCC1101() && (espatsettings.cc1101CsPin != 99 && espatsettings.cc1101Gdo0Pin != 99)) {
+					currentState = RF_MENU;
+					currentSelection = 0;
+					maxSelections = RF_MENU_COUNT;
+					displayRFMenu();
+				} else {
+					displayStatusBar();
+					display.displayStringwithCoordinates("Your Device not have", 0, 24);
+					display.displayStringwithCoordinates("RF connected!", 0, 36);
+					display.displayStringwithCoordinates("or was disabled in", 0, 48);
+					display.displayStringwithCoordinates("Config!", 0, 60, true);
+					vTaskDelay(1000 / portTICK_PERIOD_MS);
+					displayMainMenu();
 				}
 			} else if (currentSelection == MAIN_SD) {
 				currentState = SD_MENU;
@@ -2223,26 +2239,11 @@ void selectCurrentItem() {
 				}
 			}
 			break;
-			
 		case BLE_MENU:
 			if (currentSelection == BLE_BACK) {
 				goBack();
 			} else {
-				#ifdef BOARD_ESP32_C5_DEVKIT_C1
-				if (currentSelection > BLE_INFO) {
-					displayStatusBar();
-					display.displayStringwithCoordinates("This Mode Is Not", 0, 24);
-					display.displayStringwithCoordinates("Supported In This", 0, 36);
-					display.displayStringwithCoordinates("Board!", 0, 48, true);
-					vTaskDelay(1000 / portTICK_PERIOD_MS);
-					selPress = false;
-					displayBLEMenu();
-					return;
-				}
-				else if (currentSelection == BLE_EXPLOIT_ATTACK) {
-				#else
 				if (currentSelection == BLE_EXPLOIT_ATTACK) {
-				#endif
 					currentState = BLE_EXPLOIT_ATTACK_MENU;
 					currentSelection = 0;
 					maxSelections = BLE_ATK_MENU_COUNT;
@@ -2252,7 +2253,7 @@ void selectCurrentItem() {
 					currentState = BLE_ANALYZER_RUNNING;
 					ble.StartMode(BLE_SCAN_ANALYZER);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 0, 255));
 						pixels.show();
@@ -2274,7 +2275,7 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_BADUSB) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2291,18 +2292,16 @@ void selectCurrentItem() {
 						return;
 					}
 					selectforbadusb = true;
-					badble = true;
-					delete sdcard_buffer;
-					sdcard_buffer = new LinkedList<String>();
-					sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".txt");
-					currentState = SD_DELETE_MENU;
+					selection_list->clear();
+					sdcard.addListFileToLinkedList(selection_list, "/", ".txt");
+					currentState = SELECTION_LIST;
 					currentSelection = 0;
-					maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-					displayDeleteSDCard();
+					maxSelections = selection_list ? selection_list->size() + 1 : 1;
+					displaySelectionList();
 				} else if (currentSelection == BLE_MEDIA_CMD) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2318,10 +2317,10 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
+					badScript.beginKB(hid_ble, KeyboardLayout_en_US);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-					if (badusb.isConnected(hid_ble)) {
+					while (!badScript.isConnected(hid_ble) && !check(prevPress)) yield();
+					if (badScript.isConnected(hid_ble)) {
 						currentState = BLE_MEDIA_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_MEDIA_MENU_COUNT;
@@ -2337,7 +2336,7 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_KEYMOTE) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_MOUSE || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2353,10 +2352,10 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true);
+					badScript.beginKB(hid_ble, KeyboardLayout_en_US);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-					if (badusb.isConnected(hid_ble)) {
+					while (!badScript.isConnected(hid_ble) && !check(prevPress)) {yield();}
+					if (badScript.isConnected(hid_ble)) {
 						currentState = BLE_KEYMOTE_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_KEYMOTE_ITEM_COUNT;
@@ -2372,7 +2371,7 @@ void selectCurrentItem() {
 				} else if (currentSelection == BLE_TT_SCROLL) {
 					display.clearScreen();
 					displayStatusBar();
-					if (badusb.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_ALL || currentkbmode == BLE_KEYBOARD_MODE_KEYBOARD || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
+					if (badScript.isConnected(hid_ble) && (currentkbmode == BLE_KEYBOARD_MODE_ALL || currentkbmode == BLE_KEYBOARD_MODE_KEYBOARD || currentkbmode == BLE_KEYBOARD_MODE_GAMEPAD)) {
 						display.displayStringwithCoordinates("Please Disconnect Your", 0, 24);
 						display.displayStringwithCoordinates("Device To Use This",  0, 36);
 						display.displayStringwithCoordinates("Feature!",  0, 48, true);
@@ -2388,10 +2387,10 @@ void selectCurrentItem() {
 						displayBLEMenu();
 						return;
 					}
-					badusb.beginKB(hid_ble, KeyboardLayout_en_US, true, BLE_KEYBOARD_MODE_MOUSE);
+					badScript.beginKB(hid_ble, KeyboardLayout_en_US, BLE_KEYBOARD_MODE_MOUSE);
 					display.displayStringwithCoordinates("Waiting Device", 0, 24, true);
-					while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-					if (badusb.isConnected(hid_ble)) {
+					while (!badScript.isConnected(hid_ble) && !check(prevPress)) {yield();}
+					if (badScript.isConnected(hid_ble)) {
 						currentState = BLE_TT_SCROLL_MENU;
 						currentSelection = 0;
 						maxSelections = BLE_TT_ITEM_COUNT;
@@ -2439,7 +2438,6 @@ void selectCurrentItem() {
 				}
 			}
 			break;
-
 		case BLE_SPOOFER_APPLE_MENU:
 			if (currentSelection == GET_SIZE(pp_models)) {
 				goBack();
@@ -2449,7 +2447,7 @@ void selectCurrentItem() {
 					currentState = BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU;
 					currentSelection = 0;
 					maxSelections = pp_models[spooferDeviceIndex].colors_count + 1;
-					displayAppleDeviceColorSpooferMenu();
+					redrawTasks();
 				} else {
 					currentState = BLE_SPOOFER_CONN_MODE_MENU;
 					currentSelection = 0;
@@ -2549,7 +2547,7 @@ void selectCurrentItem() {
 				
 				// Start BLE attack
 				BLEScanState attackTypes[] = {BLE_ATTACK_EXPLOIT_SOUR_APPLE, BLE_ATTACK_EXPLOIT_APPLE_JUICE, BLE_ATTACK_EXPLOIT_MICROSOFT, 
-									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_NAME_FLOOD, BLE_ATTACK_EXPLOIT_SPAM_ALL};
+									   BLE_ATTACK_EXPLOIT_SAMSUNG, BLE_ATTACK_EXPLOIT_GOOGLE, BLE_ATTACK_EXPLOIT_NAME_FLOOD, BLE_ATTACK_EXPLOIT_FLIPPER, BLE_ATTACK_EXPLOIT_SPAM_ALL};
 				startBLEAttack(attackTypes[currentSelection]);
 				}
 			break;
@@ -2559,10 +2557,10 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			} 
-			else if (currentSelection == BLE_KEYMOTE_UP) badusb.Keymote(hid_ble, KEYMOTE_UP); 
-			else if (currentSelection == BLE_KEYMOTE_DOWN) badusb.Keymote(hid_ble, KEYMOTE_DOWN); 
-			else if (currentSelection == BLE_KEYMOTE_LEFT) badusb.Keymote(hid_ble, KEYMOTE_LEFT); 
-			else if (currentSelection == BLE_KEYMOTE_RIGHT) badusb.Keymote(hid_ble, KEYMOTE_RIGHT);
+			else if (currentSelection == BLE_KEYMOTE_UP) badScript.Keymote(hid_ble, KEYMOTE_UP); 
+			else if (currentSelection == BLE_KEYMOTE_DOWN) badScript.Keymote(hid_ble, KEYMOTE_DOWN); 
+			else if (currentSelection == BLE_KEYMOTE_LEFT) badScript.Keymote(hid_ble, KEYMOTE_LEFT); 
+			else if (currentSelection == BLE_KEYMOTE_RIGHT) badScript.Keymote(hid_ble, KEYMOTE_RIGHT);
 			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
@@ -2577,14 +2575,14 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			} 
-			else if (currentSelection == BLE_MEDIA_SCREENSHOT) badusb.mediaController(hid_ble, MEDIA_SCREENSHOT);
-			else if (currentSelection == BLE_MEDIA_PLAYPAUSE) badusb.mediaController(hid_ble, MEDIA_PLAY_PAUSE);
-			else if (currentSelection == BLE_MEDIA_STOP) badusb.mediaController(hid_ble, MEDIA_STOP);
-			else if (currentSelection == BLE_MEDIA_NEXT_TRACK) badusb.mediaController(hid_ble, MEDIA_NEXT_TRACK);
-			else if (currentSelection == BLE_MEDIA_PREV_TRACK) badusb.mediaController(hid_ble, MEDIA_PREV_TRACK);
-			else if (currentSelection == BLE_MEDIA_VOL_UP) badusb.mediaController(hid_ble, MEDIA_VOL_UP);
-			else if (currentSelection == BLE_MEDIA_VOL_DOWN) badusb.mediaController(hid_ble, MEDIA_VOL_DOWN);
-			else if (currentSelection == BLE_MEDIA_MUTE) badusb.mediaController(hid_ble, MEDIA_MUTE);
+			else if (currentSelection == BLE_MEDIA_SCREENSHOT) badScript.mediaController(hid_ble, MEDIA_SCREENSHOT);
+			else if (currentSelection == BLE_MEDIA_PLAYPAUSE) badScript.mediaController(hid_ble, MEDIA_PLAY_PAUSE);
+			else if (currentSelection == BLE_MEDIA_STOP) badScript.mediaController(hid_ble, MEDIA_STOP);
+			else if (currentSelection == BLE_MEDIA_NEXT_TRACK) badScript.mediaController(hid_ble, MEDIA_NEXT_TRACK);
+			else if (currentSelection == BLE_MEDIA_PREV_TRACK) badScript.mediaController(hid_ble, MEDIA_PREV_TRACK);
+			else if (currentSelection == BLE_MEDIA_VOL_UP) badScript.mediaController(hid_ble, MEDIA_VOL_UP);
+			else if (currentSelection == BLE_MEDIA_VOL_DOWN) badScript.mediaController(hid_ble, MEDIA_VOL_DOWN);
+			else if (currentSelection == BLE_MEDIA_MUTE) badScript.mediaController(hid_ble, MEDIA_MUTE);
 			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
@@ -2599,9 +2597,9 @@ void selectCurrentItem() {
 				goBack();
 				return;
 			}
-			else if (currentSelection == BLE_TT_SCROLL_UP) badusb.tiktokScroll(hid_ble, SCROLL_UP);
-			else if (currentSelection == BLE_TT_SCROLL_DOWN) badusb.tiktokScroll(hid_ble, SCROLL_DOWN);
-			else if (currentSelection == BLE_TT_LIKE_VIDEO) badusb.tiktokScroll(hid_ble, LIKE_VIDEO);
+			else if (currentSelection == BLE_TT_SCROLL_UP) badScript.tiktokScroll(hid_ble, SCROLL_UP);
+			else if (currentSelection == BLE_TT_SCROLL_DOWN) badScript.tiktokScroll(hid_ble, SCROLL_DOWN);
+			else if (currentSelection == BLE_TT_LIKE_VIDEO) badScript.tiktokScroll(hid_ble, LIKE_VIDEO);
 			pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 			pixels.show();
 			display.displayStringwithCoordinates("Sended Ctrl", 0, 24, true);
@@ -2715,13 +2713,12 @@ void selectCurrentItem() {
 				displayWiFiSelectAptoSta();
 			} else if (currentSelection == WIFI_UTILS_SET_EVIL_PORTAL_HTML) {
 				selectforevilportal = true;
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".html");
-				currentState = SD_DELETE_MENU;
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list, "/", ".html");
+				currentState = SELECTION_LIST;
 				currentSelection = 0;
-				maxSelections = sdcard_buffer->size() + 1;
-				displayDeleteSDCard();
+				maxSelections = selection_list->size() + 1;
+				displaySelectionList();
 			} else if (currentSelection == WIFI_UTILS_BACK) {
 				goBack();
 			}
@@ -2796,6 +2793,17 @@ void selectCurrentItem() {
 				currentState = WIFI_SCAN_SNIFFER_RUNNING;
 				display.setColor(WHITE);
 				startSnifferScan(WIFI_GENERAL_CH_ANALYZER);
+			} else if (currentSelection == WIFI_GENERAL_SAE_COMMIT_SCAN) {
+				currentState = WIFI_SCAN_SNIFFER_RUNNING;
+				displayStatusBar(true);
+				startSnifferScan(WIFI_GENERAL_SAE_COMMIT_SCAN);
+			} else if (currentSelection == WIFI_GENERAL_JOIN_WIFI) {
+				currentState = WIFI_JOIN_MENU;
+				maxSelections = access_points ? access_points->size() + 1 : 1;
+				currentSelection = 0;
+				displayStatusBar(true);
+				displayWiFiListMenu();
+				return;
 			}
 			wifiSnifferMode = currentSelection;
 			break;
@@ -2804,7 +2812,7 @@ void selectCurrentItem() {
 				if (currentSelection == WIFI_GENERAL_AP_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -2815,7 +2823,7 @@ void selectCurrentItem() {
 					access_points->clear();
 					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -2826,7 +2834,7 @@ void selectCurrentItem() {
 					device_station->clear();
 					startWiFiScan(WIFI_GENERAL_DUAL_BAND_AP_STA_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -2836,7 +2844,7 @@ void selectCurrentItem() {
 				else if (currentSelection == WIFI_GENERAL_AP_SCAN_OLD) {
 					startWiFiScan(WIFI_GENERAL_AP_SCAN_OLD);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
@@ -2845,13 +2853,67 @@ void selectCurrentItem() {
 				else if (currentSelection == WIFI_GENERAL_AP_STA_SCAN) {
 					startWiFiScan(WIFI_GENERAL_AP_STA_SCAN);
 					#ifndef BUILTIN_RGB_LED
-						digialWrite(espatsettings.statusLedPin, HIGH);
+						digitalWrite(espatsettings.statusLedPin, HIGH);
 					#else
 						pixels.setPixelColor(0, pixels.Color(0, 255, 0));
 						pixels.show();
 					#endif
 				}
 			} else wifiScanRunning = false;
+			break;
+		case WIFI_JOIN_MENU:
+			if (!access_points || access_points->size() == 0) {
+				goBack();
+			} else {
+				if (currentSelection < access_points->size()) {
+					AccessPoint ap = access_points->get(currentSelection);
+					String pwd1 = espatsettings.getApPassword(ap.essid);
+					String pwd2 = "";
+					if (pwd1.isEmpty()) pwd2 = display.keyboard();
+					else pwd2 = pwd1;
+					if (pwd2 == "\x01") {
+						goBack();
+						return;
+					}
+					vTaskDelay(100 / portTICK_PERIOD_MS);
+					wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+					esp_wifi_init(&cfg);
+					esp_wifi_set_mode(WIFI_MODE_STA);
+					esp_wifi_set_storage(WIFI_STORAGE_RAM);
+					esp_wifi_start();
+					wifi.setMac();
+					Serial.println("[INFO] Connecting to '" + ap.essid+ "' WiFi, " +  "PWD: " + pwd2 + (pwd1.isEmpty() ? " (from input)" : " (from settings)"));
+					WiFi.begin(ap.essid.c_str(), pwd2.c_str());
+					wifi_initialized = true;
+					int count = 0;
+					String text = "Connecting";
+					for (int j = 0; j < 20; j++) {
+						text += ".";
+						display.clearScreen();
+						display.displayStringwithCoordinates(text, 0, 12, true);
+						if (WiFi.status() == WL_CONNECTED) {
+							Serial.println("[INFO] Successfully connected '" + ap.essid + "' WiFi");
+							if (pwd1.isEmpty()) { // If we didn't have a saved password, save the one we just used
+								espatsettings.wifi[ap.essid] = pwd2;
+								espatsettings.updateConfig();
+							}
+							wifi_connected = true;
+							display.clearScreen();
+							display.displayStringwithCoordinates("Connected!", 0, 12, true);
+							vTaskDelay(2000 / portTICK_PERIOD_MS);
+							timeClock.main();
+							currentState = WIFI_GENERAL_MENU;
+							maxSelections = WIFI_GENERAL_MENU_COUNT;
+							currentSelection = 0;
+							displayWiFiGeneralMenu();
+							break;
+						}
+						delay(500);
+					}
+				} else {
+					goBack();
+				}
+			}
 			break;
 		case WIFI_SELECT_MENU:
 			if (!access_points || access_points->size() == 0) {
@@ -2953,7 +3015,10 @@ void selectCurrentItem() {
 					 currentSelection == WIFI_ATK_BAD_MSG ||
 					 currentSelection == WIFI_ATK_BAD_MSG_ALL ||
 					 currentSelection == WIFI_ATK_SLEEP ||
-					 currentSelection == WIFI_ATK_SLEEP_ALL) && 
+					 currentSelection == WIFI_ATK_SLEEP_ALL ||
+					 currentSelection == WIFI_ATK_CSA ||
+					 currentSelection == WIFI_ATK_QUIET ||
+					 currentSelection == WIFI_ATK_SAE_COMMIT) &&
 					(!access_points || !hasSelectedAPs())) {
 					display.clearScreen();
 					display.displayStringwithCoordinates("NO AP SELECTED!", 0, 12);
@@ -2995,6 +3060,25 @@ void selectCurrentItem() {
 					displayWiFiAttackMenu();
 					return;
 				}
+
+				if (currentSelection == WIFI_ATK_DEAUTH ||
+					currentSelection == WIFI_ATK_STA_DEAUTH ||
+					currentSelection == WIFI_ATK_AUTH ||
+					currentSelection == WIFI_ATK_EVIL_PORTAL_DEAUTH) {
+					if (hasWPA3APs()) {
+						display.clearScreen();
+						display.displayStringwithCoordinates("WPA3 AP Selected!", 0, 12);
+						display.displayStringwithCoordinates("Attack May Fail", 0, 21);
+						display.displayStringwithCoordinates("SELECT to continue", 0, 31);
+						display.displayStringwithCoordinates("LEFT to exit", 0, 42, true);
+						Serial.println("[WARN] WPA3 AP Selected!, Attack May Fail! or No Effect");
+						while (!check(selPress) && !prevPress) yield();
+						if (check(prevPress)) {
+							displayWiFiAttackMenu();
+							return;
+						}
+					}
+				}
 				
 				// Check memory before starting attack
 				if (!checkLeftMemory()) {
@@ -3018,9 +3102,9 @@ void selectCurrentItem() {
 				#endif
 				
 				// Start WiFi attack
-				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_FUN_BEACON,
+				WiFiScanState attackTypes[] = {WIFI_ATTACK_DEAUTH, WIFI_ATTACK_STA_DEAUTH, WIFI_ATTACK_DEAUTH_FLOOD, WIFI_ATTACK_SAE_COMMIT, WIFI_ATTACK_AUTH, WIFI_ATTACK_RIC_BEACON, WIFI_ATTACK_FUN_BEACON,
 									   WIFI_ATTACK_RND_BEACON, WIFI_ATTACK_AP_BEACON, WIFI_ATTACK_EVIL_PORTAL, WIFI_ATTACK_EVIL_PORTAL_DEAUTH, WIFI_ATTACK_KARMA, WIFI_ATTACK_BAD_MSG,
-									   WIFI_ATTACK_BAD_MSG_ALL, WIFI_ATTACK_SLEEP, WIFI_ATTACK_SLEEP_ALL};
+									   WIFI_ATTACK_BAD_MSG_ALL, WIFI_ATTACK_SLEEP, WIFI_ATTACK_SLEEP_ALL, WIFI_ATTACK_CSA, WIFI_ATTACK_QUIET};
 				startWiFiAttack(attackTypes[currentSelection]);
 			}
 			break;
@@ -3069,11 +3153,11 @@ void selectCurrentItem() {
 				}
 			break;
 		case IR_MENU:
-			if (currentSelection == IR_TV_B_GONE) {
-				currentState = IR_TV_B_GONE_REGION;
+			if (currentSelection == IR_UNIVERSAL_POWER_REMOTE) {
+				currentState = IR_UNIVERSAL_POWER_REMOTE_MENU;
 				currentSelection = 0;
-				maxSelections = IR_TV_B_GONE_REGION_COUNT;
-				displayIRTvBGoneRegionMenu();
+				maxSelections = IR_UNIVERSAL_POWER_MODE_COUNT;
+				displayUniversalPowerRemoteModeMenu();
 			} else if (currentSelection == IR_READ) {
 				currentState = IR_READ_MENU;
 				currentSelection = 0;
@@ -3081,14 +3165,13 @@ void selectCurrentItem() {
 				display.clearScreen();
 				displayIRReadMenu();
 			} else if (currentSelection == IR_SEND) {
-				currentState = SD_DELETE_MENU;
+				currentState = SELECTION_LIST;
 				selectforirtx = true;
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".ir");
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list, "/", ".ir");
 				currentSelection = 0;
-				maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-				displayDeleteSDCard();
+				maxSelections = selection_list->size() + 1;
+				displaySelectionList();
 			} else if (currentSelection == IR_BACK) {
 				goBack();
 			}
@@ -3113,8 +3196,8 @@ void selectCurrentItem() {
 				quickRemoteTV = false;
 			}
 			break;
-		case IR_TV_B_GONE_REGION:
-			if (currentSelection == IR_TV_B_GONE_BACK) {
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
+			if (currentSelection == IR_UNIVERSAL_POWER_BACK) {
 				goBack();
 			} else {
 				// Check memory before starting attack
@@ -3124,17 +3207,122 @@ void selectCurrentItem() {
 					display.displayStringwithCoordinates("Cannot start", 0, 21);
 					display.displayStringwithCoordinates("attack", 0, 31, true);
 					vTaskDelay(2000 / portTICK_PERIOD_MS);
-					displayIRTvBGoneRegionMenu();
+					displayUniversalPowerRemoteModeMenu();
 					return;
 				}
-				if (currentSelection == IR_TV_B_GONE_NA) {
-					irTvBGoneRegion = NA;
-				} else {
-					irTvBGoneRegion = EU;
+				if (currentSelection == IR_UNIVERSAL_POWER_TV) {
+					universal_power_mode = "TV";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_PROJECTOR) {
+					universal_power_mode = "PROJECTOR";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_AC) {
+					universal_power_mode = "AC";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_FAN) {
+					universal_power_mode = "FAN";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_LED) {
+					universal_power_mode = "LED";
+				} else if (currentSelection == IR_UNIVERSAL_POWER_MONITOR) {
+					universal_power_mode = "MONITOR";
 				}
 				currentState = IR_SEND_RUNNING;
-				starttvbgone = true;
+				startuniversalpowerremote = true;
 			}
+			break;
+
+		case RF_MENU:
+			if (currentSelection == RF_BACK) {
+				goBack();
+			} else if (currentSelection == RF_READ) {
+				currentState = RF_RECEIVER_RUNNING;
+				rf.main();
+				rf.configureMode(RF_RECEIVER_MODE);
+				displayRFRead(false);
+			} else if (currentSelection == RF_FREQ_ANALYZER) {
+				currentState = RF_FREQUENCY_ANALYZER_RUNNING;
+				rf.main();
+				rf.configureMode(RF_FREQUENCY_ANALYZER_MODE);
+				displayRFFrequencyAnalyzer();
+			} else if (currentSelection == RF_SEND) {
+				currentState = RF_SEND_SELECT_SUB_FILE;
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list, "/", ".sub");
+				currentSelection = 0;
+				maxSelections = selection_list ? selection_list->size() + 1 : 1;
+				displayRFSubFile();
+			}
+			break;
+		case RF_RECEIVER_RUNNING:
+			if (rf.getKeyDetect()) {
+				display.clearScreen();
+				display.drawingCenterString("Sending Code...", 32, true);
+				rf.shutdownCC1101();
+				rf.sendCommand(rf.keyData);
+				//rf.sendCommand(rf.keyData);
+				rfreplaycode = true;
+				if (rf.keyData.fix != 0 && rf.keyData.protocol != "RAW") { rf.keyData.keeloq_step(1); }
+
+				display.clearScreen();
+				display.drawingCenterString("Sended!", 32, true);
+				vTaskDelay(700 / portTICK_PERIOD_MS);
+				displayRFRead(true);
+			} else {
+				rf.shutdownCC1101();
+				rf.main();
+				if (infrequencychange) {
+					infrequencychange = false;
+					rf.configureMode(RF_RECEIVER_MODE);
+					displayRFRead(rf.getKeyDetect());
+					break;
+				}
+				infrequencychange = true;
+				displayRFFrequencychange();
+			}
+			break;
+		case RF_FREQUENCY_ANALYZER_RUNNING:
+			if (inRssichange) {
+				inRssichange = false;
+				displayRFFrequencyAnalyzer();
+				break;
+			}
+			inRssichange = true;
+			displayRFFrequencyAnalyzerRssichange();
+			break;
+		case RF_SEND_SELECT_SUB_FILE:
+			if (currentSelection == selection_list->size()) {
+				goBack();
+			} else {
+				rf.selectedSubFile(selection_list->get(currentSelection));
+				if (rf.keyData.protocol == "RcSwitch" && rf.keyData.serial != 0) rf.keeloqLoopEmulate_pre(rf.keyData);
+				currentState = RF_SEND_RUNNING;
+				displayRFTxData();
+			}
+			break;
+		case RF_SEND_RUNNING:
+			if (inkeeloqstepchange) {
+				inkeeloqstepchange = false;
+				displayRFTxData();
+				break;
+			}
+			display.clearScreen();
+			display.drawingCenterString("Sending...", 32, true);
+			if (rf.keyData.protocol == "RcSwitch") {
+				if (rf.keyData.serial == 0) {
+					for (int i = 0; uint64_t key : rf.keyList) {
+						rf.keyData.Bit = rf.bitList[i++];
+						rf.keyData.key = key;
+						rf.sendCommand(rf.keyData);
+					}
+				} else {
+					rf.sendCommand(rf.keyData);
+					rf.keyData.keeloq_step(rf.num_keeloq_steps);
+					rf.keeloq_save(rf.keyData);
+				}
+			} else {
+				rf.transmittedCommand(rf.keyData);
+			}
+			display.clearScreen();
+			display.drawingCenterString("Sended!", 32, true);
+			vTaskDelay(2000 / portTICK_PERIOD_MS);
+			displayRFTxData();
 			break;
 		case SD_MENU:
 			if (currentSelection == SD_BACK) {
@@ -3145,23 +3333,23 @@ void selectCurrentItem() {
 				vTaskDelay(1000 / portTICK_PERIOD_MS);
 				goBack();
 			} else if (currentSelection == SD_DELETE) {
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer);
-				currentState = SD_DELETE_MENU;
+				selectforsddelete = true;
+				selection_list->clear();
+				sdcard.addListFileToLinkedList(selection_list);
+				currentState = SELECTION_LIST;
 				currentSelection = 0;
-				maxSelections = sdcard_buffer->size() + 1;
-				displayDeleteSDCard();
+				maxSelections = selection_list->size() + 1;
+				displaySelectionList();
 			}
 			break;
-		case SD_DELETE_MENU:
-			if (!sdcard_buffer || sdcard_buffer->size() == 0) {
+		case SELECTION_LIST:
+			if (!selection_list || selection_list->size() == 0) {
 				goBack();
 			} else {
 				display.setColor(WHITE);
-				if (currentSelection < sdcard_buffer->size()) {
+				if (currentSelection < selection_list->size()) {
 					if (selectforbadusb) {
-						String fileName = sdcard_buffer->get(currentSelection);
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Select file for", 0, 12);
 						display.displayStringwithCoordinates("BadUSB:", 0, 24);
@@ -3179,7 +3367,7 @@ void selectCurrentItem() {
 									display.displayStringwithCoordinates("Select another", 0, 24);
 									display.displayStringwithCoordinates("file", 0, 36, true);
 									vTaskDelay(1000 / portTICK_PERIOD_MS);
-									displayDeleteSDCard();
+									displaySelectionList();
 									return;
 								}
 								selectforbadusb = false;
@@ -3197,7 +3385,7 @@ void selectCurrentItem() {
 						maxSelections = BADUSB_LAYOUT_COUNT;
 						displayBadUSBKeyboardLayout();
 					} else if (selectforirtx) {
-						String fileName = sdcard_buffer->get(currentSelection);
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Select file for", 0, 12);
 						display.displayStringwithCoordinates("Ir:", 0, 24);
@@ -3214,7 +3402,7 @@ void selectCurrentItem() {
 									display.displayStringwithCoordinates("Select another", 0, 24);
 									display.displayStringwithCoordinates("file", 0, 36, true);
 									vTaskDelay(1000 / portTICK_PERIOD_MS);
-									displayDeleteSDCard();
+									displaySelectionList();
 									checkisnotempty.close();
 									return;
 								}
@@ -3242,14 +3430,14 @@ void selectCurrentItem() {
 								}
 							} else if (check(prevPress)) {
 								confirmed = true;
-								displayDeleteSDCard();
+								displaySelectionList();
 								return;
 							}
 							vTaskDelay(10 / portTICK_PERIOD_MS);
 						}
 						if (!send_select_code) currentState = IR_SEND_RUNNING;
 					} else if (selectforevilportal) {
-						String fileName = sdcard_buffer->get(currentSelection);
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Select file for", 0, 12);
 						display.displayStringwithCoordinates("Eportal:", 0, 24);
@@ -3267,7 +3455,7 @@ void selectCurrentItem() {
 									display.displayStringwithCoordinates("Select another", 0, 24);
 									display.displayStringwithCoordinates("file", 0, 36, true);
 									vTaskDelay(1000 / portTICK_PERIOD_MS);
-									displayDeleteSDCard();
+									displaySelectionList();
 									return;
 								}
 								selectforevilportal = false;
@@ -3275,7 +3463,7 @@ void selectCurrentItem() {
 								htmlFile = "/" + fileName;
 							} else if (check(prevPress)) {
 								confirmed = true;
-								displayDeleteSDCard();
+								displaySelectionList();
 								return;
 							}
 							vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -3284,8 +3472,8 @@ void selectCurrentItem() {
 						currentSelection = 0;
 						maxSelections = WIFI_UTILS_MENU_COUNT;
 						displayWiFiUtilsMenu();
-					} else {
-						String fileName = sdcard_buffer->get(currentSelection);
+					} else if (selectforsddelete) {
+						String fileName = selection_list->get(currentSelection);
 						display.clearScreen();
 						display.displayStringwithCoordinates("Delete file:", 0, 12);
 						display.displayStringwithCoordinates(fileName, 0, 24);
@@ -3296,7 +3484,7 @@ void selectCurrentItem() {
 						while (!confirmed) {
 							if (check(selPress)) {
 								sdcard.deleteFile("/" + fileName);
-								sdcard_buffer->remove(currentSelection);
+								selection_list->remove(currentSelection);
 								maxSelections--;
 								confirmed = true;
 							} else if (check(prevPress)) {
@@ -3304,7 +3492,7 @@ void selectCurrentItem() {
 							}
 							vTaskDelay(10 / portTICK_PERIOD_MS);
 						}
-						displayDeleteSDCard();
+						displaySelectionList();
 					}
 				} else {
 					goBack();
@@ -3321,12 +3509,11 @@ void selectCurrentItem() {
 				display.clearScreen();
 			}
 		case BADUSB_RUNNING:
-			if (badble) {
-				badusb.beginLayout(hid_ble, badble);
+				badScript.beginKB(hid_ble, keyboardLayouts[keyboardLayout]);
 				displayStatusBar();
 				display.displayStringwithCoordinates("Waiting Victim", 0, 24, true);
-				while (!badusb.isConnected(hid_ble) && !check(prevPress)) {yield();}
-				if (badusb.isConnected(hid_ble)) {
+				while (!badScript.isConnected(hid_ble) && !check(prevPress)) {yield();}
+				if (badScript.isConnected(hid_ble)) {
 					display.clearScreen();
 					displayStatusBar();
 					display.displayStringwithCoordinates("Preparing", 0, 24, true);
@@ -3339,7 +3526,7 @@ void selectCurrentItem() {
 					display.clearScreen();
 					displayStatusBar();
 					display.displayStringwithCoordinates("Deploying BadUSB", 0, 24, true);
-					badusb.launchBadUSB(badusbFile, hid_ble);
+					badScript.launchBadScript(badusbFile, hid_ble);
 					display.clearScreen();
 					displayStatusBar();
 					display.displayStringwithCoordinates("BadUSB Launched", 0, 24);
@@ -3353,18 +3540,16 @@ void selectCurrentItem() {
 					display.displayStringwithCoordinates("Cancelled", 0, 24, true);
 					vTaskDelay(1000 / portTICK_PERIOD_MS);
 					selPress = false; // Prevent immediate re-entry
-					if (badble) {
-						goBack();
-					}
+					goBack();
 					return;
-				}
-
 			}
 			break;
 		case IR_CODE_SELECT:
 			if (currentSelection < ir_codes->size()) {
 				IRCode code = ir_codes->get(currentSelection);
+				//irsend.begin();
 				irtx.sendIRCommand(&code);
+				//digitalWrite(espatsettings.irTxPin, LOW);
 				display.clearScreen();
 				displayStatusBar();
 				display.displayStringwithCoordinates("IR Code Sent", 0, 24, true);
@@ -3463,20 +3648,23 @@ void goBack() {
 			maxSelections = WIFI_MENU_COUNT;
 			displayWiFiMenu();
 			break;
+		case WIFI_JOIN_MENU:
 		case WIFI_SCAN_SNIFFER_RUNNING:
-			currentState = WIFI_GENERAL_MENU;
 			//currentSelection = 0;
+			if (currentState == WIFI_SCAN_SNIFFER_RUNNING) {
+				if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) display.clearGraph(wifi.wifi_analyzer_frames);
+				wifi.wifi_analyzer_ssid = "";
+				wifiSnifferMode = -1;
+				wifi.StartMode(WIFI_SCAN_OFF);
+				#ifndef BUILTIN_RGB_LED
+					digitalWrite(espatsettings.statusLedPin, LOW);
+				#else
+					pixels.clear();
+					pixels.show();
+				#endif
+			}
+			currentState = WIFI_GENERAL_MENU;
 			maxSelections = WIFI_GENERAL_MENU_COUNT;
-			if (wifiSnifferMode == WIFI_GENERAL_CH_ANALYZER) display.clearGraph(wifi.wifi_analyzer_frames);
-			wifi.wifi_analyzer_ssid = "";
-			wifiSnifferMode = -1;
-			wifi.StartMode(WIFI_SCAN_OFF);
-			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
-			#else
-				pixels.clear();
-				pixels.show();
-			#endif
 			displayWiFiGeneralMenu();
 			break;
 		case WIFI_SELECT_MENU:
@@ -3547,7 +3735,7 @@ void goBack() {
 			display.clearGraph(ble.ble_analyzer_frames);
 			ble.ble_analyzer_device = "";
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 			#else
 				pixels.clear();
 				pixels.show();
@@ -3651,6 +3839,12 @@ void goBack() {
 				} 
 				break;
 		case BLE_SPOOFER_RUNNING:
+		#ifndef BUILTIN_RGB_LED
+				digitalWrite(espatsettings.statusLedPin, HIGH);
+			#else
+				pixels.clear();
+				pixels.show();
+			#endif
 			bleSpooferDone = false;
 			samsungbuds = false;
 			spooferDeviceIndex = -1;
@@ -3726,19 +3920,19 @@ void goBack() {
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
-		case IR_TV_B_GONE_REGION:
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
 			currentState = IR_MENU;
 			currentSelection = 0;
 			maxSelections = IR_MENU_COUNT;
 			displayIRMenu();
 			break;
 		case IR_SEND_RUNNING:
-			if (starttvbgone) {
-				starttvbgone = false;
-				currentState = IR_MENU;
-				currentSelection = 0;
-				maxSelections = IR_MENU_COUNT;
-				displayIRMenu();
+			if (startuniversalpowerremote) {
+				startuniversalpowerremote = false;
+				currentState = IR_UNIVERSAL_POWER_REMOTE_MENU;
+				//currentSelection = 0;
+				maxSelections = IR_UNIVERSAL_POWER_MODE_COUNT;
+				displayUniversalPowerRemoteModeMenu();
 			} else {
 				if (send_select_code) {
 					send_select_code = false;
@@ -3748,12 +3942,28 @@ void goBack() {
 					displayIRMenu();
 				} else {
 					selectforirtx = true;
-					currentState = SD_DELETE_MENU;
+					currentState = SELECTION_LIST;
 					currentSelection = 0;
-					maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-					displayDeleteSDCard();
+					maxSelections = selection_list ? selection_list->size() + 1 : 1;
+					displaySelectionList();
 				}
 			}
+			break;
+		case RF_MENU:
+			currentState = MAIN_MENU;
+			currentSelection = 0;
+			maxSelections = MAIN_MENU_COUNT;
+			displayMainMenu();
+			break;
+		case RF_SEND_SELECT_SUB_FILE:
+		case RF_RECEIVER_RUNNING:
+		case RF_FREQUENCY_ANALYZER_RUNNING:
+			rf.shutdownCC1101();
+			itemoffset = 0;
+			currentState = RF_MENU;
+			currentSelection = 0;
+			maxSelections = RF_MENU_COUNT;
+			displayRFMenu();
 			break;
 		case SD_MENU:
 			currentState = MAIN_MENU;
@@ -3761,36 +3971,34 @@ void goBack() {
 			maxSelections = MAIN_MENU_COUNT;
 			displayMainMenu();
 			break;
-		case SD_DELETE_MENU:
-		if (selectforbadusb) {
-			selectforbadusb = false;
-			if (badble) {
-				badble = false;
+		case SELECTION_LIST:
+			if (selectforbadusb) {
+				selectforbadusb = false;
 				currentState = BLE_MENU;
 				currentSelection = 0;
 				maxSelections = BLE_MENU_COUNT;
 				displayBLEMenu();
+			} else if (selectforirtx) {
+				selectforirtx = false;
+				currentState = IR_MENU;
+				currentSelection = 0;
+				maxSelections = IR_MENU_COUNT;
+				displayIRMenu();
+			} else if (selectforevilportal) {
+				selectforevilportal = false;
+				currentState = WIFI_UTILS_MENU;
+				currentSelection = 0;
+				maxSelections = WIFI_UTILS_MENU_COUNT;
+				displayWiFiUtilsMenu();
 			}
-		} else if (selectforirtx) {
-			selectforirtx = false;
-			currentState = IR_MENU;
-			currentSelection = 0;
-			maxSelections = IR_MENU_COUNT;
-			displayIRMenu();
-		} else if (selectforevilportal) {
-			selectforevilportal = false;
-			currentState = WIFI_UTILS_MENU;
-			currentSelection = 0;
-			maxSelections = WIFI_UTILS_MENU_COUNT;
-			displayWiFiUtilsMenu();
-		}
-		else {
-			currentState = SD_MENU;
-			currentSelection = 0;
-			maxSelections = SD_MENU_COUNT;
-			displaySDMenu();
-		}
-		break;
+			else if (selectforsddelete) {
+				selectforsddelete = false;
+				currentState = SD_MENU;
+				currentSelection = 0;
+				maxSelections = SD_MENU_COUNT;
+				displaySDMenu();
+			}
+			break;
 		case SD_UPDATE_MENU:
 			currentState = SD_MENU;
 			currentSelection = 0;
@@ -3798,25 +4006,19 @@ void goBack() {
 			displaySDMenu();
 			break;
 		case BADUSB_KEY_LAYOUT_MENU:
-			if (badble) {
-				badble = false;
-				currentState = BLE_MENU;
-				currentSelection = 0;
-				maxSelections = BLE_MENU_COUNT;
-				displayBLEMenu();
-			}
+			currentState = BLE_MENU;
+			currentSelection = 0;
+			maxSelections = BLE_MENU_COUNT;
+			displayBLEMenu();
 			break;
 		case BADUSB_RUNNING:
-			if (badble) {
-				selectforbadusb = true;
-				delete sdcard_buffer;
-				sdcard_buffer = new LinkedList<String>();
-				sdcard.addListFileToLinkedList(sdcard_buffer, "/", ".txt");
-				currentState = SD_DELETE_MENU;
-				currentSelection = 0;
-				maxSelections = sdcard_buffer ? sdcard_buffer->size() + 1 : 1;
-				displayDeleteSDCard();
-			}
+			selectforbadusb = true;
+			selection_list->clear();
+			sdcard.addListFileToLinkedList(selection_list, "/", ".txt");
+			currentState = SELECTION_LIST;
+			currentSelection = 0;
+			maxSelections = selection_list ? selection_list->size() + 1 : 1;
+			displaySelectionList();
 			break;
 		case IR_READ_RUNNING:
 			currentState = IR_MENU;
@@ -3902,6 +4104,45 @@ void handleInput(MenuState handle_state) {
 		else if (handle_state == IR_READ_RUNNING) {
 			irrx.discard_code();
 		}
+		else if (handle_state == RF_RECEIVER_RUNNING) {
+			if (infrequencychange) {
+				rf.stepFrequency(-1);
+				displayRFFrequencychange();
+			}
+			else if (rf.getKeyDetect()) {
+				fixRfDisplayLoop = false;
+				rf.resetKeyDetect();
+				rf.rcSwitch.resetAvailable();
+				Serial.println("[INFO] Discard Rf code");
+				if (rfreplaycode) {
+					rfreplaycode = false;
+					rf.main();
+					rf.configureMode(RF_RECEIVER_MODE);
+				}
+				displayRFRead(false);
+			} else goBack();
+		}
+		else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING) {
+			if (inRssichange) {
+				rf.stepRSSIThreshold(-1);
+				displayRFFrequencyAnalyzerRssichange();
+			} else goBack();
+		}
+		else if (handle_state == RF_SEND_RUNNING) {
+			if (rf.keeloq_loop_emulate && inkeeloqstepchange) {
+				rf.stepKeeLoqStep(-1);
+				displayRFKeeloqStepChange();
+				return;
+			} else if (rf.keeloq_loop_emulate) {
+				rf.keyList.clear();
+				rf.bitList.clear();
+				rf.keeloq_loop_emulate = false;
+			}
+			currentState = RF_SEND_SELECT_SUB_FILE;
+			currentSelection = 0;
+			maxSelections = selection_list ? selection_list->size() + 1 : 1;
+			displayRFSubFile();
+		}
 		else {
 			if (handleStateRunningCheck ||
 				(handle_state == BLE_TT_SCROLL_MENU ||
@@ -3932,6 +4173,31 @@ void handleInput(MenuState handle_state) {
 		} 
 		else if (handle_state == IR_READ_RUNNING) {
 			irrx.save_code();
+		} else if (handle_state == RF_RECEIVER_RUNNING) {
+			if (infrequencychange) {
+				display.clearScreen();
+				rf.stepFrequency(1);
+				displayRFFrequencychange();
+			}
+			if (rf.getKeyDetect()) {
+				rf.save();
+				displayRFReadSave();
+				vTaskDelay(2000 / portTICK_PERIOD_MS);
+				displayRFRead(true);
+			}
+		}
+		else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING && inRssichange) {
+			rf.stepRSSIThreshold(1);
+			displayRFFrequencyAnalyzerRssichange();
+		}
+		else if (handle_state == RF_SEND_RUNNING && rf.keeloq_loop_emulate) {
+			if (inkeeloqstepchange) {
+				rf.stepKeeLoqStep(1);
+				displayRFKeeloqStepChange();
+			} else {
+				inkeeloqstepchange = true;
+				displayRFKeeloqStepChange();
+			}
 		}
 		else {
 			if (handleStateRunningCheck ||
@@ -4149,31 +4415,22 @@ void handleTasks(MenuState handle_state) {
 	}
 
 	else if (handle_state == IR_SEND_RUNNING) {
-		if (starttvbgone) {
-			Serial.println("[INFO] Starting IR TV-B-Gone");
-			String region;
-			if (irTvBGoneRegion == NA) {
-				region = "NA";
-				begoneregion = NA;
-			}
-			else {
-				region = "EU";
-				begoneregion = EU;
-			}
+		if (startuniversalpowerremote) {
+			Serial.println("[INFO] Starting IR Universal Power Remote");
 			display.clearScreen();
 			displayStatusBar();
-			display.displayStringwithCoordinates("TV-B-Gone Mode", 0, 24);
-			display.displayStringwithCoordinates("Region:" + region, 0,36);
+			display.displayStringwithCoordinates("Universal Pwr Remote", 0, 24);
+			display.displayStringwithCoordinates("Mode:" + universal_power_mode, 0,36);
 			display.displayStringwithCoordinates("Press Sel to stop", 0, 48, true);
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, HIGH);
+				digitalWrite(espatsettings.statusLedPin, HIGH);
 			#else
 				pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 				pixels.show();
 			#endif
-			irtx.startTVBGone();
+			irtx.startUniversalPowerRemote();
 			#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 			#else
 				pixels.clear();
 				pixels.show();
@@ -4182,12 +4439,11 @@ void handleTasks(MenuState handle_state) {
 			displayStatusBar();
 			display.displayStringwithCoordinates("All Codes", 0, 24);
 			display.displayStringwithCoordinates("Sended", 0, 36);
-			display.displayStringwithCoordinates("Total:" + String(irtx.begone_code_sended),0, 48);
+			display.displayStringwithCoordinates("Total:" + String(irtx.universal_power_code_sended),0, 48);
 			display.displayStringwithCoordinates("Press Sel to exit", 0, 60, true);
 			while(!check(selPress)) yield();
-			Serial.println("[INFO] IR TV-B-Gone Done! Total: " + String(irtx.begone_code_sended) + " codes sended.");
-			//starttvbgone = false;
-			irtx.begone_code_sended = 0;
+			Serial.println("[INFO] IR Universal Power Remote Done! Total: " + String(irtx.universal_power_code_sended) + " codes sended.");
+			irtx.universal_power_code_sended = 0;
 			goBack();
 		} else {
 			if (!send_select_code) {
@@ -4198,7 +4454,7 @@ void handleTasks(MenuState handle_state) {
 				display.displayStringwithCoordinates("Please wait!", 0, 48, true);
 				Serial.println("[INFO] Starting IR Send File: " + irSendFile);
 				#ifndef BUILTIN_RGB_LED
-					digialWrite(espatsettings.statusLedPin, HIGH);
+					digitalWrite(espatsettings.statusLedPin, HIGH);
 				#else
 					pixels.setPixelColor(0, pixels.Color(255, 0, 0));
 					pixels.show();
@@ -4206,7 +4462,7 @@ void handleTasks(MenuState handle_state) {
 				irtx.sendIRTx(irSendFile);
 				vTaskDelay(300 / portTICK_PERIOD_MS);
 				#ifndef BUILTIN_RGB_LED
-				digialWrite(espatsettings.statusLedPin, LOW);
+				digitalWrite(espatsettings.statusLedPin, LOW);
 				#else
 					pixels.clear();
 					pixels.show();
@@ -4219,6 +4475,32 @@ void handleTasks(MenuState handle_state) {
 				Serial.println("[INFO] IR File Sent: " + irSendFile);
 				irSendFile = "";
 				goBack();
+			}
+		}
+	}
+
+	else if (handle_state == RF_RECEIVER_RUNNING || handle_state == RF_RECEIVER_RAW_RUNNING) {
+		if (handle_state == RF_RECEIVER_RUNNING) {
+			if (rf.rcSwitch.available()) {
+				rf.parseReceivedData();
+			}
+			if (rf.getKeyDetect()) {
+				if (!fixRfDisplayLoop) {
+					fixRfDisplayLoop = true;
+					display.clearScreen();
+					displayRFRead(true);
+					blink_led(0, 0, 255, 3);
+				}
+			}
+		}
+	}
+
+	else if (handle_state == RF_FREQUENCY_ANALYZER_RUNNING) {
+		if (!inRssichange) {
+			rf.frequencyAnalyzerLoop();
+			if (rf.redraw) {
+				rf.redraw = false;
+				displayRFFrequencyAnalyzer();
 			}
 		}
 	}
@@ -4241,29 +4523,7 @@ void handleTasks(MenuState handle_state) {
 
 		if (handle_state == BLE_ATTACK_RUNNING) {
 			// BLE attack handling...
-			switch(currentBLEAttackType) {
-				case BLE_ATTACK_EXPLOIT_SOUR_APPLE:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_SOUR_APPLE);
-					break;
-				case BLE_ATTACK_EXPLOIT_APPLE_JUICE:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_APPLE_JUICE);
-					break;
-				case BLE_ATTACK_EXPLOIT_MICROSOFT:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_MICROSOFT);
-					break;
-				case BLE_ATTACK_EXPLOIT_SAMSUNG:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_SAMSUNG);
-					break;
-				case BLE_ATTACK_EXPLOIT_GOOGLE:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_GOOGLE);
-					break;
-				case BLE_ATTACK_EXPLOIT_NAME_FLOOD:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_NAME_FLOOD);
-					break;
-				case BLE_ATTACK_EXPLOIT_SPAM_ALL:
-					ble.StartMode(BLE_ATTACK_EXPLOIT_SPAM_ALL);
-					break;
-			}
+			ble.StartMode(currentBLEAttackType);
 		} 
 		else if (handle_state == WIFI_ATTACK_RUNNING) {
 			// SỬA: Tách biệt xử lý Evil Portal và các WiFi attack khác
@@ -4518,8 +4778,17 @@ void redrawTasks() {
 		case BLE_SPOOFER_APPLE_MENU:
 			displayAppleSpooferMenu();
 			break;
+		case BLE_SPOOFER_APPLE_DEVICE_COLOR_MENU:
+			displayAppleDeviceColorSpooferMenu();
+			break;
 		case BLE_SPOOFER_SAMSUNG_MENU:
 			displaySamsungSpooferMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_BUDS_MENU:
+			displaySamsungBudsDeviceMenu();
+			break;
+		case BLE_SPOOFER_SAMSUNG_WATCHS_MENU:
+			displaySamsungWatchsDeviceMenu();
 			break;
 		case BLE_SPOOFER_CONN_MODE_MENU:
 			displayConnectableModeSpooferMenu();
@@ -4554,6 +4823,9 @@ void redrawTasks() {
 		case WIFI_SELECT_STA_MENU:
 			displayWiFiSelectStaInAp();
 			break;
+		case WIFI_JOIN_MENU:
+			displayWiFiListMenu();
+			break;
 		case NRF24_MENU:
 			displayNRF24Menu();
 			break;
@@ -4563,14 +4835,25 @@ void redrawTasks() {
 		case IR_MENU:
 			displayIRMenu();
 			break;
-		case IR_TV_B_GONE_REGION:
-			displayIRTvBGoneRegionMenu();
+		case IR_UNIVERSAL_POWER_REMOTE_MENU:
+			displayUniversalPowerRemoteModeMenu();
+			break;
+		case RF_MENU:
+			displayRFMenu();
+			break;
+		case RF_SEND_SELECT_SUB_FILE:
+			displayRFSubFile();
 			break;
 		case SD_MENU:
 			displaySDMenu();
 			break;
-		case SD_DELETE_MENU:
-			displayDeleteSDCard();
+		case SD_UPDATE_MENU:
+			break;
+		case SELECTION_LIST:
+			displaySelectionList();
+			break;
+		case BADUSB_KEY_LAYOUT_MENU:
+			displayBadUSBKeyboardLayout();
 			break;
 		case BLE_MEDIA_MENU:
 			displayMediaCtrlBLEMenu();
@@ -4580,9 +4863,6 @@ void redrawTasks() {
 			break;
 		case BLE_TT_SCROLL_MENU:
 			displayTikTokScrollMenu();
-			break;
-		case BADUSB_KEY_LAYOUT_MENU:
-			displayBadUSBKeyboardLayout();
 			break;
 		case IR_READ_MENU:
 			displayIRReadMenu();
@@ -4619,6 +4899,18 @@ void autoSleepCheck() {
 }
 
 void menuloop() {
+	// Check for critical low memory
+	if (getHeap(GET_USED_HEAP_PERCENT) > 95) { // Critical low memory threshold
+		if (!low_memory_warning) {
+			Serial.println("[CRITICAL] Critical low memory detected! Stop add to buffer...");
+			low_memory_warning = true;
+			display.clearScreen();
+			display.drawingCenterString("Low Memory!", 32, true);
+			vTaskDelay(2000 / portTICK_PERIOD_MS);
+		}
+	} else {
+		low_memory_warning = false;
+	}
 	handleStateRunningCheck = !(currentState == WIFI_SCAN_RUNNING) && // prevent into deep sleep mode when in attack mode 
 							!(currentState == WIFI_SCAN_SNIFFER_RUNNING) &&
 							!(currentState == BLE_SCAN_RUNNING) &&
@@ -4632,13 +4924,16 @@ void menuloop() {
 							!(currentState == IR_SEND_RUNNING) &&
 							!(currentState == BADUSB_RUNNING) &&
 							!(currentState == IR_READ_RUNNING) &&
+							!(currentState == RF_RECEIVER_RUNNING) &&
+							!(currentState == RF_FREQUENCY_ANALYZER_RUNNING) &&
+							!(currentState == RF_SEND_RUNNING) &&
 							!(currentState == CLOCK_MENU) && 
 							!(currentState == BLE_KEYMOTE_MENU) && 
 							!(currentState == BLE_TT_SCROLL_MENU) && 
 							!(currentState == BLE_MEDIA_MENU);
 	autoSleepCheck();
-	handleInput(currentState);
 	handleTasks(currentState);
+	handleInput(currentState);
 	logutils.save();
 	if (standby) {
 		display.setColor(WHITE);
@@ -4654,16 +4949,4 @@ void menuloop() {
 			vTaskDelay(20 / portTICK_PERIOD_MS);
 		}
 	}
-	// Check for critical low memory and auto-reboot
-	if (getHeap(GET_FREE_HEAP) < MEM_LOWER_LIM) { // Critical low memory threshold
-		if (!low_memory_warning) {
-			Serial.println("[SYSTEM_REBOOT] Critical low memory detected! Stop add to buffer...");
-			low_memory_warning = true;
-		}
-	} else {
-		low_memory_warning = false;
-	}
-
 }
-
-#pragma GCC diagnostic pop

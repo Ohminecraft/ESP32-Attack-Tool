@@ -70,6 +70,93 @@ bool copyFile(fs::FS &srcFS, const char* srcPath, fs::FS &dstFS, const char* dst
     return true;
 }
 
+JsonDocument ESP32ATSetting::getConfig() {
+    JsonDocument jsonDoc;
+    JsonObject config = jsonDoc.to<JsonObject>();
+    
+    config["spiSckPin"] = spiSckPin;
+    config["spiMisoPin"] = spiMisoPin;
+    config["spiMosiPin"] = spiMosiPin;
+
+    config["displayWidth"] = displayWidth;
+    config["displayHeight"] = displayHeight;
+    config["displayInvert"] = displayInvert;
+    config["maxShowSelection"] = maxShowSelection;
+    config["graphLineLimit"] = graphLineLimit;
+    config["displaySdaPin"] = displaySdaPin;
+    config["displaySclPin"] = displaySclPin;
+
+    config["statusLedPin"] = statusLedPin; 
+
+    config["evilportalSSID"] = evilportalSSID;
+
+    JsonObject _wifi = config["wifi"].to<JsonObject>();
+    for (const auto &pair : wifi) { _wifi[pair.first] = pair.second; }
+
+    config["autoConnectWiFi"] = autoConnectWiFi;
+    
+    config["savepcap"] = savepcap;
+
+    config["bleName"] = bleName;
+    config["usingSwiftpairForBLEUtilty"] = usingSwiftpairForBLEUtilty;
+    config["sourappleSpamDelay"] = sourappleSpamDelay; 
+    config["applejuiceSpamDelay"] = applejuiceSpamDelay; 
+    config["swiftpairSpamDelay"] = swiftpairSpamDelay; 
+    config["spamallSpamDelay"] = spamAllDelay; 
+    config["badscriptKeyDelay"] = badscriptKeyDelay;
+    config["useAppleJuicePaired"] = useAppleJuicePaired; 
+    config["useBleNameasnameofNameFlood"] = useBleNameasnameofNameFlood; 
+
+    config["irTxPin"] = irTxPin;
+    config["irRxPin"] = irRxPin;
+    config["irRepeat"] = irRepeat;
+    
+    config["sdCsPin"] = sdcardCsPin;
+
+    config["nrf24CePin"] = nrfCePin; 
+    config["nrf24CsPin"] = nrfCsPin;
+
+    config["cc1101CsPin"] = cc1101CsPin;
+    config["cc1101Gdo0Pin"] = cc1101Gdo0Pin;
+
+    config["usingEncoder"] = usingEncoder;
+    config["encPinA"] = encPinA; 
+    config["encPinB"] = encPinB; 
+
+    config["leftBtnPin"] = leftBtnPin;
+    config["rightBtnPin"] = rightBtnPin;
+
+    config["selBtnPin"] = selectBtnPin;
+
+    config["timeZone"] = timeZone;
+    config["autoDeepSleep"] = autoDeepSleep;
+    config["autoStandby"] = autoStandby;
+
+    return jsonDoc;
+}
+
+void ESP32ATSetting::updateConfig() {
+    JsonDocument jsonDoc = getConfig();
+
+    File configfile = SD.open("/ESP32AttackTool/ESP32AttackToolconfig.json", FILE_WRITE);
+    if (!configfile) {
+        Serial.println("[ERROR] Failed to open config file in SD card!, Falling back to LittleFS...");
+        // Fallback to LittleFS
+        configfile = LittleFS.open("/ESP32AttackToolconfig.json", FILE_WRITE);
+        if (!configfile) {
+            Serial.println("[ERROR] Failed to open config file in LittleFS!");
+            return;
+        }
+    }
+
+    if (serializeJsonPretty(jsonDoc, configfile) < 5) {
+        Serial.println("[ERROR] Failed to write config to file!");
+    } else {
+        Serial.println("[INFO] Config saved successfully.");
+    }
+    configfile.close();
+}
+
 void ESP32ATSetting::resetSettings(bool useLittleFS) {
     if (!useLittleFS) {
         if (SD.exists("/ESP32AttackTool/ESP32AttackToolconfig.json")) {
@@ -118,6 +205,7 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
     defaultSetting["applejuiceSpamDelay"] = APPLE_JUICE_SPAM_DELAY; // default Apple Juice spam delay
     defaultSetting["swiftpairSpamDelay"] = SWIFTPAIR_SPAM_DELAY; // default Swift Pair spam delay
     defaultSetting["spamallSpamDelay"] = 20; // default Spam All spam delay
+    defaultSetting["badscriptKeyDelay"] = 50; // default Bad Script key delay
     defaultSetting["useAppleJuicePaired"] = true; // default use AppleJuice Paired
     defaultSetting["useBleNameasnameofNameFlood"] = true; // default use Blename as name of Name Flood Exploit Attack
     
@@ -129,6 +217,9 @@ void ESP32ATSetting::resetSettings(bool useLittleFS) {
 
     defaultSetting["nrf24CePin"] = NRF24_CE_PIN; // default NRF24 CE pin
     defaultSetting["nrf24CsPin"] = NRF24_CSN_PIN; // default NRF24 CSN pin
+
+    defaultSetting["cc1101CsPin"] = CC1101_CS_PIN; // default CC1101 CS pin
+    defaultSetting["cc1101Gdo0Pin"] = CC1101_GDO0_PIN; // default CC1101 GDO0 pin
 
     defaultSetting["usingEncoder"] = true; // default using encoder for input
     defaultSetting["encPinA"] = ENC_PIN_A; // default encoder pin A
@@ -518,6 +609,13 @@ void ESP32ATSetting::loadSettings() {
         Serial.println("[WARN] Failed to get 'spamallSpamDelay' configuration | Ignoring it using default");
         failed_count++;
     }
+    if (!_settings["badscriptKeyDelay"].isNull()) {
+        badscriptKeyDelay = _settings["badscriptKeyDelay"].as<uint16_t>();
+        Serial.println("badscriptKeyDelay: " + String(badscriptKeyDelay));
+    } else {
+        Serial.println("[WARN] Failed to get 'badscriptKeyDelay' configuration | Ignoring it using default");
+        failed_count++;
+    }
     if (!_settings["irTxPin"].isNull()) {
         irTxPin = _settings["irTxPin"].as<uint8_t>();
         Serial.println("irTxPin: " + String(irTxPin));
@@ -558,6 +656,20 @@ void ESP32ATSetting::loadSettings() {
         Serial.println("nrfCsPin: " + String(nrfCsPin));
     } else {
         Serial.println("[WARN] Failed to get 'nrf24CsPin' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["cc1101CsPin"].isNull()) {
+        cc1101CsPin = _settings["cc1101CsPin"].as<uint8_t>();
+        Serial.println("cc1101CsPin: " + String(cc1101CsPin));
+    } else {
+        Serial.println("[WARN] Failed to get 'cc1101CsPin' configuration | Ignoring it using default");
+        failed_count++;
+    }
+    if (!_settings["cc1101Gdo0Pin"].isNull()) {
+        cc1101Gdo0Pin = _settings["cc1101Gdo0Pin"].as<uint8_t>();
+        Serial.println("cc1101Gdo0Pin: " + String(cc1101Gdo0Pin));
+    } else {
+        Serial.println("[WARN] Failed to get 'cc1101Gdo0Pin' configuration | Ignoring it using default");
         failed_count++;
     }
     if (!_settings["usingEncoder"].isNull()) {
